@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,7 @@ from ..document.canvas import get_canvas_props, set_canvas_props
 from ..document.registry import guess_project_path
 from ..document.timeutil import format_time, parse_time
 from ..document.validators import validate_document
-from ..errors import ParameterError, SynfigNotFoundError
+from ..errors import ParameterError, SynfigNotFoundError, WorkspaceError
 from ..security.paths import (
     PROJECT_EXTENSIONS,
     check_file_size,
@@ -159,15 +160,44 @@ def register(server: FastMCP, ctx: AppContext) -> None:
     async def open_project(path: str) -> str:
         """Open an existing .sif/.sifz/.sfg project from the workspace.
 
+        If the file is located outside the workspace, it is automatically
+        imported into workspace/imports/ along with its texture assets.
         If the same file is already open, returns the existing project_id.
         """
-        resolved = resolve_workspace_path(
-            path,
-            ctx.settings.workspace,
-            must_exist=True,
-            allowed_extensions=PROJECT_EXTENSIONS,
-            purpose="project",
-        )
+        try:
+            resolved = resolve_workspace_path(
+                path,
+                ctx.settings.workspace,
+                must_exist=True,
+                allowed_extensions=PROJECT_EXTENSIONS,
+                purpose="project",
+            )
+        except WorkspaceError as err:
+            candidate = Path(path).expanduser()
+            if (
+                candidate.is_absolute()
+                and candidate.is_file()
+                and candidate.suffix.lower() in PROJECT_EXTENSIONS
+            ):
+                import_dir = ctx.settings.workspace / "imports" / candidate.stem
+                import_dir.mkdir(parents=True, exist_ok=True)
+                target = import_dir / candidate.name
+                shutil.copy2(candidate, target)
+                for sibling in candidate.parent.iterdir():
+                    if sibling.is_file() and sibling.suffix.lower() in {
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                        ".bmp",
+                        ".wav",
+                        ".ogg",
+                    }:
+                        dest_sibling = import_dir / sibling.name
+                        if not dest_sibling.exists():
+                            shutil.copy2(sibling, dest_sibling)
+                resolved = target
+            else:
+                raise err
         session, created = await ctx.registry.open(resolved)
         return json_dumps(
             {
