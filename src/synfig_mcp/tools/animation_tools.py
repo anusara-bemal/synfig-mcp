@@ -18,7 +18,7 @@ from ..document.bones import (
     create_bone as bones_create,
 )
 from ..document.bones import (
-    list_bones,
+    list_bones as bones_list,
 )
 from ..document.bones import (
     set_bone_param as bones_set_param,
@@ -502,10 +502,15 @@ def register(server, ctx: AppContext) -> None:  # type: ignore[no-untyped-def]
         return json_dumps({"project_id": project_id, **result})
 
     @tool(server)
-    async def list_bones_tool(project_id: str) -> str:
+    async def list_bones(project_id: str) -> str:
         """List all bones in the canvas."""
         session = await ctx.registry.get(project_id)
-        return json_dumps({"project_id": project_id, "bones": list_bones(session.root)})
+        return json_dumps({"project_id": project_id, "bones": bones_list(session.root)})
+
+    @tool(server)
+    async def list_bones_tool(project_id: str) -> str:
+        """Alias for list_bones."""
+        return await list_bones(project_id)
 
     @tool(server)
     async def set_bone_param(project_id: str, bone: str, param: str, value: Any) -> str:
