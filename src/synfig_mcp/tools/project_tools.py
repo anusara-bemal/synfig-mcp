@@ -10,12 +10,13 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from ..cli.binary import find_synfig_studio_binary, launch_studio_process
 from ..document import io
 from ..document.canvas import get_canvas_props, set_canvas_props
 from ..document.registry import guess_project_path
 from ..document.timeutil import format_time, parse_time
 from ..document.validators import validate_document
-from ..errors import ParameterError
+from ..errors import ParameterError, SynfigNotFoundError
 from ..security.paths import (
     PROJECT_EXTENSIONS,
     check_file_size,
@@ -42,6 +43,7 @@ def register(server: FastMCP, ctx: AppContext) -> None:
         antialias: int = 1,
         path: str | None = None,
         save: bool = True,
+        open_in_studio: bool = False,
     ) -> str:
         """Create a new empty Synfig project.
 
@@ -95,12 +97,61 @@ def register(server: FastMCP, ctx: AppContext) -> None:
             io.write_project(tree, target, backup=True)
             saved_path = target
         session = await ctx.registry.create(tree, path=saved_path, name=clean_name)
+        if (open_in_studio or ctx.settings.auto_open_studio) and saved_path:
+            studio_bin = find_synfig_studio_binary(ctx.settings.synfig_studio_bin)
+            if studio_bin:
+                launch_studio_process(studio_bin, saved_path)
         return json_dumps(
             {
                 "project_id": session.project_id,
                 "name": clean_name,
                 "saved": str(saved_path) if saved_path else None,
+                "opened_in_gui": bool((open_in_studio or ctx.settings.auto_open_studio) and saved_path),
                 "info": session.info(),
+            }
+        )
+
+    @tool(server)
+    async def open_in_studio(project_id: str | None = None, path: str | None = None) -> str:
+        """Open a project directly inside the Synfig Studio desktop GUI window.
+
+        Saves any dirty in-memory state to disk first and opens the GUI application
+        with the canvas loaded on screen.
+        """
+        studio_bin = find_synfig_studio_binary(ctx.settings.synfig_studio_bin)
+        if not studio_bin:
+            raise SynfigNotFoundError(
+                "Synfig Studio GUI binary (synfigstudio) was not found on your system.",
+                hint="Ensure Synfig Studio is installed, or set SYNFIG_STUDIO_BIN.",
+            )
+
+        target_path: Path
+        resolved_pid: str | None = None
+        if project_id:
+            session = await ctx.registry.get(project_id)
+            resolved_pid = project_id
+            async with session.lock:
+                if not session.path:
+                    session.path = guess_project_path(ctx.settings.workspace, session.name)
+                io.write_project(session.tree, session.path, backup=False)
+                session.dirty = False
+                target_path = session.path
+        elif path:
+            target_path = resolve_workspace_path(
+                path, ctx.settings.workspace, must_exist=True, purpose="project"
+            )
+        else:
+            raise ParameterError("Provide either project_id or path to open in Synfig Studio GUI.")
+
+        pid = launch_studio_process(studio_bin, target_path)
+        return json_dumps(
+            {
+                "project_id": resolved_pid,
+                "path": str(target_path),
+                "opened_in_gui": True,
+                "studio_binary": studio_bin,
+                "pid": pid,
+                "message": f"Successfully launched Synfig Studio GUI opening '{target_path.name}'.",
             }
         )
 
@@ -127,12 +178,18 @@ def register(server: FastMCP, ctx: AppContext) -> None:
         )
 
     @tool(server)
-    async def save_project(project_id: str, path: str | None = None, backup: bool = True) -> str:
+    async def save_project(
+        project_id: str,
+        path: str | None = None,
+        backup: bool = True,
+        open_in_studio: bool = False,
+    ) -> str:
         """Save a project back to disk (.sif, .sifz or .sfg).
 
         If path is omitted, saves to the file the project was opened from
         (a newly created, unsaved project is written to the workspace under
         its name). Backup creates a .bak copy before overwriting.
+        If open_in_studio=True, opens the saved project in Synfig Studio GUI.
         """
         session = await ctx.registry.get(project_id)
         async with session.lock:
@@ -152,19 +209,28 @@ def register(server: FastMCP, ctx: AppContext) -> None:
             session.dirty = False
             if target.resolve().is_file():
                 ctx.registry._by_path[str(target.resolve())] = session.project_id
+        if open_in_studio or ctx.settings.auto_open_studio:
+            studio_bin = find_synfig_studio_binary(ctx.settings.synfig_studio_bin)
+            if studio_bin:
+                launch_studio_process(studio_bin, target)
         return json_dumps(
             {
                 "project_id": project_id,
                 "saved": str(target),
                 "format": target.suffix.lower().lstrip("."),
                 "backup": backup,
+                "opened_in_gui": bool(open_in_studio or ctx.settings.auto_open_studio),
             }
         )
 
     @tool(server)
-    async def save_project_as(project_id: str, path: str, backup: bool = True) -> str:
+    async def save_project_as(
+        project_id: str, path: str, backup: bool = True, open_in_studio: bool = False
+    ) -> str:
         """Save a project to a new path (.sif, .sifz or .sfg)."""
-        return await save_project(project_id, path=path, backup=backup)
+        return await save_project(
+            project_id, path=path, backup=backup, open_in_studio=open_in_studio
+        )
 
     @tool(server)
     async def close_project(project_id: str, save: bool = False) -> str:

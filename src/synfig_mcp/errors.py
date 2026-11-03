@@ -136,10 +136,11 @@ class ExportError(SynfigMCPError):
 class SynfigNotFoundError(SynfigMCPError):
     code = "synfig_binary_not_found"
 
-    def __init__(self) -> None:
+    def __init__(self, message: str | None = None, *, hint: str | None = None) -> None:
         super().__init__(
-            "Could not locate the 'synfig' binary.",
-            hint=(
+            message or "Could not locate the 'synfig' binary.",
+            hint=hint
+            or (
                 "Set the SYNFIG_BIN environment variable to the full path of synfig(.exe), "
                 "or install Synfig (https://www.synfig.org) and make sure it is on PATH. "
                 "Run synfig_doctor for a diagnosis."

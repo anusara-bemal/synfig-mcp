@@ -65,8 +65,10 @@
 - [`import_asset`](#import-asset)
 - [`import_json_snapshot`](#import-json-snapshot)
 - [`import_svg`](#import-svg)
+- [`install_synfig_plugin`](#install-synfig-plugin)
 - [`link_params`](#link-params)
 - [`list_assets`](#list-assets)
+- [`list_bones`](#list-bones)
 - [`list_bones_tool`](#list-bones-tool)
 - [`list_exported_values`](#list-exported-values)
 - [`list_keyframes`](#list-keyframes)
@@ -77,6 +79,7 @@
 - [`lock_layer`](#lock-layer)
 - [`move_keyframe`](#move-keyframe)
 - [`move_layer`](#move-layer)
+- [`open_in_studio`](#open-in-studio)
 - [`open_project`](#open-project)
 - [`redo`](#redo)
 - [`remove_keyframe`](#remove-keyframe)
@@ -1613,6 +1616,7 @@ Returns JSON with project_id and the saved path.
 | `antialias` | `integer` | No | `1` | — |
 | `path` | `string | null` | No | `null` | — |
 | `save` | `boolean` | No | `true` | — |
+| `open_in_studio` | `boolean` | No | `false` | — |
 
 ### Return Value
 
@@ -2190,6 +2194,32 @@ Structured JSON string (or MCP `Image` content for frame renders).
 
 ---
 
+## `install_synfig_plugin`
+
+Install the Synfig MCP Sync plugin into Synfig Studio's user plugins folder.
+
+Adds a 'Synfig MCP: Reload Canvas' menu item under Synfig Studio's Plugins menu
+so you can instantly refresh the open window whenever the AI modifies files.
+
+### Parameters
+
+_None_
+
+### Return Value
+
+Structured JSON string (or MCP `Image` content for frame renders).
+
+### Example Call
+
+```json
+{
+  "tool": "install_synfig_plugin",
+  "arguments": {}
+}
+```
+
+---
+
 ## `link_params`
 
 Link two parameters (target references source's exported value).
@@ -2249,9 +2279,36 @@ Structured JSON string (or MCP `Image` content for frame renders).
 
 ---
 
-## `list_bones_tool`
+## `list_bones`
 
 List all bones in the canvas.
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `project_id` | `string` | Yes | — | — |
+
+### Return Value
+
+Structured JSON string (or MCP `Image` content for frame renders).
+
+### Example Call
+
+```json
+{
+  "tool": "list_bones",
+  "arguments": {
+    "project_id": "sample_project_id"
+  }
+}
+```
+
+---
+
+## `list_bones_tool`
+
+Alias for list_bones.
 
 ### Parameters
 
@@ -2518,6 +2575,37 @@ Structured JSON string (or MCP `Image` content for frame renders).
   "arguments": {
     "project_id": "sample_project_id",
     "layer": "value"
+  }
+}
+```
+
+---
+
+## `open_in_studio`
+
+Open a project directly inside the Synfig Studio desktop GUI window.
+
+Saves any dirty in-memory state to disk first and opens the GUI application
+with the canvas loaded on screen.
+
+### Parameters
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `project_id` | `string | null` | No | `null` | — |
+| `path` | `string | null` | No | `null` | — |
+
+### Return Value
+
+Structured JSON string (or MCP `Image` content for frame renders).
+
+### Example Call
+
+```json
+{
+  "tool": "open_in_studio",
+  "arguments": {
+    "project_id": null
   }
 }
 ```
@@ -2822,6 +2910,7 @@ Save a project back to disk (.sif, .sifz or .sfg).
 If path is omitted, saves to the file the project was opened from
 (a newly created, unsaved project is written to the workspace under
 its name). Backup creates a .bak copy before overwriting.
+If open_in_studio=True, opens the saved project in Synfig Studio GUI.
 
 ### Parameters
 
@@ -2830,6 +2919,7 @@ its name). Backup creates a .bak copy before overwriting.
 | `project_id` | `string` | Yes | — | — |
 | `path` | `string | null` | No | `null` | — |
 | `backup` | `boolean` | No | `true` | — |
+| `open_in_studio` | `boolean` | No | `false` | — |
 
 ### Return Value
 
@@ -2859,6 +2949,7 @@ Save a project to a new path (.sif, .sifz or .sfg).
 | `project_id` | `string` | Yes | — | — |
 | `path` | `string` | Yes | — | — |
 | `backup` | `boolean` | No | `true` | — |
+| `open_in_studio` | `boolean` | No | `false` | — |
 
 ### Return Value
 

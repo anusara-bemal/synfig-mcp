@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from ..cli.binary import default_candidates, find_synfig_binary
 from .common import AppContext, json_dumps, tool
 
@@ -74,6 +76,50 @@ def register(server, ctx: AppContext) -> None:  # type: ignore[no-untyped-def]
         """List layer types supported by this synfig build."""
         layer_types = await ctx.known_layer_types()
         return json_dumps({"count": len(layer_types), "layer_types": layer_types})
+
+    @tool(server)
+    async def install_synfig_plugin() -> str:
+        """Install the Synfig MCP Sync plugin into Synfig Studio's user plugins folder.
+
+        Adds a 'Synfig MCP: Reload Canvas' menu item under Synfig Studio's Plugins menu
+        so you can instantly refresh the open window whenever the AI modifies files.
+        """
+        home = Path.home()
+        candidates = [
+            home / "synfig" / "plugins" / "synfig_mcp_sync",
+            home / ".synfig" / "plugins" / "synfig_mcp_sync",
+        ]
+        target_dir = candidates[0] if (home / "synfig").exists() else candidates[1]
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        plugin_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+   <name>Synfig MCP: Reload Canvas</name>
+   <desc>Instantly reload current canvas modified by synfig-mcp</desc>
+   <exec>reload.py</exec>
+</plugin>
+"""
+        reload_py = """#!/usr/bin/env python
+import sys
+
+# Synfig Studio plugin runner: passing cleanly triggers canvas reload
+if __name__ == "__main__":
+    sys.exit(0)
+"""
+        (target_dir / "plugin.xml").write_text(plugin_xml, encoding="utf-8")
+        (target_dir / "reload.py").write_text(reload_py, encoding="utf-8")
+
+        return json_dumps(
+            {
+                "installed": True,
+                "plugin_path": str(target_dir),
+                "name": "Synfig MCP: Reload Canvas",
+                "message": (
+                    "Plugin installed! In Synfig Studio, restart the app or check "
+                    "Plugins -> Synfig MCP: Reload Canvas to refresh open files instantly."
+                ),
+            }
+        )
 
 
 def _resolution_origin(env_bin: str | None) -> str:

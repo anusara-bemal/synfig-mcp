@@ -57,6 +57,7 @@ class Settings:
     """Immutable runtime settings for the server."""
 
     synfig_bin: str | None = None
+    synfig_studio_bin: str | None = None
     workspace: Path = field(default_factory=Path.cwd)
     log_level: str = "INFO"
     render_timeout: float = 300.0
@@ -69,6 +70,7 @@ class Settings:
     history_depth: int = 50
     render_workers: int = 2
     autosave: bool = False
+    auto_open_studio: bool = False
 
     @property
     def max_file_bytes(self) -> int:
@@ -113,6 +115,9 @@ def load_settings(
 
     return Settings(
         synfig_bin=(str(pick("SYNFIG_BIN")).strip() or None) if pick("SYNFIG_BIN") else None,
+        synfig_studio_bin=(str(pick("SYNFIG_STUDIO_BIN")).strip() or None)
+        if pick("SYNFIG_STUDIO_BIN")
+        else None,
         workspace=workspace,
         log_level=str(pick("SYNFIG_MCP_LOG_LEVEL") or "INFO").upper(),
         render_timeout=_as_float(pick("SYNFIG_MCP_RENDER_TIMEOUT"), 300.0),
@@ -125,4 +130,5 @@ def load_settings(
         history_depth=max(_as_int(pick("SYNFIG_MCP_HISTORY_DEPTH"), 50), 1),
         render_workers=max(_as_int(pick("SYNFIG_MCP_RENDER_WORKERS"), 2), 1),
         autosave=_as_bool(pick("SYNFIG_MCP_AUTOSAVE"), False),
+        auto_open_studio=_as_bool(pick("SYNFIG_MCP_AUTO_OPEN_STUDIO"), False),
     )

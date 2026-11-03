@@ -178,3 +178,52 @@ def supports_flag(help_text: str, flag: str) -> bool:
 
 def renderers_available(probed: dict[str, Any], renderer: str) -> bool:
     return renderer in probed.get("renderers", [])
+
+
+def find_synfig_studio_binary(env_studio_bin: str | None = None) -> str | None:
+    """Find the Synfig Studio GUI binary (synfigstudio / synfigstudio.exe)."""
+    if env_studio_bin:
+        candidate = Path(env_studio_bin).expanduser()
+        if candidate.is_file():
+            return str(candidate)
+    cli_bin = find_synfig_binary(None)
+    if cli_bin:
+        cli_p = Path(cli_bin)
+        gui_name = "synfigstudio.exe" if platform.system() == "Windows" else "synfigstudio"
+        gui_candidate = cli_p.parent / gui_name
+        if gui_candidate.is_file():
+            return str(gui_candidate)
+    which = shutil.which("synfigstudio") or shutil.which("synfigstudio.exe")
+    if which:
+        return which
+    if platform.system() == "Windows":
+        for p in [
+            r"C:\Program Files\Synfig\bin\synfigstudio.exe",
+            r"C:\Program Files (x86)\Synfig\bin\synfigstudio.exe",
+        ]:
+            if Path(p).is_file():
+                return p
+    return None
+
+
+def launch_studio_process(studio_bin: str, file_path: str | Path) -> int:
+    """Launch the Synfig Studio GUI in a detached, non-blocking background process."""
+    path_str = str(Path(file_path).resolve())
+    if platform.system() == "Windows":
+        creation_flags = 0
+        if hasattr(subprocess, "DETACHED_PROCESS"):
+            creation_flags |= subprocess.DETACHED_PROCESS
+        if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+            creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+        proc = subprocess.Popen(  # noqa: S603
+            [studio_bin, path_str],
+            creationflags=creation_flags,
+            close_fds=True,
+        )
+    else:
+        proc = subprocess.Popen(  # noqa: S603
+            [studio_bin, path_str],
+            start_new_session=True,
+            close_fds=True,
+        )
+    return proc.pid
