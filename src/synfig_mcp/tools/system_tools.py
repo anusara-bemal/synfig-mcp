@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..cli.binary import default_candidates, find_synfig_binary
+from ..cli.binary import default_candidates, find_synfig_binary, find_synfig_studio_binary
 from .common import AppContext, json_dumps, tool
 
 
@@ -20,6 +20,15 @@ def register(server, ctx: AppContext) -> None:  # type: ignore[no-untyped-def]
         """
         probed = await ctx.probe()
         payload = dict(probed)
+        studio_bin = find_synfig_studio_binary()
+        home = Path.home()
+        plugin_cand = [
+            home / "synfig" / "plugins" / "synfig_mcp_sync" / "plugin.xml",
+            home / ".synfig" / "plugins" / "synfig_mcp_sync" / "plugin.xml",
+        ]
+        plugin_installed = any(p.is_file() for p in plugin_cand)
+        plugin_file = next((str(p) for p in plugin_cand if p.is_file()), None)
+
         payload.update(
             {
                 "workspace": str(ctx.settings.workspace),
@@ -27,6 +36,11 @@ def register(server, ctx: AppContext) -> None:  # type: ignore[no-untyped-def]
                 "synfig_bin_env": ctx.settings.synfig_bin,
                 "path_candidates": [c for c in default_candidates()],
                 "resolved_via": _resolution_origin(ctx.settings.synfig_bin),
+                "studio_binary": studio_bin,
+                "studio_reachable": studio_bin is not None,
+                "plugin_installed": plugin_installed,
+                "plugin_reachable": plugin_installed,
+                "plugin_path": plugin_file,
                 "config": {
                     "render_timeout": ctx.settings.render_timeout,
                     "max_frames": ctx.settings.max_frames,
