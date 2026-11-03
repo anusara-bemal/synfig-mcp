@@ -85,7 +85,7 @@ warn_unreachable = true
 implicit_reexport = false
 
 [[tool.mypy.overrides]]
-module = ["lxml.*", "mcp.*"]
+module = ["lxml.*", "mcp.*", "tomli.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -122,9 +122,10 @@ def _terminate(process: asyncio.subprocess.Process) -> None:
     if process.returncode is not None:
         return
     try:
-        if os.name == "posix":
+        killpg = getattr(os, "killpg", None)
+        if killpg is not None:
             with contextlib.suppress(ProcessLookupError, PermissionError):
-                os.killpg(process.pid, signal.SIGTERM)  # type: ignore[attr-defined]
+                killpg(process.pid, signal.SIGTERM)
         else:
             process.terminate()
     except ProcessLookupError:

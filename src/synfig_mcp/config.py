@@ -11,17 +11,20 @@ import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover - 3.10 only
-    import tomli as tomllib  # type: ignore[import-not-found]
+    import tomli as tomllib
 
 
 def _load_toml(path: Path) -> dict[str, Any]:
     with path.open("rb") as fh:
-        return cast(dict[str, Any], tomllib.load(fh))
+        raw: Any = tomllib.load(fh)
+        if isinstance(raw, dict):
+            return {str(k): v for k, v in raw.items()}
+        return {}
 
 
 _TRUE = {"1", "true", "yes", "on"}
