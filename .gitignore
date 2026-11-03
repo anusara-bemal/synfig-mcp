@@ -21,5 +21,7 @@ htmlcov/
 .synfig-mcp-workspace/
 *.bak
 *.tmp
+imports/
+lab11/
 .DS_Store
 Thumbs.db
