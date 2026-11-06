@@ -1,6 +1,9 @@
 """
-Lossless SIF XML parser using lxml.
-Preserves unknown tags, whitespace, and custom attributes.
+[STUB - P1 Prototype] Lossless SIF XML parser using lxml.
+
+NOTE: This is a P1 prototype stub preserving unknown tags and basic serialization.
+The full lossless, non-destructive SIF/SIFZ/SFG round-trip engine with full
+schema node preservation will be implemented in Phase P6.
 """
 
 from pathlib import Path
@@ -9,7 +12,7 @@ from lxml import etree
 
 
 class SifDocument:
-    """Represents a parsed .sif XML document tree."""
+    """[STUB - P1 Prototype] Represents a parsed .sif XML document tree."""
 
     def __init__(self, tree: etree._ElementTree) -> None:
         self.tree = tree

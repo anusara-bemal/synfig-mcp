@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "layer.add",
+  "params": {
+    "doc_id": "doc_0",
+    "layer_type": "circle",
+    "canvas_path": "",
+    "depth": 0,
+    "params": {
+      "color": {
+        "type": "color",
+        "r": 0.2,
+        "g": 0.6,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "radius": {
+        "type": "real",
+        "value": 2.5
+      },
+      "origin": {
+        "type": "vector",
+        "x": 0.0,
+        "y": 0.0,
+        "unit": "synfig"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "hello",
+  "params": {
+    "protocol_version": "1.0",
+    "client_name": "synfig-mcp",
+    "token": "0123456789abcdef0123456789abcdef"
+  }
+}

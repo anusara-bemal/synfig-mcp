@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "method": "event.selection_changed",
+  "params": {
+    "doc_id": "doc_0",
+    "selected_layers": ["circle_001"]
+  }
+}

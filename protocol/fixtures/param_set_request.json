@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "param.set",
+  "params": {
+    "doc_id": "doc_0",
+    "layer_id": "circle_001",
+    "param_name": "color",
+    "value": {
+      "type": "color",
+      "r": 1.0,
+      "g": 0.0,
+      "b": 0.0,
+      "a": 1.0
+    }
+  }
+}

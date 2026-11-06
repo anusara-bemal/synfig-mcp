@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synfig-mcp.org/schemas/responses.json",
+  "title": "JsonRpcResponse",
+  "type": "object",
+  "properties": {
+    "jsonrpc": { "const": "2.0" },
+    "id": { "type": ["integer", "string", "null"] },
+    "result": {},
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": "string" },
+        "data": { "type": "object" }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["jsonrpc", "id"],
+  "oneOf": [
+    { "required": ["result"] },
+    { "required": ["error"] }
+  ],
+  "additionalProperties": false
+}

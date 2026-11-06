@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "doc_id": "doc_0",
+    "name": "Synfig Animation 1",
+    "file_path": null,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24.0,
+    "start_time": 0.0,
+    "end_time": 5.0,
+    "duration_frames": 120
+  }
+}

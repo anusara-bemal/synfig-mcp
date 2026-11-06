@@ -1,6 +1,8 @@
 """
-HeadlessBackend: pure-Python .sif/.sifz/.sfg document engine + synfig CLI.
-Used for CI, servers, and users running without patched Synfig Studio.
+[STUB - P1 Prototype] HeadlessBackend: pure-Python .sif/.sifz/.sfg document engine + synfig CLI.
+
+NOTE: This is a P1 prototype in-memory stub. The complete headless document engine
+with full XML AST transformations and synfig CLI execution will be developed in Phase P6.
 """
 
 from typing import Any
@@ -9,7 +11,7 @@ from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
 
 
 class HeadlessBackend(BackendBase):
-    """Secondary backend operating on files via lxml and invoking synfig CLI."""
+    """[STUB - P1 Prototype] Secondary backend operating on files via lxml and invoking synfig CLI."""
 
     def __init__(self) -> None:
         self._documents: dict[str, DocumentInfo] = {}
@@ -23,7 +25,7 @@ class HeadlessBackend(BackendBase):
             backend="headless",
             connected=True,
             studio_running=False,
-            details={"engine": "lxml_sif"},
+            details={"engine": "lxml_sif_stub"},
         )
 
     async def doc_list(self) -> list[DocumentInfo]:

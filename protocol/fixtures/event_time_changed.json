@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "method": "event.time_changed",
+  "params": {
+    "doc_id": "doc_0",
+    "time": 2.5,
+    "frame": 60
+  }
+}

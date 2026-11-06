@@ -28,11 +28,17 @@ flowchart LR
 
 ---
 
-## 2. Core Components
+## 2. Core Components & Implementation Status
+
+> [!NOTE]
+> **Implementation Status Tracker**:
+> - **LiveBackend**: *[P1 Stub]* Currently returns mock/in-memory data. Real C++ bridge communication and read path is implemented in **Phase P3**; write actions in **Phase P4**.
+> - **HeadlessBackend**: *[P1 Stub]* Currently an in-memory document tracker with preliminary lxml serialization. Full lossless round-trip and CLI render pipeline is implemented in **Phase P6**.
+> - **Protocol Layer**: *[P2 Active]* Single source of truth JSON Schemas (`protocol/schema/`), golden fixtures (`protocol/fixtures/`), Pydantic models, async client, and `FakeBridgeServer`.
 
 1. **LiveBackend**:
    - Primary backend used when an artist has Synfig Studio open.
-   - Communicates via local newline-delimited JSON-RPC 2.0 over `127.0.0.1`.
+   - Communicates via local newline-delimited JSON-RPC 2.0 over `127.0.0.1:19998` with session token auth.
    - Actions are marshalled to the GTK main loop via `Glib::Dispatcher` and grouped in `synfigapp::Action::PassiveGrouper` for atomic undo with `Ctrl+Z`.
 
 2. **HeadlessBackend**:

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synfig-mcp.org/schemas/handshake.json",
+  "title": "Handshake",
+  "definitions": {
+    "HelloRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": ["integer", "string"] },
+        "method": { "const": "hello" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "protocol_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+            "client_name": { "type": "string" },
+            "token": { "type": "string", "minLength": 16 }
+          },
+          "required": ["protocol_version", "token"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "additionalProperties": false
+    },
+    "HelloResponse": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": ["integer", "string"] },
+        "result": {
+          "type": "object",
+          "properties": {
+            "protocol_version": { "type": "string" },
+            "studio_version": { "type": "string" },
+            "capabilities": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "session_id": { "type": "string" }
+          },
+          "required": ["protocol_version", "studio_version", "capabilities"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "additionalProperties": false
+    }
+  }
+}

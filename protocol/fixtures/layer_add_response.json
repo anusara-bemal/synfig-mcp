@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "doc_id": "doc_0",
+    "layer_id": "circle_001",
+    "layer_type": "circle",
+    "description": "Circle001",
+    "depth": 0,
+    "diff": {
+      "action": "layer_add",
+      "created": ["circle_001"],
+      "modified": [],
+      "deleted": []
+    }
+  }
+}

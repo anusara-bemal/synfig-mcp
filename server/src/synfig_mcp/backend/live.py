@@ -1,5 +1,8 @@
 """
-LiveBackend: communicates with patched Synfig Studio over local TCP socket.
+[STUB - P1 Prototype] LiveBackend: communicates with patched Synfig Studio over local TCP socket.
+
+NOTE: This is a P1 prototype in-memory stub. The live protocol client connecting to
+mcp_bridge via JSON-RPC 2.0 will be fully wired in Phase P3.
 """
 
 from typing import Any
@@ -9,7 +12,7 @@ from synfig_mcp.config import settings
 
 
 class LiveBackend(BackendBase):
-    """Primary backend connecting to running Synfig Studio via native C++ bridge."""
+    """[STUB - P1 Prototype] Primary backend connecting to running Synfig Studio via native C++ bridge."""
 
     def __init__(self, host: str | None = None, port: int | None = None) -> None:
         self.host = host or settings.bridge_host
@@ -26,7 +29,7 @@ class LiveBackend(BackendBase):
             backend="live",
             connected=self._connected,
             studio_running=self._connected,
-            details={"host": self.host, "port": self.port},
+            details={"host": self.host, "port": self.port, "status": "p1_prototype_stub"},
         )
 
     async def doc_list(self) -> list[DocumentInfo]:

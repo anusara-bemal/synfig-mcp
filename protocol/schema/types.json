@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synfig-mcp.org/schemas/types.json",
+  "title": "SynfigValue",
+  "description": "Tagged union representation of Synfig ValueBase data types.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "real" },
+        "value": { "type": "number" }
+      },
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "integer" },
+        "value": { "type": "integer" }
+      },
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "bool" },
+        "value": { "type": "boolean" }
+      },
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "angle" },
+        "degrees": { "type": "number" },
+        "radians": { "type": "number" }
+      },
+      "required": ["type", "degrees"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "time" },
+        "seconds": { "type": "number" },
+        "frame": { "type": "integer" },
+        "time_string": { "type": "string" }
+      },
+      "required": ["type", "seconds"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "color" },
+        "r": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "g": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "b": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "a": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0 }
+      },
+      "required": ["type", "r", "g", "b"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "vector" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "unit": { "type": "string", "enum": ["synfig", "pixels"], "default": "synfig" },
+        "pixel_x": { "type": "number" },
+        "pixel_y": { "type": "number" }
+      },
+      "required": ["type", "x", "y"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "gradient" },
+        "cpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pos": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "color": {
+                "type": "object",
+                "properties": {
+                  "r": { "type": "number" },
+                  "g": { "type": "number" },
+                  "b": { "type": "number" },
+                  "a": { "type": "number" }
+                },
+                "required": ["r", "g", "b", "a"]
+              }
+            },
+            "required": ["pos", "color"]
+          }
+        }
+      },
+      "required": ["type", "cpoints"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "bline_point_list" },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "vertex": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "t1": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "t2": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "width": { "type": "number", "default": 1.0 },
+              "origin": { "type": "number", "default": 0.5 },
+              "split": { "type": "boolean", "default": false }
+            },
+            "required": ["vertex", "t1", "t2"]
+          }
+        }
+      },
+      "required": ["type", "points"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "canvas_ref" },
+        "canvas_id": { "type": "string" }
+      },
+      "required": ["type", "canvas_id"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "valuenode_link" },
+        "link_id": { "type": "string" }
+      },
+      "required": ["type", "link_id"],
+      "additionalProperties": false
+    }
+  ]
+}

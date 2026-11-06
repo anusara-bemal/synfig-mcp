@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synfig-mcp.org/schemas/requests.json",
+  "title": "JsonRpcRequest",
+  "type": "object",
+  "properties": {
+    "jsonrpc": { "const": "2.0" },
+    "id": { "type": ["integer", "string"] },
+    "method": {
+      "type": "string",
+      "enum": [
+        "hello",
+        "doc.list",
+        "doc.new",
+        "doc.open",
+        "doc.save",
+        "doc.info",
+        "doc.set_properties",
+        "canvas.list",
+        "canvas.create",
+        "layer.add",
+        "layer.remove",
+        "layer.duplicate",
+        "layer.reorder",
+        "layer.raise",
+        "layer.lower",
+        "layer.group",
+        "layer.ungroup",
+        "param.get",
+        "param.set",
+        "param.link",
+        "param.convert",
+        "param.export",
+        "anim.time_get",
+        "anim.time_set",
+        "anim.keyframe_add",
+        "anim.keyframe_remove",
+        "anim.waypoint_set",
+        "anim.waypoint_remove",
+        "history.undo",
+        "history.redo",
+        "history.list",
+        "selection.get",
+        "selection.set",
+        "render.frame"
+      ]
+    },
+    "params": {
+      "type": "object"
+    }
+  },
+  "required": ["jsonrpc", "id", "method", "params"],
+  "additionalProperties": false
+}
