@@ -16,6 +16,7 @@
         "doc.save",
         "doc.info",
         "doc.set_properties",
+        "scene.tree",
         "canvas.list",
         "canvas.create",
         "layer.add",

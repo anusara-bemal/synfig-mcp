@@ -41,6 +41,7 @@ PACKAGES=(
     mingw-w64-ucrt-x86_64-libltdl
     mingw-w64-ucrt-x86_64-mlt
     mingw-w64-ucrt-x86_64-boost
+    mingw-w64-ucrt-x86_64-nlohmann-json
 )
 
 echo "=== Verifying MSYS2 packages ==="

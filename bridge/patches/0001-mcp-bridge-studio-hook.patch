@@ -1,0 +1,57 @@
+diff --git a/synfig-studio/src/gui/CMakeLists.txt b/synfig-studio/src/gui/CMakeLists.txt
+index a54f4a2..60f8274 100644
+--- a/synfig-studio/src/gui/CMakeLists.txt
++++ b/synfig-studio/src/gui/CMakeLists.txt
+@@ -69,6 +69,13 @@ target_sources(synfigstudio
+ 		"${CMAKE_CURRENT_LIST_DIR}/main_win32.cpp"
+ 		"${CMAKE_CURRENT_LIST_DIR}/mainwindow.cpp"
+ 		"${CMAKE_CURRENT_LIST_DIR}/helpers.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/auth.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/types_serializer.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/dispatcher.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/events.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/handlers.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/bridge_server.cpp"
++		"${CMAKE_CURRENT_LIST_DIR}/mcp_bridge/bridge_init.cpp"
+ )
+ 
+ include(actionmanagers/CMakeLists.txt)
+@@ -108,6 +115,10 @@ if(TCMALLOC_LIBRARY)
+ 	target_link_libraries(synfigstudio PRIVATE ${TCMALLOC_LIBRARY})
+ endif()
+ 
++if (WIN32)
++	target_link_libraries(synfigstudio PRIVATE ws2_32)
++endif()
++
+ install(
+ 	TARGETS synfigstudio
+ 	DESTINATION bin
+diff --git a/synfig-studio/src/gui/app.cpp b/synfig-studio/src/gui/app.cpp
+index 591b680..a859f59 100644
+--- a/synfig-studio/src/gui/app.cpp
++++ b/synfig-studio/src/gui/app.cpp
+@@ -104,6 +104,7 @@
+ 
+ #include <gui/instance.h>
+ #include <gui/localization.h>
++#include "mcp_bridge/bridge_init.h"
+ #include <gui/modules/mod_palette/mod_palette.h>
+ #include <gui/onemoment.h>
+ #include <gui/resourcehelper.h>
+@@ -1820,6 +1821,7 @@ void App::init(const synfig::String& rootpath)
+ 		SoundProcessor::Sound(ResourceHelper::get_sound_path("renderdone.wav")));
+ 
+ 	App::dock_info_ = dock_info;
++	mcp_bridge::start();
+ }
+ 
+ StateManager* App::get_state_manager() { return state_manager; }
+@@ -1827,6 +1829,7 @@ StateManager* App::get_state_manager() { return state_manager; }
+ void
+ App::on_shutdown()
+ {
++	mcp_bridge::stop();
+ 	shutdown_in_progress=true;
+ 
+ 	save_settings();

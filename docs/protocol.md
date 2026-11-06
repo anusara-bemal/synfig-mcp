@@ -110,6 +110,7 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `doc.save` | `doc_id`, `file_path?` | `instance->save()`, `instance->save_as(path)` | Verified |
 | `doc.info` | `doc_id` | `instance->get_canvas()->rend_desc()`, `get_name()` | Verified |
 | `doc.set_properties`| `doc_id`, `width?`, `height?`, `fps?`, `start_time?`, `end_time?` | `Action::CanvasRendDescSet::create()` | Verified |
+| `scene.tree` | `doc_id` | `canvas->rbegin()..rend()` recursive layer traversal | Verified |
 | `canvas.list` | `doc_id` | `canvas->children()`, `canvas->get_root()` | Verified |
 | `canvas.create` | `doc_id`, `id` | `Action::CanvasAdd::create()` | Verified |
 | `layer.add` | `doc_id`, `layer_type`, `canvas_path`, `depth?`, `params?` | `canvas_interface->add_layer_to()` (`Action::LayerAdd`) | Verified |

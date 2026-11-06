@@ -1,0 +1,38 @@
+# Git
+.git/
+
+# Build directories
+build_synfig/
+synfig_upstream/
+cmake-build/
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# Operating system
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.log
+

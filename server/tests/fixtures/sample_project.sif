@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<canvas version="1.2" width="1920" height="1080" xres="2834.645669" yres="2834.645669" fps="24.000" start-time="0f" end-time="5s" antialias="1" view-box="-4.0 2.25 4.0 -2.25">
+  <name>Test Animation</name>
+  <layer type="circle" active="true" version="0.2" desc="Circle001">
+    <param name="z_depth">
+      <real value="0.0000000000"/>
+    </param>
+    <param name="amount">
+      <real value="1.0000000000"/>
+    </param>
+    <param name="color">
+      <color>
+        <r>0.200000</r>
+        <g>0.600000</g>
+        <b>1.000000</b>
+        <a>1.000000</a>
+      </color>
+    </param>
+    <param name="radius">
+      <real value="1.5000000000"/>
+    </param>
+    <param name="origin">
+      <vector>
+        <x>0.0000000000</x>
+        <y>0.0000000000</y>
+      </vector>
+    </param>
+  </layer>
+  <layer type="rectangle" active="true" version="0.2" desc="Rect001">
+    <param name="z_depth">
+      <real value="1.0000000000"/>
+    </param>
+    <param name="amount">
+      <real value="1.0000000000"/>
+    </param>
+    <param name="color">
+      <color>
+        <r>0.800000</r>
+        <g>0.200000</g>
+        <b>0.200000</b>
+        <a>1.000000</a>
+      </color>
+    </param>
+    <param name="point1">
+      <vector>
+        <x>-2.0000000000</x>
+        <y>1.0000000000</y>
+      </vector>
+    </param>
+    <param name="point2">
+      <vector>
+        <x>2.0000000000</x>
+        <y>-1.0000000000</y>
+      </vector>
+    </param>
+  </layer>
+</canvas>
