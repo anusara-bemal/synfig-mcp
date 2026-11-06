@@ -1,0 +1,54 @@
+name: Bridge Build
+
+on:
+  push:
+    branches: [main, v*]
+  pull_request:
+    branches: [main, v*]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            cmake ninja-build pkg-config ccache intltool \
+            libxml++2.6-dev libsigc++-2.0-dev libglibmm-2.4-dev libgtkmm-3.0-dev \
+            libmlt++-dev libmlt-dev libfftw3-dev libavcodec-dev libavformat-dev \
+            libswscale-dev libmagick++-dev libopenexr-dev libboost-all-dev
+
+      - name: Fetch and build Synfig Studio
+        run: |
+          bash bridge/scripts/fetch_synfig.sh
+          bash bridge/scripts/apply_patches.sh
+          bash bridge/scripts/build_linux.sh
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            autoconf automake-wrapper intltool libtool make patch tar
+            mingw-w64-ucrt-x86_64-ccache mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-gtkmm3
+            mingw-w64-ucrt-x86_64-glibmm mingw-w64-ucrt-x86_64-libxml++2.6
+            mingw-w64-ucrt-x86_64-fftw mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-imagemagick mingw-w64-ucrt-x86_64-openexr
+            mingw-w64-ucrt-x86_64-libmng mingw-w64-ucrt-x86_64-harfbuzz
+            mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-libltdl
+            mingw-w64-ucrt-x86_64-mlt mingw-w64-ucrt-x86_64-boost
+
+      - name: Run Windows Build
+        shell: msys2 {0}
+        run: |
+          bash bridge/scripts/build_windows_msys2.sh

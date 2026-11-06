@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "synfig": {
+      "type": "stdio",
+      "command": "synfig-mcp"
+    }
+  }
+}

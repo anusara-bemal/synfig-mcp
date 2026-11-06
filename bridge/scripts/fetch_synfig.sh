@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
-# Fetch pinned Synfig source code at tag v1.5.5
+# Fetch pinned Synfig source code using bridge/PINNED_COMMIT
 set -e
 
-PINNED_TAG="v1.5.5"
-REPO_URL="https://github.com/synfig/synfig.git"
-TARGET_DIR="${1:-./build_synfig/synfig_src}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PINNED_FILE="${ROOT_DIR}/bridge/PINNED_COMMIT"
 
-echo "=== Fetching Synfig at pinned tag ${PINNED_TAG} ==="
-if [ -d "${TARGET_DIR}/.git" ]; then
-    echo "Directory ${TARGET_DIR} already exists. Checking out ${PINNED_TAG}..."
-    cd "${TARGET_DIR}"
-    git fetch --tags
-    git checkout "${PINNED_TAG}"
-else
-    mkdir -p "$(dirname "${TARGET_DIR}")"
-    git clone --depth 1 --branch "${PINNED_TAG}" "${REPO_URL}" "${TARGET_DIR}"
+if [ ! -f "${PINNED_FILE}" ]; then
+    echo "ERROR: Pinned commit file not found at ${PINNED_FILE}"
+    exit 1
 fi
 
-cd "${TARGET_DIR}"
-COMMIT_HASH=$(git rev-parse HEAD)
-echo "=== Pinned Synfig Commit: ${COMMIT_HASH} (${PINNED_TAG}) ==="
+PINNED_COMMIT="$(tr -d '[:space:]' < "${PINNED_FILE}")"
+REPO_URL="https://github.com/synfig/synfig.git"
+TARGET_DIR="${1:-${ROOT_DIR}/build_synfig/synfig_src}"
+
+echo "=== Fetching Synfig at pinned commit ${PINNED_COMMIT} ==="
+
+if [ -d "${TARGET_DIR}/.git" ]; then
+    echo "Directory ${TARGET_DIR} already exists. Fetching commit..."
+    cd "${TARGET_DIR}"
+    git fetch origin "${PINNED_COMMIT}" || git fetch --all
+    git checkout "${PINNED_COMMIT}"
+else
+    mkdir -p "$(dirname "${TARGET_DIR}")"
+    git clone "${REPO_URL}" "${TARGET_DIR}"
+    cd "${TARGET_DIR}"
+    git checkout "${PINNED_COMMIT}"
+fi
+
+CURRENT_HASH="$(git rev-parse HEAD)"
+echo "=== Synfig source ready at: ${CURRENT_HASH} ==="

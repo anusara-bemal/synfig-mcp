@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "synfig": {
+      "command": "uvx",
+      "args": ["synfig-mcp"],
+      "env": {
+        "BACKEND_MODE": "auto",
+        "BRIDGE_PORT": "19998"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "synfig-mcp": {
+    "command": "synfig-mcp",
+    "transport": "stdio"
+  }
+}

@@ -1,0 +1,99 @@
+"""
+Typed error hierarchy with stable numeric codes for synfig-mcp protocol and operations.
+"""
+
+from typing import Any
+
+
+class SynfigError(Exception):
+    """Base class for all synfig-mcp errors."""
+
+    code: int = 1000
+    message: str = "Internal Synfig MCP error"
+
+    def __init__(self, message: str | None = None, details: dict[str, Any] | None = None) -> None:
+        super().__init__(message or self.message)
+        self.message = message or self.message
+        self.details = details or {}
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert error to a standard JSON-RPC error payload."""
+        return {
+            "code": self.code,
+            "message": self.message,
+            "data": self.details,
+        }
+
+
+# Protocol & Connection Errors (1000-1099)
+class BridgeConnectionError(SynfigError):
+    """Failed to connect to the Synfig Studio bridge."""
+
+    code = 1001
+    message = "Cannot connect to Synfig Studio live bridge"
+
+
+class BridgeAuthError(SynfigError):
+    """Authentication or token verification failure with the live bridge."""
+
+    code = 1002
+    message = "Authentication with Synfig Studio bridge failed"
+
+
+class ProtocolVersionMismatchError(SynfigError):
+    """Protocol version incompatibility between server and Studio bridge."""
+
+    code = 1003
+    message = "Incompatible bridge protocol version"
+
+
+# Document & Scene Errors (1100-1199)
+class DocumentNotFoundError(SynfigError):
+    """Requested document or canvas ID does not exist."""
+
+    code = 1101
+    message = "Document or canvas not found"
+
+
+class LayerNotFoundError(SynfigError):
+    """Specified layer not found in document."""
+
+    code = 1102
+    message = "Layer not found"
+
+
+class ParamNotFoundError(SynfigError):
+    """Specified parameter not found on layer."""
+
+    code = 1103
+    message = "Parameter not found on layer"
+
+
+# Validation & Security Errors (1200-1299)
+class ValidationError(SynfigError):
+    """Parameter or action arguments failed schema validation."""
+
+    code = 1201
+    message = "Validation failed for action parameters"
+
+
+class SecuritySandboxError(SynfigError):
+    """File access outside of configured workspace sandbox."""
+
+    code = 1202
+    message = "File path access outside allowed workspace sandbox"
+
+
+# Execution & Render Errors (1300-1399)
+class ActionExecutionError(SynfigError):
+    """Synfig action execution failed in Studio or CLI."""
+
+    code = 1301
+    message = "Synfig action system failed to execute request"
+
+
+class RenderError(SynfigError):
+    """Rendering process failed."""
+
+    code = 1302
+    message = "Rendering failed"

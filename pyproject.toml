@@ -1,0 +1,6 @@
+[tool.poe.tasks]
+check = "poe -C server check"
+lint = "poe -C server lint"
+format = "poe -C server format"
+typecheck = "poe -C server typecheck"
+test = "poe -C server test"

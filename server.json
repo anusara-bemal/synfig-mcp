@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-server.json",
+  "name": "synfig-mcp",
+  "description": "Live Model Context Protocol control of Synfig Studio with headless fallback",
+  "version": "0.1.0",
+  "homepage": "https://github.com/synfig/synfig-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/synfig/synfig-mcp.git"
+  },
+  "license": "MIT",
+  "packages": [
+    {
+      "registry": "pypi",
+      "package": "synfig-mcp"
+    }
+  ],
+  "transport": {
+    "type": "stdio",
+    "command": "synfig-mcp"
+  }
+}
