@@ -1,1 +1,21 @@
-"""SIF XML reader and writer."""
+"""SIF XML reader, writer, and document DOM model."""
+
+from synfig_mcp.sif.parser import (
+    SifDocument,
+    SifLayer,
+    format_synfig_time,
+    parse_synfig_time,
+    synfig_value_to_xml,
+    xml_to_synfig_value,
+)
+from synfig_mcp.sif.writer import save_sif
+
+__all__ = [
+    "SifDocument",
+    "SifLayer",
+    "format_synfig_time",
+    "parse_synfig_time",
+    "save_sif",
+    "synfig_value_to_xml",
+    "xml_to_synfig_value",
+]
