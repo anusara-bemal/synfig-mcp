@@ -42,6 +42,10 @@ class FakeBridgeServer:
         self.close_on_next_request: bool = False
         self.send_malformed_json: bool = False
 
+        self._fake_docs: dict[str, dict[str, Any]] = {}
+        self._fake_time: float = 0.0
+        self._fake_keyframes: list[dict[str, Any]] = []
+
     async def start(self) -> None:
         """Start the fake bridge TCP server."""
         self._server = await asyncio.start_server(self._handle_client, self.host, self.port)
@@ -202,12 +206,75 @@ class FakeBridgeServer:
             }
 
         # Document methods
-        if method == "doc.info":
-            doc_id = params.get("doc_id", "doc_0")
+        if method == "doc.list":
+            if not self._fake_docs:
+                self._fake_docs["doc_0"] = {
+                    "id": "doc_0",
+                    "doc_id": "doc_0",
+                    "name": "Synfig Animation 1",
+                    "file_path": None,
+                    "width": 1920,
+                    "height": 1080,
+                    "fps": 24.0,
+                    "start_time": 0.0,
+                    "end_time": 5.0,
+                    "duration_frames": 120,
+                }
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
-                "result": {
+                "result": list(self._fake_docs.values()),
+            }
+
+        if method == "doc.new":
+            d_id = f"doc_{len(self._fake_docs)}"
+            doc_obj = {
+                "id": d_id,
+                "doc_id": d_id,
+                "name": params.get("name", f"Synfig Animation {len(self._fake_docs) + 1}"),
+                "file_path": None,
+                "width": params.get("width", 1920),
+                "height": params.get("height", 1080),
+                "fps": params.get("fps", 24.0),
+                "start_time": 0.0,
+                "end_time": 5.0,
+                "duration_frames": 120,
+            }
+            self._fake_docs[d_id] = doc_obj
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": doc_obj,
+            }
+
+        if method in ("doc.info", "doc.open"):
+            doc_id = params.get("doc_id", "doc_0")
+            cached_doc = self._fake_docs.get(doc_id)
+            if not cached_doc:
+                cached_doc = {
+                    "id": doc_id,
+                    "doc_id": doc_id,
+                    "name": "Synfig Animation 1",
+                    "file_path": params.get("file_path", None),
+                    "width": 1920,
+                    "height": 1080,
+                    "fps": 24.0,
+                    "start_time": 0.0,
+                    "end_time": 5.0,
+                    "duration_frames": 120,
+                }
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": cached_doc,
+            }
+
+        if method == "doc.set_properties":
+            doc_id = params.get("doc_id", "doc_0")
+            cached_doc = self._fake_docs.get(doc_id)
+            if not cached_doc:
+                cached_doc = {
+                    "id": doc_id,
                     "doc_id": doc_id,
                     "name": "Synfig Animation 1",
                     "file_path": None,
@@ -217,6 +284,66 @@ class FakeBridgeServer:
                     "start_time": 0.0,
                     "end_time": 5.0,
                     "duration_frames": 120,
+                }
+            if "width" in params:
+                cached_doc["width"] = params["width"]
+            if "height" in params:
+                cached_doc["height"] = params["height"]
+            if "fps" in params:
+                cached_doc["fps"] = params["fps"]
+            if "name" in params:
+                cached_doc["name"] = params["name"]
+            self._fake_docs[doc_id] = cached_doc
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": cached_doc,
+            }
+
+        if method == "doc.save":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"file_path": params.get("file_path", "doc_0.sifz")},
+            }
+
+        if method == "doc.close":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"closed": True},
+            }
+
+        if method == "canvas.list":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"canvases": ["/"]},
+            }
+
+        if method == "scene.tree":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "canvas_path": params.get("canvas_path", "/"),
+                    "layers": [
+                        {
+                            "id": "Circle001",
+                            "type": "circle",
+                            "desc": "Circle001",
+                            "active": True,
+                            "depth": 0,
+                            "params": {
+                                "radius": {"type": "real", "value": 1.5},
+                                "color": {
+                                    "type": "color",
+                                    "value": {"r": 0.2, "g": 0.6, "b": 1.0, "a": 1.0},
+                                },
+                            },
+                        }
+                    ],
                 },
             }
 
@@ -228,7 +355,7 @@ class FakeBridgeServer:
                     "doc_id": params.get("doc_id", "doc_0"),
                     "layer_id": "circle_001",
                     "layer_type": params.get("layer_type", "circle"),
-                    "description": "Circle001",
+                    "description": params.get("description", "Circle001"),
                     "depth": params.get("depth", 0),
                     "diff": {
                         "action": "layer_add",
@@ -239,6 +366,65 @@ class FakeBridgeServer:
                 },
             }
 
+        if method == "layer.remove":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "removed": True,
+                    "diff": {
+                        "action": "layer.remove",
+                        "created": [],
+                        "modified": [],
+                        "deleted": [params.get("layer_id", "")],
+                    },
+                },
+            }
+
+        if method in ("layer.duplicate", "layer.reorder", "layer.raise", "layer.lower"):
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", "circle_001"),
+                    "depth": params.get("new_depth", 0),
+                    "reordered": True,
+                    "raised": True,
+                    "lowered": True,
+                    "diff": {"action": method, "created": [], "modified": [], "deleted": []},
+                },
+            }
+
+        if method == "layer.group":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "group_id": params.get("group_name", "Group"),
+                    "grouped_layers": params.get("layer_ids", []),
+                },
+            }
+
+        if method == "layer.ungroup":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "ungrouped_layers": ["Circle001"],
+                },
+            }
+
+        if method == "param.get":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "value": {"type": "real", "value": 1.5},
+                },
+            }
+
         if method == "param.set":
             return {
                 "jsonrpc": "2.0",
@@ -246,13 +432,95 @@ class FakeBridgeServer:
                 "result": {
                     "doc_id": params.get("doc_id", "doc_0"),
                     "layer_id": params.get("layer_id", "circle_001"),
-                    "param_name": params.get("param_name", "color"),
-                    "before": {"type": "color", "r": 0.2, "g": 0.6, "b": 1.0, "a": 1.0},
-                    "after": params.get("value"),
+                    "param_name": params.get("param_name", "radius"),
+                    "before": {"type": "real", "value": 1.0},
+                    "after": params.get("value", {"type": "real", "value": 1.5}),
                 },
             }
 
+        if method == "anim.time_get":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"time": {"seconds": self._fake_time}},
+            }
+
+        if method == "anim.time_set":
+            t = params.get("time", 0.0)
+            self._fake_time = float(t) if isinstance(t, (int, float)) else 0.0
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"time": {"seconds": self._fake_time}},
+            }
+
+        if method == "anim.keyframe_add":
+            t = float(params.get("time", 0.0))
+            kf = {"time": t, "description": params.get("description", ""), "active": True}
+            self._fake_keyframes.append(kf)
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "time": t,
+                    "description": kf["description"],
+                    "active": True,
+                    "diff": {
+                        "action": "anim.keyframe_add",
+                        "created": [f"kf_{t}"],
+                        "modified": [],
+                        "deleted": [],
+                    },
+                },
+            }
+
+        if method == "anim.keyframe_list":
+            if not self._fake_keyframes:
+                self._fake_keyframes = [{"time": 0.0, "description": "Start", "active": True}]
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "keyframes": self._fake_keyframes,
+                },
+            }
+
+        if method == "anim.keyframe_remove":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"removed": True},
+            }
+
+        if method == "selection.get":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"selected_layers": ["Circle001"]},
+            }
+
+        if method == "selection.set":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"selected_layers": params.get("layer_ids", [])},
+            }
+
         if method in ("history.undo", "history.redo"):
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"success": True},
+            }
+
+        if method == "history.list":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"undo_count": 1, "redo_count": 0},
+            }
+
+        if method == "render.frame":
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,

@@ -278,13 +278,19 @@ class LiveBackend(BackendBase):
     async def anim_time_get(self, doc_id: str) -> float:
         client = await self._ensure_client()
         res = await client.call("anim.time_get", {"doc_id": doc_id})
-        return float(res.get("time", 0.0))
+        t_val = res.get("time")
+        if isinstance(t_val, dict):
+            return float(t_val.get("seconds", 0.0))
+        return float(t_val or 0.0)
 
     async def anim_time_set(self, doc_id: str, time: float | str) -> float:
         client = await self._ensure_client()
-        t_val = float(time) if isinstance(time, (int, float)) else time
-        res = await client.call("anim.time_set", {"doc_id": doc_id, "time": t_val})
-        return float(res.get("time", 0.0))
+        t_in = float(time) if isinstance(time, (int, float)) else time
+        res = await client.call("anim.time_set", {"doc_id": doc_id, "time": t_in})
+        t_val = res.get("time")
+        if isinstance(t_val, dict):
+            return float(t_val.get("seconds", 0.0))
+        return float(t_val or 0.0)
 
     async def anim_keyframe_add(
         self,

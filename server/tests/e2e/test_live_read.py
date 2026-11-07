@@ -74,22 +74,31 @@ async def test_live_bridge_read_path(tmp_path: Path) -> None:
         assert "doc.read" in client.capabilities
         assert "param.read" in client.capabilities
 
-        # 3. doc.info
-        info = await client.call("doc.info", {"doc_id": "doc_0"})
+        # 3. doc.list (wait for document to finish loading)
+        docs = []
+        for _ in range(20):
+            try:
+                docs = await client.call("doc.list", {})
+                if docs:
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(0.5)
+
+        assert isinstance(docs, list)
+        assert len(docs) >= 1
+        active_doc_id = docs[0]["doc_id"]
+
+        # 4. doc.info
+        info = await client.call("doc.info", {"doc_id": active_doc_id})
         assert info["width"] == 1920
         assert info["height"] == 1080
         assert info["fps"] == 24.0
         assert info["duration_frames"] == 120
         assert info["name"] == "Test Animation"
 
-        # 4. doc.list
-        docs = await client.call("doc.list", {})
-        assert isinstance(docs, list)
-        assert len(docs) >= 1
-        assert docs[0]["doc_id"] == "doc_0"
-
         # 5. scene.tree
-        tree = await client.call("scene.tree", {"doc_id": "doc_0"})
+        tree = await client.call("scene.tree", {"doc_id": active_doc_id})
         assert "layers" in tree
         layers = tree["layers"]
         layer_names = [layer.get("desc") or layer.get("type") for layer in layers]
@@ -99,7 +108,7 @@ async def test_live_bridge_read_path(tmp_path: Path) -> None:
         # 6. param.get (color)
         param_color = await client.call(
             "param.get",
-            {"doc_id": "doc_0", "layer_id": "Circle001", "param_name": "color"},
+            {"doc_id": active_doc_id, "layer_id": "Circle001", "param_name": "color"},
         )
         assert param_color["value"]["type"] == "color"
         c = param_color["value"]["value"]
@@ -110,18 +119,18 @@ async def test_live_bridge_read_path(tmp_path: Path) -> None:
         # 7. param.get (radius)
         param_radius = await client.call(
             "param.get",
-            {"doc_id": "doc_0", "layer_id": "Circle001", "param_name": "radius"},
+            {"doc_id": active_doc_id, "layer_id": "Circle001", "param_name": "radius"},
         )
         assert param_radius["value"]["type"] == "real"
         assert abs(param_radius["value"]["value"] - 1.5) < 0.01
 
         # 8. anim.time_get
-        time_info = await client.call("anim.time_get", {"doc_id": "doc_0"})
+        time_info = await client.call("anim.time_get", {"doc_id": active_doc_id})
         assert "time" in time_info
         assert "seconds" in time_info["time"]
 
         # 9. selection.get
-        sel = await client.call("selection.get", {"doc_id": "doc_0"})
+        sel = await client.call("selection.get", {"doc_id": active_doc_id})
         assert "selected_layers" in sel
 
         await client.close()

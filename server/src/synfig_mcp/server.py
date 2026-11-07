@@ -1,34 +1,34 @@
 """
 MCP Server entrypoint for synfig-mcp.
+Configures logging to stderr to maintain clean stdio transport, registers all typed tools,
+and executes the MCP protocol loop.
 """
 
-from typing import Any
+from mcp.server.mcpserver import MCPServer
 
-from mcp.server import MCPServer
-
+from synfig_mcp.backend.base import BackendBase
 from synfig_mcp.backend.select import get_backend
 from synfig_mcp.logging import configure_logging, get_logger
+from synfig_mcp.tools import register_all_tools
 
 configure_logging()
 logger = get_logger("synfig_mcp.server")
 
-mcp = MCPServer("synfig-mcp")
-backend = get_backend()
+
+def create_server(backend: BackendBase | None = None) -> MCPServer:
+    """Create and configure the MCPServer instance with all tools registered."""
+    active_backend = backend or get_backend()
+    mcp_app = MCPServer("synfig-mcp")
+    register_all_tools(mcp_app, active_backend)
+    return mcp_app
 
 
-@mcp.tool()
-async def health_check() -> dict[str, Any]:
-    """
-    Check server status, active backend (Live vs Headless), and bridge connection.
-    Use this to determine whether Synfig Studio is currently connected.
-    """
-    status = await backend.health_check()
-    return status.model_dump()
+mcp = create_server()
 
 
 def main() -> None:
-    """Run the MCP server over stdio."""
-    logger.info("Starting synfig-mcp server", backend=backend.name)
+    """Run the MCP server over clean stdio transport."""
+    logger.info("Starting synfig-mcp server over stdio transport")
     mcp.run(transport="stdio")
 
 
