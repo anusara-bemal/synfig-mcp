@@ -12,7 +12,7 @@ from typing import Any
 
 from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
 from synfig_mcp.cli.runner import CliRunner
-from synfig_mcp.errors import DocumentNotFoundError
+from synfig_mcp.errors import DocumentNotFoundError, SynfigError
 from synfig_mcp.protocol.models import SynfigValue
 from synfig_mcp.sif.parser import SifDocument, parse_synfig_time
 from synfig_mcp.sif.writer import save_sif
@@ -29,6 +29,7 @@ class HeadlessBackend(BackendBase):
         self._undo_stacks: dict[str, list[bytes]] = {}
         self._redo_stacks: dict[str, list[bytes]] = {}
         self._current_time: dict[str, float] = {}
+        self._dirty: dict[str, bool] = {}
 
     @property
     def name(self) -> str:
@@ -80,6 +81,7 @@ class HeadlessBackend(BackendBase):
                 self._undo_stacks[doc_id].pop(0)
             # Clear redo stack on new action
             self._redo_stacks[doc_id] = []
+            self._dirty[doc_id] = True
 
     async def doc_list(self) -> list[DocumentInfo]:
         """List all currently loaded documents."""
@@ -97,6 +99,7 @@ class HeadlessBackend(BackendBase):
         self._undo_stacks[doc_id] = []
         self._redo_stacks[doc_id] = []
         self._current_time[doc_id] = 0.0
+        self._dirty[doc_id] = False
 
         return self._sync_doc_info(doc_id)
 
@@ -114,6 +117,7 @@ class HeadlessBackend(BackendBase):
         self._undo_stacks[doc_id] = []
         self._redo_stacks[doc_id] = []
         self._current_time[doc_id] = 0.0
+        self._dirty[doc_id] = False
 
         return self._sync_doc_info(doc_id)
 
@@ -128,18 +132,22 @@ class HeadlessBackend(BackendBase):
 
         save_sif(self._documents[doc_id], target)
         self._doc_paths[doc_id] = target.resolve()
+        self._dirty[doc_id] = False
         self._sync_doc_info(doc_id)
         return str(target.resolve())
 
-    async def doc_close(self, doc_id: str) -> bool:
+    async def doc_close(self, doc_id: str, force: bool = False) -> bool:
         """Close an open document, freeing its memory."""
         if doc_id in self._documents:
+            if not force and self._dirty.get(doc_id, False):
+                raise SynfigError("Document has unsaved changes. Set force=True or save first.")
             del self._documents[doc_id]
             self._doc_info.pop(doc_id, None)
             self._doc_paths.pop(doc_id, None)
             self._undo_stacks.pop(doc_id, None)
             self._redo_stacks.pop(doc_id, None)
             self._current_time.pop(doc_id, None)
+            self._dirty.pop(doc_id, None)
             return True
         return False
 

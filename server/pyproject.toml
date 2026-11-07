@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "synfig-mcp"
-version = "0.1.0"
+version = "0.6.0"
 description = "Live MCP control of Synfig Studio (native bridge + headless fallback)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -103,6 +103,9 @@ minversion = "8.0"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "real_studio: tests requiring real patched Synfig Studio binary",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

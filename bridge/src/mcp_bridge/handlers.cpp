@@ -22,6 +22,8 @@
 #include <synfig/renddesc.h>
 #include <synfig/keyframe.h>
 #include <synfig/time.h>
+#include <synfig/target.h>
+#include <synfig/targetparam.h>
 #endif
 
 namespace mcp_bridge {
@@ -365,6 +367,39 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    if (method == "doc.close") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        bool force = params.value("force", false);
+        return run_on_main_thread([&, doc_id, force]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            // Safe closing without blocking on GTK modal dialogs:
+            // If dirty and !force, return an explicit error instead of popping a modal dialog.
+            if (!force && inst->get_action_count() > 0) {
+                r["error"] = {{"code", 2004}, {"message", "Document has unsaved changes. Set force=true or save first."}};
+                return r;
+            }
+
+            // Direct close() bypasses safe_close() yes_no_cancel dialog completely.
+            inst->close();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"closed", true},
+                {"diff", make_diff("doc.close", {}, {}, {doc_id})}
+            };
+            return r;
+        });
+    }
+
     if (method == "doc.set_properties") {
         std::string doc_id = params.value("doc_id", "doc_0");
         return run_on_main_thread([&, doc_id]() -> nlohmann::json {
@@ -563,7 +598,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    if (method == "layer.remove") {
+    if (method == "layer.remove" || method == "layer.delete") {
         std::string doc_id = params.value("doc_id", "doc_0");
         std::string layer_id = params.value("layer_id", "");
         return run_on_main_thread([&, doc_id, layer_id]() -> nlohmann::json {
@@ -648,7 +683,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    if (method == "layer.reorder") {
+    if (method == "layer.reorder" || method == "layer.move") {
         std::string doc_id = params.value("doc_id", "doc_0");
         std::string layer_id = params.value("layer_id", "");
         int new_depth = params.value("new_depth", 0);
@@ -919,7 +954,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     }
 
     // --- 6. ANIMATION METHODS ---
-    if (method == "anim.time_get") {
+    if (method == "anim.time_get" || method == "anim.time.get") {
         std::string doc_id = params.value("doc_id", "doc_0");
         return run_on_main_thread([&, doc_id]() -> nlohmann::json {
             nlohmann::json r;
@@ -949,7 +984,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    if (method == "anim.time_set") {
+    if (method == "anim.time_set" || method == "anim.time.set") {
         std::string doc_id = params.value("doc_id", "doc_0");
         double t_sec = 0.0;
         if (params.contains("time")) {
@@ -988,7 +1023,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    if (method == "anim.keyframe_add") {
+    if (method == "anim.keyframe_add" || method == "keyframe.add") {
         std::string doc_id = params.value("doc_id", "doc_0");
         double t_sec = params.value("time", 0.0);
         std::string desc = params.value("description", "");
@@ -1033,7 +1068,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    if (method == "anim.keyframe_remove") {
+    if (method == "anim.keyframe_remove" || method == "keyframe.delete" || method == "keyframe.remove") {
         std::string doc_id = params.value("doc_id", "doc_0");
         double t_sec = params.value("time", 0.0);
 
@@ -1051,8 +1086,14 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
             synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: anim.keyframe_remove");
 
-            synfig::Time t_kf(t_sec);
-            synfig::Keyframe kf(t_kf);
+            synfig::KeyframeList::iterator iter;
+            if (!inst->get_canvas()->keyframe_list().find(synfig::Time(t_sec), iter)) {
+                grouper.cancel();
+                r["error"] = {{"code", 2002}, {"message", "Keyframe not found at time: " + std::to_string(t_sec)}};
+                return r;
+            }
+
+            synfig::Keyframe kf = *iter;
             synfigapp::Action::Handle action = synfigapp::Action::create("KeyframeRemove");
             if (action) {
                 action->set_param("canvas", inst->get_canvas());
@@ -1067,6 +1108,36 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 {"doc_id", doc_id},
                 {"time", t_sec},
                 {"diff", make_diff("anim.keyframe_remove", {}, {}, {std::to_string(t_sec)})}
+            };
+            return r;
+        });
+    }
+
+    if (method == "anim.keyframe_list" || method == "keyframe.list") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        return run_on_main_thread([&, doc_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            nlohmann::json kfs = nlohmann::json::array();
+            for (const auto& kf : inst->get_canvas()->keyframe_list()) {
+                nlohmann::json kf_obj;
+                kf_obj["time"] = static_cast<double>(kf.get_time());
+                kf_obj["description"] = kf.get_description();
+                kf_obj["active"] = kf.active();
+                kfs.push_back(kf_obj);
+            }
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"keyframes", kfs}
             };
             return r;
         });
@@ -1254,6 +1325,112 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    if (method == "render.frame" || method == "canvas.render_frame") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string output_path = params.value("output_path", "");
+        double render_time = params.value("time", 0.0);
+        std::string target_name = params.value("target", "png");
+
+        return run_on_main_thread([&, doc_id, output_path, render_time, target_name]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            if (output_path.empty()) {
+                r["error"] = {{"code", -32602}, {"message", "Missing 'output_path' parameter"}};
+                return r;
+            }
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Canvas::Handle canvas = inst->get_canvas();
+            synfig::RendDesc desc = canvas->rend_desc();
+            if (params.contains("width")) desc.set_w(params["width"].get<int>());
+            if (params.contains("height")) desc.set_h(params["height"].get<int>());
+            desc.set_time(synfig::Time(render_time));
+
+            synfig::Target::Handle target = synfig::Target::create(
+                target_name,
+                synfig::filesystem::Path(output_path),
+                synfig::TargetParam()
+            );
+
+            if (!target) {
+                std::string ext = synfig::filesystem::Path::filename_extension(output_path);
+                if (!ext.empty() && ext[0] == '.') ext.erase(0, 1);
+                if (!ext.empty() && synfig::Target::ext_book().count(ext)) {
+                    target = synfig::Target::create(
+                        synfig::Target::ext_book()[ext],
+                        synfig::filesystem::Path(output_path),
+                        synfig::TargetParam()
+                    );
+                }
+            }
+
+            if (!target) {
+                r["error"] = {{"code", 2005}, {"message", "Unable to create render target for: " + output_path}};
+                return r;
+            }
+
+            target->set_canvas(canvas);
+            target->set_rend_desc(&desc);
+            target->set_quality(4);
+
+            bool ok = target->init();
+            if (ok) {
+                ok = target->render();
+            }
+
+            if (!ok) {
+                r["error"] = {{"code", 2006}, {"message", "Frame render failed for: " + output_path}};
+                return r;
+            }
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"output_path", output_path},
+                {"time", render_time},
+                {"success", true}
+            };
+            return r;
+        });
+    }
+
+    if (method == "test.manual_action") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        return run_on_main_thread([&, doc_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Canvas::Handle canvas = inst->get_canvas();
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(canvas);
+
+            synfig::Layer::Handle layer = synfig::Layer::create("circle");
+            layer->set_description("ManualUserCircle");
+            layer->set_canvas(canvas);
+
+            bool ok = ci ? ci->layer_add_action(layer) : false;
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"success", ok},
+                {"manual", true}
+            };
+            return r;
+        });
+    }
+
 #else
     // Standalone fallback for testing without Synfig Studio
     if (method == "doc.info") {
@@ -1270,10 +1447,11 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         };
         return res;
     }
-    if (method == "layer.add" || method == "param.set" || method == "history.undo" || method == "history.redo") {
+    if (method == "layer.add" || method == "param.set" || method == "history.undo" || method == "history.redo" || method == "doc.close" || method == "render.frame" || method == "canvas.render_frame" || method == "test.manual_action" || method == "anim.keyframe_list" || method == "keyframe.list") {
         res["result"] = {
             {"doc_id", params.value("doc_id", "doc_0")},
             {"success", true},
+            {"closed", true},
             {"diff", make_diff(method, {"mock_id"}, {}, {})}
         };
         return res;

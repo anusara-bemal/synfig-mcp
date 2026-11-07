@@ -158,7 +158,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase) -> None:
         return {"file_path": path}
 
     @mcp.tool(annotations=MUTATING)
-    async def doc_close(doc_id: str) -> dict[str, bool]:
+    async def doc_close(doc_id: str, force: bool = False) -> dict[str, bool]:
         """
         Close an open document and unload it from memory.
 
@@ -169,12 +169,12 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase) -> None:
         Object containing 'closed': true.
 
         Common mistakes:
-        Closing without saving changes first with doc_save.
+        Closing without saving changes first with doc_save, unless force=True is passed.
 
         Example:
-        doc_close(doc_id="doc_0")
+        doc_close(doc_id="doc_0", force=False)
         """
-        success = await backend.doc_close(doc_id=doc_id)
+        success = await backend.doc_close(doc_id=doc_id, force=force)
         return {"closed": success}
 
     @mcp.tool(annotations=IDEMPOTENT)

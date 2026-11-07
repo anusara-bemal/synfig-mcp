@@ -42,7 +42,7 @@ assert target_cmake1 in cmake_content, 'target_cmake1 not found'
 cmake_content = cmake_content.replace(target_cmake1, repl_cmake1, 1)
 
 target_cmake2 = 'if(TCMALLOC_LIBRARY)\r\n\ttarget_link_libraries(synfigstudio PRIVATE ${TCMALLOC_LIBRARY})\r\nendif()'
-repl_cmake2 = target_cmake2 + '\r\n\r\nif (WIN32)\r\n\ttarget_link_libraries(synfigstudio PRIVATE ws2_32)\r\nendif()'
+repl_cmake2 = target_cmake2 + '\r\n\r\nif (WIN32)\r\n\ttarget_link_libraries(synfigstudio PRIVATE ws2_32 advapi32)\r\nendif()'
 assert target_cmake2 in cmake_content, 'target_cmake2 not found'
 cmake_content = cmake_content.replace(target_cmake2, repl_cmake2, 1)
 

@@ -1,4 +1,4 @@
-# synfig-mcp Roadmap & Implementation Status
+# synfig-mcp Roadmap & Implementation Status (v0.6.0)
 
 ## Master Plan Phases
 
@@ -9,54 +9,59 @@
 | **Phase P2** | Wire Protocol, Client & Fake Bridge | **DONE** | JSON-RPC 2.0 schemas, Pydantic models, async `BridgeClient`, `FakeBridgeServer`, contract test suite. |
 | **Phase P3** | Bridge Read-Only Path | **DONE** | C++ `mcp_bridge` GTK dispatcher, token authentication, `doc.list`, `doc.info`, `scene.tree`, `param.get`, `anim.time_get`, `selection.get`. Verified live against running Studio. |
 | **Phase P4** | Bridge Mutating Path & Undo System | **DONE** | C++ mutating actions wrapped in `synfigapp::Action::PassiveGrouper`, structured diffs, `layer.add`, `param.set`, `history.undo`, `history.redo`, timeline seek, keyframes. Verified live against running Studio. |
-| **Phase P5** | Headless SIF Engine & CLI Introspection | **DONE** | Pure-Python lossless XML engine (`lxml.etree`), multi-format (`.sif`, `.sifz`, `.sfg`), CLI runner, schema registry with caching, headless undo/redo snapshot stack. 42/42 tests passing. |
-| **Phase P6** | Unified MCP Surface & FastMCP Tools | **IN PROGRESS** | Typed MCP tools over `BackendBase` (`MCPServer`, `@mcp.tool()`, `ToolAnnotations`), active backend auto-selection, clean stdio transport, comprehensive contract tests. |
-| **Phase P7** | End-to-End Live Workflow Verification | **PENDING** | Complex animation scenarios driven live via MCP client, stress testing, undo/redo mixing with manual user edits. |
-| **Phase P8** | Claude Desktop Integration, Examples & Packaging | **PENDING** | `claude_desktop_config.json`, sample walkthroughs, PyPI packaging (`uv build`), reproducible MSYS2 build scripts. |
+| **Phase P5** | Headless SIF Engine & CLI Introspection | **DONE** | Pure-Python lossless XML engine (`lxml.etree`), multi-format (`.sif`, `.sifz`, `.sfg`), CLI runner, schema registry with caching, headless undo/redo snapshot stack. 59/59 tests passing. |
+| **Phase P6** | Unified MCP Surface & FastMCP Tools | **DONE** | 27 typed MCP tools over `BackendBase` (`MCPServer`, `@mcp.tool()`, `ToolAnnotations`), active backend auto-selection, clean stdio transport, contract tests across both backends. |
+| **Phase P7 (Pre-P7 Live Gaps)** | Live E2E Bridge Hardening & Verification | **DONE** | Real `synfigstudio.exe` E2E test suite: core mutations + undo, ACL verification (`icacls`), safe non-blocking dialogs, LIFO ordering (bridge + manual edit), real Studio MCP marker. |
+| **Phase P7 (Original P7)** | Render / Preview Pipeline | **NEXT** | High-performance frame/sequence/video rendering, contact sheet generation, render progress tracking, cancellation, disk cache. |
+| **Phase P8** | Claude Desktop Integration & Packaging | **PENDING** | `claude_desktop_config.json`, sample walkthroughs, PyPI packaging (`uv build`), reproducible MSYS2 build scripts. |
 
 ---
 
-## LiveBackend Method Support Matrix
+## LiveBackend Method Support Matrix (Verified against Real Studio)
 
-| Method | Wire Protocol | Python Client Wired | C++ Handler Implemented | Verified Live (Real Studio) |
-|---|---|---|---|---|
-| `hello` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) |
-| `doc.list` | Yes | Yes | Yes | **Yes** (`test_live_read.py`) |
-| `doc.info` | Yes | Yes | Yes | **Yes** (`test_live_read.py`) |
-| `doc.new` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `doc.open` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `doc.save` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `doc.set_properties` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `canvas.list` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `canvas.create` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `scene.tree` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) |
-| `layer.add` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `layer.remove` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `layer.duplicate` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `layer.reorder` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `layer.raise` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `layer.lower` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `layer.group` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `layer.ungroup` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `param.get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) |
-| `param.set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `anim.time_get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) |
-| `anim.time_set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `anim.keyframe_add` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `anim.keyframe_remove` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `anim.waypoint_set` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `selection.get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`) |
-| `selection.set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `history.undo` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `history.redo` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) |
-| `history.list` | Yes | Yes | Yes | Contract test only (Live Studio E2E pending) |
-| `render.frame` | Yes | Yes | Yes | Headless / CLI verified |
+| Method | Wire Protocol | Python Client Wired | C++ Handler Implemented | Verified Live (Real Studio) | Undo Restores State |
+|---|---|---|---|---|---|
+| `hello` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) | N/A (Read) |
+| `doc.list` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_mcp_tools.py`) | N/A (Read) |
+| `doc.info` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) | N/A (Read) |
+| `doc.new` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | N/A (Doc Lifecycle) |
+| `doc.open` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | N/A (Doc Lifecycle) |
+| `doc.save` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | N/A (Doc Lifecycle) |
+| `doc.close` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py` - dirty safe check, error 2004) | N/A (Doc Lifecycle) |
+| `scene.tree` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) | N/A (Read) |
+| `layer.add` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | **Yes** (`history.undo`) |
+| `layer.delete` / `layer.remove` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `layer.duplicate` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `layer.move` / `layer.reorder` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) | N/A (Read) |
+| `param.set` (`real`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.set` (`color`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.set` (`vector`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.set` (`angle`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.set` (`bool`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.set` (`string`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `anim.time.get` / `anim.time_get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) | N/A (Seek) |
+| `anim.time.set` / `anim.time_set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | N/A (Seek) |
+| `keyframe.add` / `anim.keyframe_add` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `keyframe.delete` / `anim.keyframe_remove` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `canvas.render_frame` / `render.frame` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | N/A (Render) |
+| `selection.get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`) | N/A (Read) |
+| `selection.set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `history.undo` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py` - AI edit + manual GTK edit LIFO verified) | N/A |
+| `history.redo` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | N/A |
 
 ---
 
-## Tracked Gaps & Technical Debt
+## Security & Concurrency Verification Summary
 
-1. **Live Studio E2E Coverage for Secondary Mutating Actions**:
-   - `doc.new`, `doc.save`, `doc.open`, `doc.set_properties`, `canvas.create`, `layer.duplicate`, `layer.group`, `layer.ungroup`, `anim.waypoint_set`, `history.list` are fully implemented in C++ and Python and validated via `FakeBridge` contract tests, but have not yet been exercised against a live running `synfigstudio.exe` process in an automated E2E test.
-2. **Windows Token File ACL Restrictions**:
-   - On POSIX, `auth.cpp` invokes `chmod(path, 0600)`. On Windows, the token file is created in `%USERPROFILE%\.synfig\mcp_token` inheriting default user directory ACLs. Explicit Win32 DACL hardening (`SetNamedSecurityInfoW` with single-user SID) is unverified and should be added for production hardening.
+1. **Windows Token File ACL**:
+   - Implemented in `bridge/src/mcp_bridge/auth.cpp` via Win32 API (`SetNamedSecurityInfoA`).
+   - Explicitly removes all inherited permissions using `PROTECTED_DACL_SECURITY_INFORMATION`.
+   - Grants `GENERIC_ALL` strictly to current process owner SID.
+   - Verified live in `test_live_token_file_acl` via `icacls`, confirming `ANUSARA_BEMAL\anusa:(F)` with zero `(I)` inheritance flags.
+2. **GTK Dialog Safe Operations**:
+   - `doc.close` checks `inst->get_action_count() > 0`. If dirty and `force=False`, immediately returns error code 2004 without popping GUI modal dialogs.
+   - If clean or `force=True`, directly invokes `inst->close()`.
+3. **Action Undo Ordering (LIFO)**:
+   - Verified interleaving bridge mutations (`layer.add` in `PassiveGrouper`) with direct GTK main thread manual actions (`ci->layer_add_action`).
+   - Successive `history.undo` operations roll back the manual GUI action first, followed by the bridge action, preserving exact undo stack integrity.

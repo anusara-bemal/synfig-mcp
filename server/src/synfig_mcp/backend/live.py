@@ -97,9 +97,9 @@ class LiveBackend(BackendBase):
         res = await client.call("doc.save", params)
         return str(res.get("file_path", file_path or ""))
 
-    async def doc_close(self, doc_id: str) -> bool:
+    async def doc_close(self, doc_id: str, force: bool = False) -> bool:
         client = await self._ensure_client()
-        res = await client.call("doc.close", {"doc_id": doc_id})
+        res = await client.call("doc.close", {"doc_id": doc_id, "force": force})
         return bool(res.get("closed", True))
 
     async def doc_set_properties(

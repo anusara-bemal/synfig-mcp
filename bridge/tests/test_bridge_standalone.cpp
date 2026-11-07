@@ -21,6 +21,11 @@ int main() {
     assert(mcp_bridge::validate_token(token1, token2) == false);
     assert(mcp_bridge::validate_token("", token1) == false);
     assert(mcp_bridge::validate_token(token1, "") == false);
+
+    bool wrote = mcp_bridge::write_token_file(token1);
+    assert(wrote);
+    std::string read_back = mcp_bridge::read_token_file();
+    assert(read_back == token1);
     std::cout << "✓ Auth tests passed" << std::endl;
 
     // 2. Test Coordinate Conversion

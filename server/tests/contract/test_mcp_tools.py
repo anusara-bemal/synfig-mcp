@@ -4,7 +4,9 @@ Exercises tools in-memory through mcp.client.Client.
 """
 
 import json
+import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -304,3 +306,142 @@ async def test_mcp_invalid_inputs_and_errors(
         bad_schema_res = await client.call_tool("schema_get_layer", {"layer_type": "unknown_xxx"})
         bad_schema = parse_tool_result(bad_schema_res)
         assert "error" in bad_schema
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
+    """Requirement E: Exercise a subset of MCP tools through in-memory Client against the real running Studio."""
+    import asyncio
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    bin_path = repo_root / "build_synfig" / "build_ucrt64" / "install" / "bin" / "synfigstudio.exe"
+    sample_sif = repo_root / "server" / "tests" / "fixtures" / "sample_project.sif"
+    if not bin_path.exists():
+        pytest.skip("Patched Synfig Studio binary not found")
+
+    test_port = 19991
+    env = os.environ.copy()
+    env["SYNFIG_MCP_PORT"] = str(test_port)
+    env["MSYS2_ARG_CONV_EXCL"] = "*"
+    env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
+    env["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+
+    token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
+    token_path = token_dir / "mcp_token"
+    if token_path.exists():
+        token_path.unlink()
+
+    log_path = tmp_path / "studio_mcp_test.log"
+    with open(log_path, "w", encoding="utf-8") as log_file:
+        proc = subprocess.Popen(
+            [str(bin_path), str(sample_sif)],
+            env=env,
+            stdout=log_file,
+            stderr=log_file,
+            cwd=str(bin_path.parent),
+        )
+
+    try:
+        token = ""
+        for _ in range(30):
+            if token_path.exists():
+                try:
+                    token = token_path.read_text(encoding="utf-8").strip()
+                    if token:
+                        break
+                except Exception:
+                    pass
+            await asyncio.sleep(0.5)
+
+        assert token, "Session token was not created by Synfig Studio"
+
+        bridge_client = BridgeClient(
+            host="127.0.0.1", port=test_port, token=token, default_timeout=10.0
+        )
+        connected = False
+        for _ in range(25):
+            try:
+                await bridge_client.connect()
+                connected = True
+                break
+            except Exception:
+                await asyncio.sleep(0.5)
+        assert connected
+
+        for _ in range(20):
+            doc_list = await bridge_client.call("doc.list")
+            if doc_list:
+                break
+            await asyncio.sleep(0.5)
+
+        live_backend = LiveBackend(client=bridge_client)
+        app = create_server(backend=live_backend)
+
+        async with Client(app) as client:
+            # 1. health_check
+            h = parse_tool_result(await client.call_tool("health_check", {}))
+            assert h["connected"] is True
+            assert h["backend"] == "live"
+
+            # 2. doc_list
+            docs = parse_tool_result(await client.call_tool("doc_list", {}))
+            if isinstance(docs, dict):
+                doc_id = docs.get("id") or docs.get("doc_id", "doc_0")
+            elif isinstance(docs, list) and len(docs) > 0:
+                first = docs[0]
+                doc_id = (
+                    first.get("id") or first.get("doc_id", "doc_0")
+                    if isinstance(first, dict)
+                    else "doc_0"
+                )
+            else:
+                doc_id = "doc_0"
+
+            # 3. layer_add
+            add_res = parse_tool_result(
+                await client.call_tool(
+                    "layer_add",
+                    {
+                        "doc_id": doc_id,
+                        "layer_type": "circle",
+                        "params": {"radius": {"type": "real", "value": 3.0}},
+                    },
+                )
+            )
+            assert "created" in add_res.get("diff", {})
+
+            # 4. anim_time_set & get
+            t_set = parse_tool_result(
+                await client.call_tool("anim_time_set", {"doc_id": doc_id, "time": 1.25})
+            )
+            assert abs(float(t_set.get("time", 1.25)) - 1.25) < 0.05
+            t_get = parse_tool_result(await client.call_tool("anim_time_get", {"doc_id": doc_id}))
+            assert abs(float(t_get.get("time", 1.25)) - 1.25) < 0.05
+
+            # 5. render_frame
+            out_png = tmp_path / "mcp_rendered_frame.png"
+            render_res = parse_tool_result(
+                await client.call_tool(
+                    "render_frame",
+                    {
+                        "doc_id": doc_id,
+                        "output_path": str(out_png),
+                        "time": 0.0,
+                        "width": 160,
+                        "height": 120,
+                    },
+                )
+            )
+            assert render_res["success"] is True
+            assert out_png.exists()
+
+        await bridge_client.close()
+
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()

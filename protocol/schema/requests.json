@@ -14,6 +14,7 @@
         "doc.new",
         "doc.open",
         "doc.save",
+        "doc.close",
         "doc.info",
         "doc.set_properties",
         "scene.tree",
@@ -21,8 +22,10 @@
         "canvas.create",
         "layer.add",
         "layer.remove",
+        "layer.delete",
         "layer.duplicate",
         "layer.reorder",
+        "layer.move",
         "layer.raise",
         "layer.lower",
         "layer.group",
@@ -36,6 +39,7 @@
         "anim.time_set",
         "anim.keyframe_add",
         "anim.keyframe_remove",
+        "anim.keyframe_list",
         "anim.waypoint_set",
         "anim.waypoint_remove",
         "history.undo",
@@ -43,7 +47,9 @@
         "history.list",
         "selection.get",
         "selection.set",
-        "render.frame"
+        "render.frame",
+        "canvas.render_frame",
+        "test.manual_action"
       ]
     },
     "params": {

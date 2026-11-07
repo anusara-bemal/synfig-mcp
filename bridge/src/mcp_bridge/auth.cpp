@@ -9,6 +9,14 @@
 #include <sys/stat.h>
 
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <aclapi.h>
 #include <direct.h>
 #define MKDIR(dir) _mkdir(dir)
 #else
@@ -71,6 +79,63 @@ static bool ensure_directory_exists(const std::string& filepath) {
     return true;
 }
 
+#ifdef _WIN32
+static bool set_windows_owner_only_acl(const std::string& path) {
+    HANDLE hToken = NULL;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+        return false;
+    }
+
+    DWORD dwSize = 0;
+    GetTokenInformation(hToken, TokenUser, NULL, 0, &dwSize);
+    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || dwSize == 0) {
+        CloseHandle(hToken);
+        return false;
+    }
+
+    std::vector<BYTE> buffer(dwSize);
+    PTOKEN_USER pTokenUser = reinterpret_cast<PTOKEN_USER>(buffer.data());
+    if (!GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize)) {
+        CloseHandle(hToken);
+        return false;
+    }
+
+    EXPLICIT_ACCESS_A ea;
+    ZeroMemory(&ea, sizeof(EXPLICIT_ACCESS_A));
+    ea.grfAccessPermissions = GENERIC_ALL;
+    ea.grfAccessMode = SET_ACCESS;
+    ea.grfInheritance = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.TrusteeType = TRUSTEE_IS_USER;
+    ea.Trustee.ptstrName = reinterpret_cast<LPSTR>(pTokenUser->User.Sid);
+
+    PACL pAcl = NULL;
+    DWORD res = SetEntriesInAclA(1, &ea, NULL, &pAcl);
+    CloseHandle(hToken);
+
+    if (res != ERROR_SUCCESS) {
+        return false;
+    }
+
+    DWORD setRes = SetNamedSecurityInfoA(
+        const_cast<LPSTR>(path.c_str()),
+        SE_FILE_OBJECT,
+        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+        NULL,
+        NULL,
+        pAcl,
+        NULL
+    );
+
+    if (setRes != ERROR_SUCCESS) {
+        std::cerr << "[mcp_bridge] SetNamedSecurityInfoA failed with error code: " << setRes << " on path: " << path << std::endl;
+    }
+
+    LocalFree(pAcl);
+    return (setRes == ERROR_SUCCESS);
+}
+#endif
+
 bool write_token_file(const std::string& token) {
     std::string path = get_token_file_path();
     if (!ensure_directory_exists(path)) {
@@ -87,7 +152,11 @@ bool write_token_file(const std::string& token) {
     ofs << token << std::endl;
     ofs.close();
 
-#ifndef _WIN32
+#ifdef _WIN32
+    if (!set_windows_owner_only_acl(path)) {
+        std::cerr << "[mcp_bridge] Warning: Could not set owner-only ACL on token file: " << path << std::endl;
+    }
+#else
     chmod(path.c_str(), 0600);
 #endif
 

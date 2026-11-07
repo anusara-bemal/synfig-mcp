@@ -6,7 +6,7 @@ Both LiveBackend (Studio) and HeadlessBackend (pure-Python + CLI) implement this
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from synfig_mcp.protocol.models import SynfigValue
 
@@ -24,15 +24,17 @@ class HealthStatus(BaseModel):
 class DocumentInfo(BaseModel):
     """Metadata describing an open or loaded Synfig document."""
 
-    id: str
-    name: str
+    id: str = Field(validation_alias=AliasChoices("id", "doc_id"))
+    name: str = ""
     file_path: str | None = None
-    width: int
-    height: int
-    fps: float
+    width: int = 1920
+    height: int = 1080
+    fps: float = 24.0
     start_time: float = 0.0
     end_time: float = 5.0
     duration_frames: int = 120
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class BackendBase(ABC):
@@ -76,7 +78,7 @@ class BackendBase(ABC):
         ...
 
     @abstractmethod
-    async def doc_close(self, doc_id: str) -> bool:
+    async def doc_close(self, doc_id: str, force: bool = False) -> bool:
         """Close an open document."""
         ...
 
