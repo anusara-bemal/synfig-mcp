@@ -117,6 +117,10 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "history_list": {"all"},
     # Assets
     "import_asset": {"assets", "all"},
+    "asset_search": {"assets", "all"},
+    "asset_preview": {"assets", "all"},
+    "asset_download": {"assets", "all"},
+    "asset_import_local": {"assets", "all"},
     # Render & Preview
     "render_frame": {"core", "review", "all"},
     "render_sequence": {"review", "all"},
@@ -498,6 +502,83 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             file_path=file_path,
             canvas_path=canvas_path,
         )
+
+    # -----------------------------------------------------------------------
+    # Licensed Asset Pipeline (Phase A5)
+    # -----------------------------------------------------------------------
+
+    @tool_for("asset_search", annotations=READ_ONLY)
+    async def asset_search(
+        query: str,
+        provider: str = "openverse",
+        license_type: str | None = None,
+        page: int = 1,
+    ) -> dict[str, Any]:
+        """Search permitted open-license asset providers returning compact text metadata.
+        Returns: {results: [{id, title, creator, license, provider}], count}.
+        Gotcha: Returns text only to conserve LLM tokens; use asset_preview to view thumbnail.
+        """
+        from synfig_mcp.assets.pipeline import AssetPipeline
+
+        pipeline = AssetPipeline()
+        results = await pipeline.search(
+            query=query, provider=provider, license_type=license_type, page=page
+        )
+        return wrap_untrusted({"results": results, "count": len(results)})
+
+    @tool_for("asset_preview", annotations=READ_ONLY)
+    async def asset_preview(
+        asset_id: str,
+        provider: str = "openverse",
+    ) -> dict[str, Any]:
+        """Fetch a small thumbnail preview image of an asset in base64.
+        Returns: {success, asset_id, thumbnail_base64}.
+        Gotcha: Previews are low-resolution to keep vision token usage below 200 tokens.
+        """
+        from synfig_mcp.assets.pipeline import AssetPipeline
+
+        pipeline = AssetPipeline()
+        res = await pipeline.preview(asset_id=asset_id, provider=provider)
+        return wrap_untrusted(res)
+
+    @tool_for("asset_download", annotations=MUTATING)
+    async def asset_download(
+        asset_id: str,
+        provider: str = "openverse",
+    ) -> dict[str, Any]:
+        """Download and verify licensed asset: evaluates license policy, SSRF checks, sanitizes SVG/raster, hashes SHA-256.
+        Returns: {success, asset_id, local_path, sha256, attribution}.
+        Gotcha: Non-commercial (NC) and No-Derivatives (ND) licenses are blocked by default.
+        """
+        from synfig_mcp.assets.pipeline import AssetPipeline
+
+        pipeline = AssetPipeline()
+        res = await pipeline.download_asset(asset_id=asset_id, provider=provider)
+        return wrap_untrusted(res)
+
+    @tool_for("asset_import_local", annotations=MUTATING)
+    async def asset_import_local(
+        file_path: str,
+        rights: str,
+        title: str = "Untitled",
+        creator: str = "Local User",
+        license_code: str = "own",
+    ) -> dict[str, Any]:
+        """Register a local file in the project provenance manifest with mandatory rights declaration.
+        Returns: {success, asset_id, rights, sha256, local_path}.
+        Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'public-domain'.
+        """
+        from synfig_mcp.assets.pipeline import AssetPipeline
+
+        pipeline = AssetPipeline()
+        res = await pipeline.import_local_asset(
+            file_path=file_path,
+            rights=rights,
+            title=title,
+            creator=creator,
+            license_code=license_code,
+        )
+        return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
     # Effects Recipes & Style Presets (Phase A3)
