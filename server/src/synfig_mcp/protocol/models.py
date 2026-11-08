@@ -122,6 +122,7 @@ class HelloParams(BaseModel):
     protocol_version: str = "1.0"
     client_name: str = "synfig-mcp"
     token: str
+    workspace_roots: list[str] | None = None
 
 
 class HelloResult(BaseModel):

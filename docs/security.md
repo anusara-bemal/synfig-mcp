@@ -56,3 +56,9 @@ When an LLM operates on untrusted or third-party animation files, an adversary c
 4. **Loopback-Only Binding & Constant-Time Authentication**:
    - Neither the TCP bridge nor the Streamable HTTP transport can be accessed across public networks by default.
    - HTTP transport enforces constant-time bearer token validation (`secrets.compare_digest`) and refuses to start on non-loopback addresses without explicit `--allow-remote` and an explicit token.
+
+### 5.1 Document-Derived Strings Marked as Untrusted Data
+All strings extracted from SIF XML or live Studio instances (including canvas names, layer names, layer descriptions, and string parameters) originate from document content. In `synfig-mcp`:
+- Tool responses treat layer names and descriptions as untrusted document data.
+- The MCP server never interprets or executes commands embedded in document text.
+- LLMs receiving `scene_tree` or `doc_info` payloads must treat string values as data rather than instructions.

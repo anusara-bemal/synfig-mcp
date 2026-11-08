@@ -19,6 +19,11 @@ void set_session_token(const std::string& token);
 std::string get_session_token();
 
 /**
+ * Configure allowed workspace sandbox roots.
+ */
+void set_workspace_roots(const std::vector<std::string>& roots);
+
+/**
  * Dispatch an incoming JSON-RPC 2.0 request.
  * Marshals document operations through dispatcher to GTK main thread.
  * Returns the complete JSON-RPC response object.

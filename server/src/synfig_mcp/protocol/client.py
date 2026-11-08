@@ -7,12 +7,16 @@ import asyncio
 import json
 import secrets
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
+from synfig_mcp.config import settings
 from synfig_mcp.errors import (
     BridgeAuthError,
     BridgeConnectionError,
     ProtocolVersionMismatchError,
+    SecurityError,
+    SecuritySandboxError,
     SynfigError,
 )
 from synfig_mcp.logging import get_logger
@@ -38,12 +42,14 @@ class BridgeClient:
         token: str | None = None,
         protocol_version: str = "1.0",
         default_timeout: float = 5.0,
+        workspace_roots: list[str | Path] | None = None,
     ) -> None:
         self.host = host
         self.port = port
         self.token = token
         self.protocol_version = protocol_version
         self.default_timeout = default_timeout
+        self.workspace_roots = workspace_roots
 
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
@@ -114,9 +120,15 @@ class BridgeClient:
 
     async def _handshake(self) -> None:
         """Send hello handshake to bridge and verify compatibility."""
+        roots = (
+            [str(Path(r).resolve()) for r in self.workspace_roots]
+            if self.workspace_roots is not None
+            else [str(r.resolve()) for r in settings.workspace_roots]
+        )
         params = HelloParams(
             protocol_version=self.protocol_version,
             token=self.token or "",
+            workspace_roots=roots,
         )
         res = await self.call("hello", params.model_dump())
         hello_result = HelloResult.model_validate(res)
@@ -214,8 +226,14 @@ class BridgeClient:
                                 future.set_exception(BridgeAuthError(message))
                             elif code == 1003:
                                 future.set_exception(ProtocolVersionMismatchError(message))
+                            elif code == 1202:
+                                future.set_exception(SecuritySandboxError(message))
+                            elif code == 1203:
+                                future.set_exception(SecurityError(message))
                             else:
-                                future.set_exception(SynfigError(f"Bridge error {code}: {message}"))
+                                future.set_exception(
+                                    SynfigError(f"Bridge error {code}: {message}", code=code)
+                                )
                         else:
                             future.set_result(msg.get("result"))
                 elif "method" in msg:

@@ -11,10 +11,17 @@ class SynfigError(Exception):
     code: int = 1000
     message: str = "Internal Synfig MCP error"
 
-    def __init__(self, message: str | None = None, details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        message: str | None = None,
+        details: dict[str, Any] | None = None,
+        code: int | None = None,
+    ) -> None:
         super().__init__(message or self.message)
         self.message = message or self.message
         self.details = details or {}
+        if code is not None:
+            self.code = code
 
     def to_dict(self) -> dict[str, Any]:
         """Convert error to a standard JSON-RPC error payload."""

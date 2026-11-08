@@ -60,6 +60,8 @@ If you wish to compile the native bridge yourself:
    bash bridge/scripts/apply_patches.sh
    bash bridge/scripts/build_windows_msys2.sh
    ```
+   > [!NOTE]
+   > `build_windows_msys2.sh` includes an automated fallback for `mingw-w64-ucrt-x86_64-libxml++2.6-2.42.3-5-any.pkg.tar.zst` from the official MSYS2 mirror if omitted by the active repo index, verifying its pinned SHA-256 checksum (`73fbff7c50409c9524fa9cb9a46453d71feea6036195cbb0b810459c5d012175`) before installation to maintain supply-chain integrity.
 3. The compiled binary is output to `build_synfig/build_ucrt64/install/bin/synfigstudio.exe`.
 
 ---

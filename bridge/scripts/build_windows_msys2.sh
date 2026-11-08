@@ -56,6 +56,11 @@ if ! pacman -Q mingw-w64-ucrt-x86_64-libxml++2.6 >/dev/null 2>&1; then
     else
         echo "=== Downloading libxml++2.6 directly from official mirror ==="
         curl -fsSL -o /tmp/libxmlpp26.pkg.tar.zst "https://mirror.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-libxml%2B%2B2.6-2.42.3-5-any.pkg.tar.zst"
+        PINNED_SHA256="73fbff7c50409c9524fa9cb9a46453d71feea6036195cbb0b810459c5d012175"
+        echo "${PINNED_SHA256}  /tmp/libxmlpp26.pkg.tar.zst" | sha256sum -c - || {
+            echo "ERROR: SHA-256 checksum mismatch for libxml++2.6 package!" >&2
+            exit 1
+        }
         pacman -U --noconfirm --needed /tmp/libxmlpp26.pkg.tar.zst
     fi
 fi

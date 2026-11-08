@@ -6,6 +6,16 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <sstream>
+#include <algorithm>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <limits.h>
+#include <stdlib.h>
+#include <unistd.h>
+#endif
 
 #ifndef MCP_BRIDGE_STANDALONE
 #include <gui/app.h>
@@ -144,6 +154,190 @@ static nlohmann::json build_layer_tree(synfig::Canvas::Handle canvas) {
     }
     return layers;
 }
+
+static std::vector<std::string> s_workspace_roots;
+
+static std::string normalize_path_str(const std::string& p) {
+    if (p.empty()) return "";
+#ifdef _WIN32
+    char full[MAX_PATH];
+    if (GetFullPathNameA(p.c_str(), MAX_PATH, full, NULL) == 0) {
+        return p;
+    }
+    std::string cur_full = full;
+    std::string rel_suffix = "";
+
+    HANDLE h = CreateFileA(cur_full.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    while (h == INVALID_HANDLE_VALUE && !cur_full.empty()) {
+        size_t last_slash = cur_full.find_last_of("\\/");
+        if (last_slash == std::string::npos) break;
+        std::string component = cur_full.substr(last_slash + 1);
+        rel_suffix = rel_suffix.empty() ? component : (component + "\\" + rel_suffix);
+        cur_full = cur_full.substr(0, last_slash);
+        h = CreateFileA(cur_full.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    }
+
+    std::string res;
+    if (h != INVALID_HANDLE_VALUE) {
+        char final_p[MAX_PATH];
+        DWORD ret = GetFinalPathNameByHandleA(h, final_p, MAX_PATH, FILE_NAME_NORMALIZED);
+        CloseHandle(h);
+        if (ret > 0 && ret < MAX_PATH) {
+            std::string resolved = final_p;
+            if (resolved.rfind("\\\\?\\", 0) == 0) resolved = resolved.substr(4);
+            res = rel_suffix.empty() ? resolved : (resolved + "\\" + rel_suffix);
+        } else {
+            res = full;
+        }
+    } else {
+        res = full;
+    }
+    std::transform(res.begin(), res.end(), res.begin(), ::tolower);
+    std::replace(res.begin(), res.end(), '/', '\\');
+    while (!res.empty() && (res.back() == '\\' || res.back() == '/')) res.pop_back();
+    return res;
+#else
+    char resolved[PATH_MAX];
+    if (realpath(p.c_str(), resolved)) {
+        return std::string(resolved);
+    }
+    std::string cur = p;
+    std::string rel;
+    while (!cur.empty()) {
+        if (realpath(cur.c_str(), resolved)) {
+            std::string canon_base(resolved);
+            return rel.empty() ? canon_base : (canon_base + "/" + rel);
+        }
+        size_t slash = cur.find_last_of('/');
+        if (slash == std::string::npos) break;
+        std::string comp = cur.substr(slash + 1);
+        rel = rel.empty() ? comp : (comp + "/" + rel);
+        cur = cur.substr(0, slash);
+    }
+    return p;
+#endif
+}
+
+static bool is_within_root(const std::string& target_canon, const std::string& root_canon) {
+    std::string s_target = normalize_path_str(target_canon);
+    std::string s_root = normalize_path_str(root_canon);
+    if (s_target == s_root) return true;
+#ifdef _WIN32
+    if (s_target.rfind(s_root + "\\", 0) == 0) return true;
+#else
+    if (s_target.rfind(s_root + "/", 0) == 0) return true;
+#endif
+    return false;
+}
+
+static void ensure_default_workspace_roots() {
+    if (!s_workspace_roots.empty()) return;
+
+    const char* env_roots = std::getenv("SYNFIG_MCP_WORKSPACE_ROOTS");
+    if (env_roots && *env_roots) {
+        std::string s(env_roots);
+        std::stringstream ss(s);
+        std::string item;
+#ifdef _WIN32
+        char delim = ';';
+#else
+        char delim = ':';
+#endif
+        while (std::getline(ss, item, delim)) {
+            if (!item.empty()) {
+                s_workspace_roots.push_back(normalize_path_str(item));
+            }
+        }
+    }
+
+#ifdef _WIN32
+    char cwd[MAX_PATH];
+    if (GetCurrentDirectoryA(MAX_PATH, cwd)) {
+        s_workspace_roots.push_back(normalize_path_str(cwd));
+    }
+    char tmp[MAX_PATH];
+    if (GetTempPathA(MAX_PATH, tmp)) {
+        s_workspace_roots.push_back(normalize_path_str(tmp));
+    }
+#else
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd))) {
+        s_workspace_roots.push_back(normalize_path_str(cwd));
+    }
+    const char* tmp = std::getenv("TMPDIR");
+    s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
+#endif
+}
+
+void set_workspace_roots(const std::vector<std::string>& roots) {
+    s_workspace_roots.clear();
+    for (const auto& r : roots) {
+        if (!r.empty()) {
+            s_workspace_roots.push_back(normalize_path_str(r));
+        }
+    }
+#ifdef _WIN32
+    char tmp[MAX_PATH];
+    if (GetTempPathA(MAX_PATH, tmp)) {
+        s_workspace_roots.push_back(normalize_path_str(tmp));
+    }
+#else
+    const char* tmp = std::getenv("TMPDIR");
+    s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
+#endif
+}
+
+static bool is_safe_bridge_path(const std::string& path, const std::vector<std::string>& allowed_exts, std::string& out_err) {
+    if (path.empty()) {
+        out_err = "Security Sandbox Error: path cannot be empty";
+        return false;
+    }
+    if (path.find('\0') != std::string::npos) {
+        out_err = "Security Sandbox Error: null byte in path";
+        return false;
+    }
+    if (path.find("..") != std::string::npos) {
+        out_err = "Security Sandbox Error: directory traversal ('..') is rejected: " + path;
+        return false;
+    }
+    if (!allowed_exts.empty()) {
+        size_t dot_pos = path.rfind('.');
+        std::string ext = (dot_pos == std::string::npos) ? "" : path.substr(dot_pos);
+        std::string ext_lower = ext;
+        std::transform(ext_lower.begin(), ext_lower.end(), ext_lower.begin(), ::tolower);
+        bool found = false;
+        for (const auto& a : allowed_exts) {
+            std::string a_lower = a;
+            std::transform(a_lower.begin(), a_lower.end(), a_lower.begin(), ::tolower);
+            if (ext_lower == a_lower || ext_lower == ("." + a_lower)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            out_err = "Security Sandbox Error: file extension '" + ext + "' is not permitted for: " + path;
+            return false;
+        }
+    }
+
+    ensure_default_workspace_roots();
+    std::string canon_target = normalize_path_str(path);
+
+    bool inside = false;
+    for (const auto& root : s_workspace_roots) {
+        if (is_within_root(canon_target, root)) {
+            inside = true;
+            break;
+        }
+    }
+
+    if (!inside) {
+        out_err = "Security Sandbox Error: Access to path '" + path + "' is denied by bridge workspace sandbox. Path resolves to '" + canon_target + "' which is outside configured workspace roots.";
+        return false;
+    }
+
+    return true;
+}
 #endif
 
 nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authenticated) {
@@ -191,6 +385,19 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         }
 
         inout_authenticated = true;
+
+        if (params.contains("workspace_roots") && params["workspace_roots"].is_array()) {
+            std::vector<std::string> roots;
+            for (const auto& r : params["workspace_roots"]) {
+                if (r.is_string()) {
+                    roots.push_back(r.get<std::string>());
+                }
+            }
+            if (!roots.empty()) {
+                set_workspace_roots(roots);
+            }
+        }
+
         res["result"] = {
             {"protocol_version", PROTOCOL_VERSION},
             {"studio_version", STUDIO_VERSION},
@@ -323,6 +530,11 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
 
     if (method == "doc.open") {
         std::string file_path = params.value("file_path", "");
+        std::string path_err;
+        if (!is_safe_bridge_path(file_path, {".sif", ".sifz", ".sfg"}, path_err)) {
+            res["error"] = {{"code", 1203}, {"message", path_err}};
+            return res;
+        }
         return run_on_main_thread([&, file_path]() -> nlohmann::json {
             nlohmann::json r;
             r["jsonrpc"] = "2.0";
@@ -354,6 +566,13 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     if (method == "doc.save") {
         std::string doc_id = params.value("doc_id", "doc_0");
         std::string file_path = params.value("file_path", "");
+        if (!file_path.empty()) {
+            std::string path_err;
+            if (!is_safe_bridge_path(file_path, {".sif", ".sifz", ".sfg"}, path_err)) {
+                res["error"] = {{"code", 1203}, {"message", path_err}};
+                return res;
+            }
+        }
         return run_on_main_thread([&, doc_id, file_path]() -> nlohmann::json {
             nlohmann::json r;
             r["jsonrpc"] = "2.0";
@@ -1963,6 +2182,12 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         std::string output_path = params.value("output_path", "");
         double render_time = params.value("time", 0.0);
         std::string target_name = params.value("target", "png");
+
+        std::string path_err;
+        if (!is_safe_bridge_path(output_path, {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".tga"}, path_err)) {
+            res["error"] = {{"code", 1203}, {"message", path_err}};
+            return res;
+        }
 
         return run_on_main_thread([&, doc_id, output_path, render_time, target_name]() -> nlohmann::json {
             nlohmann::json r;

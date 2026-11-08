@@ -29,7 +29,7 @@ import pytest
 import pytest_asyncio
 
 from synfig_mcp.backend.live import LiveBackend
-from synfig_mcp.errors import SynfigError
+from synfig_mcp.errors import SecurityError, SecuritySandboxError, SynfigError
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.render.cache import RenderCache
 from synfig_mcp.render.pipeline import CancellationToken, RenderPipeline
@@ -907,27 +907,37 @@ async def test_live_render_contact_sheet(live_studio: BridgeClient, tmp_path: Pa
 async def test_live_render_progress_notifications(
     live_studio: BridgeClient, tmp_path: Path
 ) -> None:
-    """Requirement 1: Assert progress notifications during multi-frame render against real Studio."""
+    """Requirement 2: Hermetic progress test with cold cache asserting monotonic progress with N >= 5 frames."""
     backend = LiveBackend(client=live_studio)
+    cold_cache = RenderCache(cache_dir=tmp_path / "cold_cache")
+    pipeline = RenderPipeline(backend=backend, cache=cold_cache)
     events: list[tuple[int, int, float]] = []
 
     def on_progress(current: int, total: int, pct: float) -> None:
         events.append((current, total, pct))
 
     out_dir = tmp_path / "live_progress_seq"
-    frames = await backend.pipeline.render_sequence(
+    frames = await pipeline.render_sequence(
         doc_id="doc_0",
         output_dir=str(out_dir),
         start_time=0.0,
-        end_time=0.5,
-        fps=4.0,  # 3 frames (0s, 0.25s, 0.5s)
+        end_time=1.0,
+        fps=5.0,  # 6 frames (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
         width=160,
         height=120,
         progress_cb=on_progress,
     )
-    assert len(frames) >= 2
-    assert len(events) >= 2
-    # Verify progress values are increasing
+    assert len(frames) >= 5, f"Expected N >= 5 frames, got {len(frames)}"
+    assert len(events) >= 5, f"Expected N >= 5 progress events, got {len(events)}"
+
+    # Assert monotonic progress
+    for i in range(1, len(events)):
+        prev_curr, prev_tot, prev_pct = events[i - 1]
+        curr_curr, curr_tot, curr_pct = events[i]
+        assert curr_curr >= prev_curr, f"Non-monotonic frame count: {curr_curr} < {prev_curr}"
+        assert curr_pct >= prev_pct, f"Non-monotonic percentage: {curr_pct} < {prev_pct}"
+        assert curr_tot == len(frames)
+
     assert events[-1][0] == len(frames)
     assert events[-1][2] == 100.0
 
@@ -935,63 +945,291 @@ async def test_live_render_progress_notifications(
 @pytest.mark.real_studio
 @pytest.mark.asyncio
 async def test_live_render_cancellation(live_studio: BridgeClient, tmp_path: Path) -> None:
-    """Requirement 1: Assert cancellation stops render and cleans up partial output against real Studio."""
+    """Requirement 2: Cancellation test with long render mid-way, asserting partial output cleanup and reporting."""
     backend = LiveBackend(client=live_studio)
-    token = CancellationToken()
+    cancel_cache = RenderCache(cache_dir=tmp_path / "cancel_cache")
+    pipeline = RenderPipeline(backend=backend, cache=cancel_cache)
 
-    def on_progress(current: int, _total: int, _pct: float) -> None:
-        if current >= 1:
-            token.cancel()
+    # 1. With cleanup_on_cancel=True
+    token1 = CancellationToken()
 
-    out_dir = tmp_path / "live_cancel_cleanup"
+    def on_progress_cancel(current: int, _total: int, _pct: float) -> None:
+        if current >= 2:
+            token1.cancel()
+
+    out_dir_cleanup = tmp_path / "live_cancel_cleaned"
     with pytest.raises(SynfigError, match="cancelled by user"):
-        await backend.pipeline.render_sequence(
+        await pipeline.render_sequence(
             doc_id="doc_0",
-            output_dir=str(out_dir),
+            output_dir=str(out_dir_cleanup),
             start_time=0.0,
             end_time=1.0,
-            fps=5.0,
+            fps=5.0,  # 6 frames total
             width=160,
             height=120,
-            progress_cb=on_progress,
-            cancel_token=token,
+            progress_cb=on_progress_cancel,
+            cancel_token=token1,
             cleanup_on_cancel=True,
         )
 
     # Partial files should be cleaned up
-    remaining = list(out_dir.glob("*.png"))
-    assert len(remaining) == 0
+    remaining = list(out_dir_cleanup.glob("*.png"))
+    assert len(remaining) == 0, f"Expected 0 remaining files after cleanup, found {remaining}"
+
+    # 2. With cleanup_on_cancel=False: assert fewer frames than requested were produced
+    token2 = CancellationToken()
+
+    def on_progress_cancel2(current: int, _total: int, _pct: float) -> None:
+        if current >= 2:
+            token2.cancel()
+
+    out_dir_kept = tmp_path / "live_cancel_kept"
+    with pytest.raises(SynfigError, match="cancelled by user"):
+        await pipeline.render_sequence(
+            doc_id="doc_0",
+            output_dir=str(out_dir_kept),
+            start_time=0.0,
+            end_time=1.0,
+            fps=5.0,  # 6 frames requested
+            width=160,
+            height=120,
+            progress_cb=on_progress_cancel2,
+            cancel_token=token2,
+            cleanup_on_cancel=False,
+        )
+
+    produced = list(out_dir_kept.glob("*.png"))
+    assert 0 < len(produced) < 6, (
+        f"Expected fewer frames than requested (1..5), found {len(produced)}"
+    )
 
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
 async def test_live_render_disk_cache(live_studio: BridgeClient, tmp_path: Path) -> None:
-    """Requirement 1: Disk cache hit on identical call, miss on document or param change against real Studio."""
+    """Requirement 2: Hermetic disk cache test showing cold=miss, repeat=hit, param/document change=miss."""
     backend = LiveBackend(client=live_studio)
-    cache = RenderCache(cache_dir=tmp_path / "cache")
+    cache = RenderCache(cache_dir=tmp_path / "test_cache")
     pipeline = RenderPipeline(backend=backend, cache=cache)
 
-    f1 = tmp_path / "frame_live_1.png"
-    f2 = tmp_path / "frame_live_2.png"
-    f3 = tmp_path / "frame_live_3.png"
+    f1 = tmp_path / "frame_cold.png"
+    f2 = tmp_path / "frame_repeat.png"
+    f3 = tmp_path / "frame_param_change.png"
+    f4 = tmp_path / "frame_doc_mutation.png"
 
-    # 1. First render: cache miss, renders through Studio
+    # 1. Cold render (expected MISS)
+    print("\nCACHE TEST [Step 1]: Cold render at time=0.0s (expected MISS)")
     ok1 = await pipeline.render_cached_frame("doc_0", f1, time=0.0, width=160, height=120)
     assert ok1 is True
     assert f1.is_file()
-    cached_entries = list(cache.cache_dir.glob("*.png"))
-    assert len(cached_entries) == 1
-    assert cached_entries[0].stat().st_size > 0
+    assert len(list(cache.cache_dir.glob("*.png"))) == 1
+    print("CACHE TEST [Step 1 Result]: MISS verified -> cache entry created.")
 
-    # 2. Second identical render: cache hit
+    # 2. Repeat identical render (expected HIT)
+    print("CACHE TEST [Step 2]: Repeat identical render at time=0.0s (expected HIT)")
     ok2 = await pipeline.render_cached_frame("doc_0", f2, time=0.0, width=160, height=120)
     assert ok2 is True
     assert f2.is_file()
-    # Cache entry count must still be 1 (no new render created)
     assert len(list(cache.cache_dir.glob("*.png"))) == 1
+    print("CACHE TEST [Step 2 Result]: HIT verified -> served from disk cache without new render.")
 
-    # 3. Parameter change (time=0.5s): cache miss -> new entry created
+    # 3. Parameter change (time=0.5s) (expected MISS)
+    print("CACHE TEST [Step 3]: Parameter change to time=0.5s (expected MISS)")
     ok3 = await pipeline.render_cached_frame("doc_0", f3, time=0.5, width=160, height=120)
     assert ok3 is True
     assert f3.is_file()
     assert len(list(cache.cache_dir.glob("*.png"))) == 2
+    print("CACHE TEST [Step 3 Result]: MISS verified -> new cache entry created.")
+
+    # 4. Document mutation (modify circle layer in Studio) (expected MISS)
+    print("CACHE TEST [Step 4]: Mutate document in Studio and render at time=0.0s (expected MISS)")
+    await backend.layer_add(doc_id="doc_0", layer_type="circle")
+    ok4 = await pipeline.render_cached_frame("doc_0", f4, time=0.0, width=160, height=120)
+    assert ok4 is True
+    assert f4.is_file()
+    assert len(list(cache.cache_dir.glob("*.png"))) == 3
+    print(
+        "CACHE TEST [Step 4 Result]: MISS verified -> document state changed, new cache entry created."
+    )
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_path: Path) -> None:
+    """Security requirement: Path traversal and extension escapes via LiveBackend fail with typed SecuritySandboxError."""
+    backend = LiveBackend(client=live_studio)
+    sandbox_root = tmp_path / "sandbox_allowed"
+    sandbox_root.mkdir()
+
+    # 1. doc_open: outside sandbox rejection
+    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+        await backend.doc_open("C:/Windows/System32/drivers/etc/hosts.sif")
+
+    # 2. doc_open: forbidden extension
+    dummy_file = sandbox_root / "payload.exe"
+    dummy_file.write_text("dummy", encoding="utf-8")
+    with pytest.raises(SecuritySandboxError, match="not permitted"):
+        await backend.doc_open(str(dummy_file))
+
+    # 3. doc_save: outside sandbox rejection
+    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+        await backend.doc_save("doc_0", "C:/Windows/System32/hacked.sif")
+
+    # 4. doc_save: forbidden extension
+    with pytest.raises(SecuritySandboxError, match="not permitted"):
+        await backend.doc_save("doc_0", str(sandbox_root / "escaped.bat"))
+
+    # 5. render_frame: forbidden extension
+    with pytest.raises(SecuritySandboxError, match="not permitted"):
+        await backend.render_frame("doc_0", output_path=str(sandbox_root / "evil.ps1"))
+
+    # 6. render_frame: outside sandbox rejection
+    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+        await backend.render_frame("doc_0", output_path="C:/Windows/System32/evil.png")
+
+    # 7. render_sequence: outside sandbox rejection
+    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+        await backend.render_sequence("doc_0", output_dir="C:/Windows/System32/evil_seq")
+
+    # 8. render_video: forbidden extension
+    with pytest.raises(SecuritySandboxError, match="not permitted"):
+        await backend.render_video("doc_0", output_path=str(sandbox_root / "video.exe"))
+
+    # 9. render_contact_sheet: forbidden extension
+    with pytest.raises(SecuritySandboxError, match="not permitted"):
+        await backend.render_contact_sheet("doc_0", output_path=str(sandbox_root / "sheet.bin"))
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_bridge_direct_path_safety_rejection(
+    live_studio: BridgeClient, tmp_path: Path
+) -> None:
+    """
+    Security requirement 1: C++ bridge defense-in-depth rejects all 5 unsafe path categories:
+    1. Absolute path outside root
+    2. '..' directory traversal escape
+    3. Symlink / junction escape
+    4. Disallowed file extension
+    5. Path inside root (must succeed)
+    """
+    inside_dir = tmp_path / "inside_workspace"
+    inside_dir.mkdir(parents=True, exist_ok=True)
+
+    # Configure bridge workspace roots to include repo root and tmp_path
+    await live_studio.call(
+        "hello",
+        {
+            "token": live_studio.token or "",
+            "protocol_version": "1.0",
+            "workspace_roots": [str(REPO_ROOT), str(tmp_path)],
+        },
+    )
+
+    # -------------------------------------------------------------
+    # Case 1: Absolute path outside root -> rejected (code 1203)
+    # -------------------------------------------------------------
+    with pytest.raises(SecurityError) as exc_abs_open:
+        await live_studio.call("doc.open", {"file_path": "C:/Windows/System32/secret.sif"})
+    assert exc_abs_open.value.code == 1203
+    assert "outside configured workspace roots" in str(exc_abs_open.value).lower()
+
+    with pytest.raises(SecurityError) as exc_abs_save:
+        await live_studio.call(
+            "doc.save", {"doc_id": "doc_0", "file_path": "C:/Windows/System32/hacked.sif"}
+        )
+    assert exc_abs_save.value.code == 1203
+    assert "outside configured workspace roots" in str(exc_abs_save.value).lower()
+
+    with pytest.raises(SecurityError) as exc_abs_render:
+        await live_studio.call(
+            "render.frame", {"doc_id": "doc_0", "output_path": "C:/Windows/System32/frame.png"}
+        )
+    assert exc_abs_render.value.code == 1203
+    assert "outside configured workspace roots" in str(exc_abs_render.value).lower()
+
+    # -------------------------------------------------------------
+    # Case 2: '..' directory traversal escape -> rejected (code 1203)
+    # -------------------------------------------------------------
+    with pytest.raises(SecurityError) as exc_trav_open:
+        await live_studio.call("doc.open", {"file_path": "../../secret.sif"})
+    assert exc_trav_open.value.code == 1203
+    assert "directory traversal" in str(exc_trav_open.value).lower()
+
+    with pytest.raises(SecurityError) as exc_trav_save:
+        await live_studio.call("doc.save", {"doc_id": "doc_0", "file_path": "../../hacked.sif"})
+    assert exc_trav_save.value.code == 1203
+    assert "directory traversal" in str(exc_trav_save.value).lower()
+
+    with pytest.raises(SecurityError) as exc_trav_render:
+        await live_studio.call(
+            "render.frame", {"doc_id": "doc_0", "output_path": "../../frame.png"}
+        )
+    assert exc_trav_render.value.code == 1203
+    assert "directory traversal" in str(exc_trav_render.value).lower()
+
+    # -------------------------------------------------------------
+    # Case 3: Symlink / junction escape -> rejected (code 1203)
+    # -------------------------------------------------------------
+    junction_dir = inside_dir / "external_junction"
+    target_outside = Path("C:/Windows/System32")
+    # Create NTFS directory junction pointing outside workspace
+    subprocess.run(
+        ["cmd.exe", "/c", "mklink", "/J", str(junction_dir), str(target_outside)],
+        capture_output=True,
+    )
+    if junction_dir.exists():
+        with pytest.raises(SecurityError) as exc_junc_open:
+            await live_studio.call(
+                "doc.open", {"file_path": str(junction_dir / "drivers" / "etc" / "hosts.sif")}
+            )
+        assert exc_junc_open.value.code == 1203
+        assert "outside configured workspace roots" in str(exc_junc_open.value).lower()
+
+        with pytest.raises(SecurityError) as exc_junc_save:
+            await live_studio.call(
+                "doc.save", {"doc_id": "doc_0", "file_path": str(junction_dir / "escaped.sif")}
+            )
+        assert exc_junc_save.value.code == 1203
+        assert "outside configured workspace roots" in str(exc_junc_save.value).lower()
+
+        with pytest.raises(SecurityError) as exc_junc_render:
+            await live_studio.call(
+                "render.frame",
+                {"doc_id": "doc_0", "output_path": str(junction_dir / "escaped.png")},
+            )
+        assert exc_junc_render.value.code == 1203
+        assert "outside configured workspace roots" in str(exc_junc_render.value).lower()
+
+    # -------------------------------------------------------------
+    # Case 4: Disallowed file extension -> rejected (code 1203)
+    # -------------------------------------------------------------
+    with pytest.raises(SecurityError) as exc_ext_open:
+        await live_studio.call("doc.open", {"file_path": str(inside_dir / "payload.exe")})
+    assert exc_ext_open.value.code == 1203
+    assert "not permitted" in str(exc_ext_open.value).lower()
+
+    with pytest.raises(SecurityError) as exc_ext_save:
+        await live_studio.call(
+            "doc.save", {"doc_id": "doc_0", "file_path": str(inside_dir / "payload.bat")}
+        )
+    assert exc_ext_save.value.code == 1203
+    assert "not permitted" in str(exc_ext_save.value).lower()
+
+    with pytest.raises(SecurityError) as exc_ext_render:
+        await live_studio.call(
+            "render.frame", {"doc_id": "doc_0", "output_path": str(inside_dir / "payload.sh")}
+        )
+    assert exc_ext_render.value.code == 1203
+    assert "not permitted" in str(exc_ext_render.value).lower()
+
+    # -------------------------------------------------------------
+    # Case 5: Path inside root -> must succeed
+    # -------------------------------------------------------------
+    valid_render_path = inside_dir / "safe_output.png"
+    res_render = await live_studio.call(
+        "render.frame", {"doc_id": "doc_0", "output_path": str(valid_render_path)}
+    )
+    assert res_render.get("success") is True
+    assert valid_render_path.is_file()
+    assert valid_render_path.stat().st_size > 0
