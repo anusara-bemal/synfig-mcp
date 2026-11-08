@@ -26,7 +26,8 @@ def get_mockable_backend() -> HeadlessBackend:
     backend = HeadlessBackend()
     if not backend.runner.is_available:
 
-        async def fake_render(_doc_id: str, output_path: str, **_kwargs: Any) -> bool:
+        async def fake_render(doc_id: str, output_path: str, **_kwargs: Any) -> bool:
+            del doc_id  # Unused
             p = Path(output_path)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_bytes")
