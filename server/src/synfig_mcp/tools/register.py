@@ -106,6 +106,11 @@ TOOL_PROFILES: dict[str, set[str]] = {
     # Selection
     "selection_get": {"rig", "all"},
     "selection_set": {"rig", "all"},
+    # Cut-out Characters & Storyboards (Phase A4)
+    "character_rig_from_parts": {"rig", "all"},
+    "character_pose_apply": {"rig", "all"},
+    "character_motion_apply": {"rig", "all"},
+    "storyboard_from_script": {"rig", "all"},
     # History & Undo
     "history_undo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "history_redo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
@@ -863,6 +868,78 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
                 res = await client.call("selection.set", {"doc_id": doc_id, "layer_ids": layer_ids})
                 return dict(res)
         return {"selected_layers": layer_ids}
+
+    # -----------------------------------------------------------------------
+    # Cut-out Characters & Storyboards (Phase A4)
+    # -----------------------------------------------------------------------
+
+    @tool_for("character_rig_from_parts", annotations=MUTATING)
+    async def character_rig_from_parts(
+        spec: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Assemble a hierarchical 2D cut-out character puppet from geometric or imported parts.
+        Returns: Rig summary with character ID, root group, and parts count.
+        Gotcha: Use dry_run=true to preview hierarchy before assembling.
+        """
+        from synfig_mcp.characters.rigging import RiggingEngine
+
+        engine = RiggingEngine(backend=backend)
+        res = await engine.character_rig_from_parts(spec=spec, dry_run=dry_run)
+        return wrap_untrusted(res)
+
+    @tool_for("character_pose_apply", annotations=MUTATING)
+    async def character_pose_apply(
+        doc_id: str = "doc_0",
+        character_id: str = "hero",
+        pose_name: str = "idle",
+        time: float = 0.0,
+    ) -> dict[str, Any]:
+        """Apply a named pose preset (idle, punch, jump, walk_contact, walk_passing) to character parts.
+        Returns: Status with applied bone rotations and active facial slots.
+        Gotcha: Verify character_id matches the rigged puppet root prefix.
+        """
+        from synfig_mcp.characters.rigging import RiggingEngine
+
+        engine = RiggingEngine(backend=backend)
+        res = await engine.character_pose_apply(
+            doc_id=doc_id, character_id=character_id, pose_name=pose_name, time=time
+        )
+        return wrap_untrusted(res)
+
+    @tool_for("character_motion_apply", annotations=MUTATING)
+    async def character_motion_apply(
+        doc_id: str = "doc_0",
+        character_id: str = "hero",
+        motion_name: str = "walk",
+        start_time: float = 0.0,
+    ) -> dict[str, Any]:
+        """Apply a complete motion cycle preset (walk, punch, idle) across keyframe waypoints.
+        Returns: Applied keyframe sequence, cycle duration, and target character ID.
+        Gotcha: Automatically sets multi-frame easing waypoints along the timeline.
+        """
+        from synfig_mcp.characters.rigging import RiggingEngine
+
+        engine = RiggingEngine(backend=backend)
+        res = await engine.character_motion_apply(
+            doc_id=doc_id, character_id=character_id, motion_name=motion_name, start_time=start_time
+        )
+        return wrap_untrusted(res)
+
+    @tool_for("storyboard_from_script", annotations=MUTATING)
+    async def storyboard_from_script(
+        spec: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Assemble a multi-shot animatic timeline from a structured storyboard script.
+        Returns: Shot manifest with calculated start/end times, camera moves, and animatic duration.
+        Gotcha: Establishes non-destructive camera transform layers for every scripted shot.
+        """
+        from synfig_mcp.characters.storyboard import StoryboardEngine
+
+        engine = StoryboardEngine(backend=backend)
+        res = await engine.storyboard_from_script(spec=spec, dry_run=dry_run)
+        return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
     # History (Undo / Redo)

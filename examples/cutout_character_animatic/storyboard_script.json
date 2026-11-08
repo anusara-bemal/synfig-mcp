@@ -1,0 +1,31 @@
+{
+  "title": "Neon Wanderer - Scene 01 Animatic",
+  "doc_id": "doc_0",
+  "fps": 24.0,
+  "shots": [
+    {
+      "shot_id": "shot_01",
+      "description": "Wide establishing shot of the original character standing in the rain.",
+      "duration_seconds": 2.5,
+      "camera_movement": "pan_left",
+      "characters_present": ["original_hero"],
+      "dialogue": "..."
+    },
+    {
+      "shot_id": "shot_02",
+      "description": "Medium shot: character notices approaching threat, shifts from idle into fighting stance.",
+      "duration_seconds": 2.0,
+      "camera_movement": "zoom_in",
+      "characters_present": ["original_hero"],
+      "dialogue": "There they are."
+    },
+    {
+      "shot_id": "shot_03",
+      "description": "Dynamic action shot: character delivers a high-impact punch burst with speed lines.",
+      "duration_seconds": 1.5,
+      "camera_movement": "static",
+      "characters_present": ["original_hero"],
+      "dialogue": "Haaah!"
+    }
+  ]
+}
