@@ -56,8 +56,8 @@ jobs:
           async def test():
               backend = HeadlessBackend()
               doc = await backend.doc_new(160, 120, 24.0)
-              print('Headless doc created:', doc.doc_id)
-              ok = await backend.render_frame(doc.doc_id, '/tmp/test_frame.png', time=0.0)
+              print('Headless doc created:', doc.id)
+              ok = await backend.render_frame(doc.id, '/tmp/test_frame.png', time=0.0)
               print('Headless render success:', ok)
               assert ok is True
           asyncio.run(test())
