@@ -124,14 +124,18 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `param.get` | `doc_id`, `layer_id`, `param_name` | `layer->get_param(param_name)` | Verified |
 | `param.set` | `doc_id`, `layer_id`, `param_name`, `value` | `Action::LayerParamSet::create()` or `canvas_interface->change_value()` | Verified |
 | `param.link` | `doc_id`, `layer_id`, `param_name`, `link_id`| `Action::ValueDescLink::create()` | Verified |
-| `param.convert` | `doc_id`, `layer_id`, `param_name`, `type` | `Action::ValueDescConvert::create()` | Verified |
-| `param.export` | `doc_id`, `layer_id`, `param_name`, `name` | `Action::ValueDescExport::create()` | Verified |
+| `param.convert` | `doc_id`, `layer_id`, `param_name`, `type` | `synfigapp::Action::ValueDescConvert::create()` | Verified |
+| `param.export` | `doc_id`, `layer_id`, `param_name`, `name` | `synfigapp::Action::ValueDescExport::create()` | Verified |
+| `param.unexport` | `doc_id`, `name` | `synfigapp::Action::ValueNodeRemove::create()` | Verified |
 | `anim.time_get` | `doc_id` | `canvas_interface->get_time()` | Verified |
 | `anim.time_set` | `doc_id`, `time` | `canvas_interface->seek_time(time)` | Verified |
-| `anim.keyframe_add` | `doc_id`, `time`, `description?` | `Action::KeyframeAdd::create()` | Verified |
-| `anim.keyframe_remove`| `doc_id`, `time` | `Action::KeyframeRemove::create()` | Verified |
-| `anim.waypoint_set` | `doc_id`, `layer_id`, `param_name`, `time`, `value`, `interpolation?` | `Action::WaypointSetSmart::create()` | Verified |
-| `anim.waypoint_remove`| `doc_id`, `layer_id`, `param_name`, `time` | `Action::WaypointRemove::create()` | Verified |
+| `anim.keyframe_add` | `doc_id`, `time`, `description?` | `synfigapp::Action::KeyframeAdd::create()` | Verified |
+| `anim.keyframe_remove`| `doc_id`, `time` | `synfigapp::Action::KeyframeRemove::create()` | Verified |
+| `anim.waypoint_set` | `doc_id`, `layer_id`, `param_name`, `time`, `value`, `interpolation_in?`, `interpolation_out?` | `synfigapp::Action::ValueDescSet::create()` (animate=true) + `synfigapp::Action::WaypointSet::create()` | Verified |
+| `anim.waypoint_remove`| `doc_id`, `layer_id`, `param_name`, `time` | `synfigapp::Action::WaypointRemove::create()` | Verified |
+| `anim.animate_param` | `doc_id`, `layer_id`, `param_name`, `waypoints[]` | `synfigapp::Action::PassiveGrouper` wrapping batch `ValueDescSet` + `WaypointSet` (single undo step) | Verified |
+| `anim.interpolation_set` | `doc_id`, `interpolation`, `layer_id?`, `param_name?`, `time?` | `synfigapp::Main::set_interpolation()` or `synfigapp::Action::WaypointSet::create()` | Verified |
+| `doc.set_time_range` | `doc_id`, `start_time`, `end_time`, `fps?` | `synfigapp::Action::CanvasRendDescSet::create()` | Verified |
 | `history.undo` | `doc_id` | `instance->undo()` | Verified |
 | `history.redo` | `doc_id` | `instance->redo()` | Verified |
 | `history.list` | `doc_id` | `instance->undo_action_stack()`, `redo_action_stack()` | Verified |

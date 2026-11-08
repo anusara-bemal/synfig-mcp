@@ -10,10 +10,11 @@
 | **Phase P3** | Bridge Read-Only Path | **DONE** | C++ `mcp_bridge` GTK dispatcher, token authentication, `doc.list`, `doc.info`, `scene.tree`, `param.get`, `anim.time_get`, `selection.get`. Verified live against running Studio. |
 | **Phase P4** | Bridge Mutating Path & Undo System | **DONE** | C++ mutating actions wrapped in `synfigapp::Action::PassiveGrouper`, structured diffs, `layer.add`, `param.set`, `history.undo`, `history.redo`, timeline seek, keyframes. Verified live against running Studio. |
 | **Phase P5** | Headless SIF Engine & CLI Introspection | **DONE** | Pure-Python lossless XML engine (`lxml.etree`), multi-format (`.sif`, `.sifz`, `.sfg`), CLI runner, schema registry with caching, headless undo/redo snapshot stack. 59/59 tests passing. |
-| **Phase P6** | Unified MCP Surface & FastMCP Tools | **DONE** | 27 typed MCP tools over `BackendBase` (`MCPServer`, `@mcp.tool()`, `ToolAnnotations`), active backend auto-selection, clean stdio transport, contract tests across both backends. |
+| **Phase P6** | Unified MCP Surface & FastMCP Tools | **DONE** | 47 typed MCP tools over `BackendBase` (`MCPServer`, `@mcp.tool()`, `ToolAnnotations`), active backend auto-selection, clean stdio transport, contract tests across both backends. |
 | **Phase P7 (Pre-P7 Live Gaps)** | Live E2E Bridge Hardening & Verification | **DONE** | Real `synfigstudio.exe` E2E test suite: core mutations + undo, ACL verification (`icacls`), safe non-blocking dialogs, LIFO ordering (bridge + manual edit), real Studio MCP marker. |
-| **Phase P7 (Original P7)** | Render / Preview Pipeline | **NEXT** | High-performance frame/sequence/video rendering, contact sheet generation, render progress tracking, cancellation, disk cache. |
-| **Phase P8** | Claude Desktop Integration & Packaging | **PENDING** | `claude_desktop_config.json`, sample walkthroughs, PyPI packaging (`uv build`), reproducible MSYS2 build scripts. |
+| **Phase P7a** | Core Animation Write Path & ValueNodes | **DONE** | `anim.waypoint_set`, `anim.waypoint_remove`, `anim.animate_param` (bulk waypoints in 1 undo step), `anim.interpolation_set`, `doc.set_time_range`, `param.convert`, `param.export`, `param.unexport`. Verified against live Studio with undo and timeline interpolation. |
+| **Phase P7b** | Render / Preview Pipeline & ADR | **DONE** | High-performance frame/sequence/video rendering, contact sheet generation, progress notifications, cancellation, disk cache keyed by state+params. ADR recorded in `docs/decisions/ADR-0004-render-pipeline.md`. |
+| **Phase P8** | Packaging, Distribution & Diagnostics | **DONE** | CI artifact packaging (`bridge-build.yml`), GPL-3.0 notice/offer, `synfig-mcp doctor` CLI, Streamable HTTP transport with bearer auth & host filtering, headless Dockerfile, `server.json`, PyPI build dry-run (`uv build`), Windows installation & troubleshooting guides. |
 
 ---
 
@@ -40,11 +41,25 @@
 | `param.set` (`angle`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
 | `param.set` (`bool`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
 | `param.set` (`string`) | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
+| `param.convert` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | **Yes** (`history.undo`) |
+| `param.export` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py::test_live_param_export_unexport`) | **Yes** (`history.undo`) |
+| `param.unexport` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py::test_live_param_export_unexport`) | **Yes** (`history.undo`) |
 | `anim.time.get` / `anim.time_get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`, `test_live_mutate.py`) | N/A (Seek) |
 | `anim.time.set` / `anim.time_set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | N/A (Seek) |
+| `anim.waypoint_set` / `waypoint.set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | **Yes** (`history.undo`) |
+| `anim.waypoint_remove` / `waypoint.remove` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py::test_live_waypoint_remove`) | **Yes** (`history.undo`) |
+| `anim.animate_param` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | **Yes** (`history.undo` - 1 single step) |
+| `anim.interpolation_set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py::test_live_interpolation_set`) | **Yes** (`history.undo`) |
+| `doc.set_time_range` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py::test_live_doc_set_time_range`) | **Yes** (`history.undo`) |
 | `keyframe.add` / `anim.keyframe_add` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
 | `keyframe.delete` / `anim.keyframe_remove` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
 | `canvas.render_frame` / `render.frame` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`, `test_mcp_tools.py`) | N/A (Render) |
+| `render_sequence` | Yes | Yes | Yes (Pipeline) | **Yes** (`test_live_mutate.py::test_live_render_sequence`) | N/A (Render) |
+| `render_sequence` (progress notifications) | Yes | Yes | Yes (Pipeline) | **Yes** (`test_live_mutate.py::test_live_render_progress_notifications`) | N/A (Render) |
+| `render_sequence` (cancellation & cleanup) | Yes | Yes | Yes (Pipeline) | **Yes** (`test_live_mutate.py::test_live_render_cancellation`) | N/A (Render) |
+| `render_cached_frame` (disk cache) | Yes | Yes | Yes (Pipeline) | **Yes** (`test_live_mutate.py::test_live_render_disk_cache`) | N/A (Render) |
+| `render_video` | Yes | Yes | Yes (Pipeline) | **Yes** (`test_live_mutate.py::test_live_render_video`) | N/A (Render) |
+| `render_contact_sheet` | Yes | Yes | Yes (Pipeline) | **Yes** (`test_live_mutate.py::test_live_render_contact_sheet`) | N/A (Render) |
 | `selection.get` | Yes | Yes | Yes | **Yes** (`test_live_read.py`) | N/A (Read) |
 | `selection.set` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py`) | **Yes** (`history.undo`) |
 | `history.undo` | Yes | Yes | Yes | **Yes** (`test_live_mutate.py` - AI edit + manual GTK edit LIFO verified) | N/A |

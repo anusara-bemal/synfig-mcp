@@ -25,7 +25,9 @@ def xml_canvas_strategy(draw: st.DrawFn) -> str:
     width = draw(st.integers(min_value=100, max_value=3840))
     height = draw(st.integers(min_value=100, max_value=2160))
     fps = draw(st.floats(min_value=1.0, max_value=120.0, allow_nan=False, allow_infinity=False))
-    comment_text = draw(xml_texts)
+    comment_text = draw(xml_texts).replace("--", "- -")
+    if comment_text.endswith("-"):
+        comment_text += " "
     custom_attr = draw(xml_names)
     custom_val = draw(xml_texts)
 

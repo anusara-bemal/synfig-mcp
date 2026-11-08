@@ -215,6 +215,36 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase) -> None:
         )
         return res.model_dump()
 
+    @mcp.tool(annotations=IDEMPOTENT)
+    async def doc_set_time_range(
+        doc_id: str = "doc_0",
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+    ) -> dict[str, Any]:
+        """
+        Set canvas animation playback timeline start time, end time, and framerate.
+
+        When to use:
+        Use to lengthen or shorten the animation timeline or adjust frames per second.
+
+        Returns:
+        Updated DocumentInfo containing 'start_time', 'end_time', and 'fps'.
+
+        Common mistakes:
+        Setting start_time greater than or equal to end_time.
+
+        Example:
+        doc_set_time_range(doc_id="doc_0", start_time=0.0, end_time=10.0, fps=30.0)
+        """
+        res = await backend.doc_set_time_range(
+            doc_id=doc_id,
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+        )
+        return res.model_dump()
+
     # -----------------------------------------------------------------------
     # Canvas Hierarchy
     # -----------------------------------------------------------------------
@@ -525,6 +555,89 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase) -> None:
             canvas_path=canvas_path,
         )
 
+    @mcp.tool(annotations=MUTATING)
+    async def param_convert(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        type: str,
+    ) -> dict[str, Any]:
+        """
+        Convert a layer parameter into a linkable ValueNode (e.g. 'composite', 'scale', 'add', 'sine', 'linear', 'timeloop').
+
+        When to use:
+        Use when a parameter needs to be driven by a math expression, separated into sub-components, or looped over time.
+
+        Returns:
+        Object containing 'layer_id', 'param_name', and converted ValueNode 'type'.
+
+        Common mistakes:
+        Converting to an incompatible type (e.g. converting a Real number to 'composite').
+
+        Example:
+        param_convert(doc_id="doc_0", layer_id="Circle001", param_name="origin", type="composite")
+        """
+        return await backend.param_convert(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            param_name=param_name,
+            type=type,
+        )
+
+    @mcp.tool(annotations=MUTATING)
+    async def param_export(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        name: str,
+    ) -> dict[str, Any]:
+        """
+        Export a parameter's ValueNode to the canvas value node library for sharing across layers.
+
+        When to use:
+        Use to publish a value (like a shared color or origin) so multiple layers can link to it.
+
+        Returns:
+        Object containing exported 'name' and diff summary.
+
+        Common mistakes:
+        Exporting under a name that already exists in the document library.
+
+        Example:
+        param_export(doc_id="doc_0", layer_id="Circle001", param_name="radius", name="SharedRadius")
+        """
+        return await backend.param_export(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            param_name=param_name,
+            name=name,
+        )
+
+    @mcp.tool(annotations=MUTATING)
+    async def param_unexport(
+        doc_id: str,
+        name: str,
+    ) -> dict[str, Any]:
+        """
+        Unexport a previously exported ValueNode from the canvas library.
+
+        When to use:
+        Use when a shared ValueNode is no longer needed in the project library.
+
+        Returns:
+        Object confirming unexported 'name'.
+
+        Common mistakes:
+        Attempting to unexport a node that is still referenced by multiple active parameters.
+
+        Example:
+        param_unexport(doc_id="doc_0", name="SharedRadius")
+        """
+        return await backend.param_unexport(
+            doc_id=doc_id,
+            name=name,
+        )
+
     # -----------------------------------------------------------------------
     # Animation & Timeline
     # -----------------------------------------------------------------------
@@ -644,6 +757,133 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase) -> None:
             doc_id=doc_id, time=time, canvas_path=canvas_path
         )
         return {"removed": success}
+
+    @mcp.tool(annotations=MUTATING)
+    async def anim_waypoint_set(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        time: float,
+        value: Any,
+        interpolation_in: str = "clamped",
+        interpolation_out: str = "clamped",
+    ) -> dict[str, Any]:
+        """
+        Insert or update a waypoint for a layer parameter at a specific timeline timestamp.
+
+        When to use:
+        Use to animate a parameter smoothly across time (e.g. moving an origin, fading opacity, morphing color).
+
+        Returns:
+            Dictionary containing 'waypoint' details and 'interpolated_value'.
+
+        Common mistakes:
+        Passing invalid interpolation strings (valid: 'linear', 'constant', 'halt', 'clamped', 'tcb').
+
+        Example:
+        anim_waypoint_set(doc_id="doc_0", layer_id="Circle001", param_name="origin", time=2.0, value=[3.0, 0.0], interpolation_in="linear", interpolation_out="linear")
+        """
+        return await backend.anim_waypoint_set(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            param_name=param_name,
+            time=time,
+            value=value,
+            interpolation_in=interpolation_in,
+            interpolation_out=interpolation_out,
+        )
+
+    @mcp.tool(annotations=MUTATING)
+    async def anim_waypoint_remove(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        time: float,
+    ) -> dict[str, Any]:
+        """
+        Remove a waypoint from a layer parameter at a given time.
+
+        When to use:
+        Use to delete an animation key/waypoint without deleting the parameter itself.
+
+        Returns:
+            Object with 'removed': bool.
+
+        Common mistakes:
+        Providing a time that does not match an existing waypoint.
+
+        Example:
+        anim_waypoint_remove(doc_id="doc_0", layer_id="Circle001", param_name="origin", time=2.0)
+        """
+        res = await backend.anim_waypoint_remove(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            param_name=param_name,
+            time=time,
+        )
+        return res if isinstance(res, dict) else {"removed": bool(res)}
+
+    @mcp.tool(annotations=MUTATING)
+    async def anim_animate_param(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        waypoints: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """
+        Define a full parameter animation trajectory using a batch of waypoints in ONE single undo step.
+
+        When to use:
+        Use whenever setting multiple animation keys for a property to ensure the user can undo the entire motion path in a single action.
+
+        Returns:
+            Object containing 'count': number of waypoints applied.
+
+        Common mistakes:
+        Omitting 'time' or 'value' from waypoint dictionary items.
+
+        Example:
+        anim_animate_param(doc_id="doc_0", layer_id="Circle001", param_name="origin", waypoints=[{"time": 0.0, "value": [0.0, 0.0]}, {"time": 2.0, "value": [3.0, 0.0]}])
+        """
+        return await backend.anim_animate_param(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            param_name=param_name,
+            waypoints=waypoints,
+        )
+
+    @mcp.tool(annotations=MUTATING)
+    async def anim_interpolation_set(
+        doc_id: str,
+        interpolation: str,
+        layer_id: str | None = None,
+        param_name: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Set default canvas waypoint interpolation or change interpolation on existing waypoints.
+
+        When to use:
+        Use to configure interpolation style ('linear', 'constant', 'halt', 'clamped', 'tcb') globally or on a parameter.
+
+        Returns:
+            Object with 'success': bool and 'interpolation'.
+
+        Common mistakes:
+        Using unsupported interpolation types.
+
+        Example:
+        anim_interpolation_set(doc_id="doc_0", interpolation="linear")
+        """
+        res = await backend.anim_interpolation_set(
+            doc_id=doc_id,
+            interpolation=interpolation,
+            layer_id=layer_id,
+            param_name=param_name,
+        )
+        if isinstance(res, dict):
+            res.setdefault("success", True)
+            return res
+        return {"success": bool(res)}
 
     # -----------------------------------------------------------------------
     # Selection
@@ -802,6 +1042,117 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase) -> None:
             "time": time,
             "target": target,
         }
+
+    @mcp.tool(annotations=IDEMPOTENT)
+    async def render_sequence(
+        doc_id: str,
+        output_dir: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        target: str = "png",
+    ) -> list[str]:
+        """
+        Render an image sequence across an animation time range using the rendering pipeline.
+
+        When to use:
+        Use to produce a sequence of frame images for review or video compilation.
+
+        Returns:
+            List of generated output frame file paths.
+
+        Common mistakes:
+        Passing a file path instead of an output directory.
+
+        Example:
+        render_sequence(doc_id="doc_0", output_dir="C:/Temp/frames", start_time=0.0, end_time=2.0, fps=24.0)
+        """
+        return await backend.render_sequence(
+            doc_id=doc_id,
+            output_dir=output_dir,
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+            width=width,
+            height=height,
+            target=target,
+        )
+
+    @mcp.tool(annotations=IDEMPOTENT)
+    async def render_video(
+        doc_id: str,
+        output_path: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Render an animation time range and compile directly to a video file (.mp4 or .gif).
+
+        When to use:
+        Use to produce a playable video or animated GIF preview of the animation.
+
+        Returns:
+            Object containing 'success': bool and 'output_path'.
+
+        Common mistakes:
+        Targeting an invalid extension (use .mp4 or .gif).
+
+        Example:
+        render_video(doc_id="doc_0", output_path="C:/Temp/preview.mp4", start_time=0.0, end_time=2.0, fps=24.0)
+        """
+        success = await backend.render_video(
+            doc_id=doc_id,
+            output_path=output_path,
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+            width=width,
+            height=height,
+        )
+        return {"success": success, "output_path": output_path}
+
+    @mcp.tool(annotations=IDEMPOTENT)
+    async def render_contact_sheet(
+        doc_id: str,
+        output_path: str,
+        cols: int = 4,
+        rows: int = 3,
+        width: int | None = None,
+        height: int | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> dict[str, Any]:
+        """
+        Render selected keyframe timestamps into a visual contact sheet / storyboard grid image.
+
+        When to use:
+        Use for rapid visual inspection of an animation's key poses on a single overview image.
+
+        Returns:
+            Object containing 'success': bool and 'output_path'.
+
+        Common mistakes:
+        Setting cols or rows to 0.
+
+        Example:
+        render_contact_sheet(doc_id="doc_0", output_path="C:/Temp/storyboard.png", cols=4, rows=2)
+        """
+        success = await backend.render_contact_sheet(
+            doc_id=doc_id,
+            output_path=output_path,
+            cols=cols,
+            rows=rows,
+            width=width,
+            height=height,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        return {"success": success, "output_path": output_path}
 
     # -----------------------------------------------------------------------
     # Schema & Registry Introspection

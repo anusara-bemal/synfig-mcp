@@ -5,7 +5,7 @@ Implements the unified BackendBase interface by translating requests to JSON-RPC
 marshalled into Studio's GTK main thread and action system.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from pydantic import TypeAdapter
 
@@ -13,6 +13,7 @@ from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
 from synfig_mcp.config import settings
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.models import SynfigValue
+from synfig_mcp.security.sandbox import validate_path
 
 synfig_value_adapter: TypeAdapter[SynfigValue] = TypeAdapter(SynfigValue)
 
@@ -31,6 +32,7 @@ class LiveBackend(BackendBase):
         self.port = port or settings.bridge_port
         self.token = token
         self._client = client
+        self._pipeline: Any = None
 
     @property
     def name(self) -> str:
@@ -77,6 +79,16 @@ class LiveBackend(BackendBase):
         res = await client.call("doc.list")
         return [DocumentInfo.model_validate(d) for d in res]
 
+    async def get_doc_state(self, doc_id: str) -> str:
+        """Query document state / action history to form a cache key."""
+        client = await self._ensure_client()
+        try:
+            hist = await client.call("history.list", {"doc_id": doc_id})
+            undo_stack = hist.get("undo_stack", [])
+            return f"{doc_id}:{len(undo_stack)}:{':'.join(undo_stack[-5:])}"
+        except Exception:
+            return doc_id
+
     async def doc_new(
         self, width: int = 1920, height: int = 1080, fps: float = 24.0
     ) -> DocumentInfo:
@@ -85,17 +97,24 @@ class LiveBackend(BackendBase):
         return DocumentInfo.model_validate(res)
 
     async def doc_open(self, file_path: str) -> DocumentInfo:
+        safe_path = validate_path(
+            file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, must_exist=True
+        )
         client = await self._ensure_client()
-        res = await client.call("doc.open", {"file_path": file_path})
+        res = await client.call("doc.open", {"file_path": str(safe_path)})
         return DocumentInfo.model_validate(res)
 
     async def doc_save(self, doc_id: str, file_path: str | None = None) -> str:
+        safe_path_str: str | None = None
+        if file_path:
+            safe_path = validate_path(file_path, allowed_extensions={".sif", ".sifz", ".sfg"})
+            safe_path_str = str(safe_path)
         client = await self._ensure_client()
         params: dict[str, Any] = {"doc_id": doc_id}
-        if file_path:
-            params["file_path"] = file_path
+        if safe_path_str:
+            params["file_path"] = safe_path_str
         res = await client.call("doc.save", params)
-        return str(res.get("file_path", file_path or ""))
+        return str(res.get("file_path", safe_path_str or ""))
 
     async def doc_close(self, doc_id: str, force: bool = False) -> bool:
         client = await self._ensure_client()
@@ -131,6 +150,24 @@ class LiveBackend(BackendBase):
             params["end_time"] = end_time
 
         res = await client.call("doc.set_properties", params)
+        return DocumentInfo.model_validate(res)
+
+    async def doc_set_time_range(
+        self,
+        doc_id: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+    ) -> DocumentInfo:
+        client = await self._ensure_client()
+        params: dict[str, Any] = {"doc_id": doc_id}
+        if start_time is not None:
+            params["start_time"] = start_time
+        if end_time is not None:
+            params["end_time"] = end_time
+        if fps is not None:
+            params["fps"] = fps
+        res = await client.call("doc.set_time_range", params)
         return DocumentInfo.model_validate(res)
 
     async def canvas_list(self, doc_id: str) -> list[str]:
@@ -275,6 +312,47 @@ class LiveBackend(BackendBase):
         )
         return dict(res)
 
+    async def param_convert(
+        self, doc_id: str, layer_id: str, param_name: str, type: str
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "param.convert",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": param_name,
+                "type": type,
+            },
+        )
+        return dict(res)
+
+    async def param_export(
+        self, doc_id: str, layer_id: str, param_name: str, name: str
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "param.export",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": param_name,
+                "name": name,
+            },
+        )
+        return dict(res)
+
+    async def param_unexport(self, doc_id: str, name: str) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "param.unexport",
+            {
+                "doc_id": doc_id,
+                "name": name,
+            },
+        )
+        return dict(res)
+
     async def anim_time_get(self, doc_id: str) -> float:
         client = await self._ensure_client()
         res = await client.call("anim.time_get", {"doc_id": doc_id})
@@ -332,6 +410,95 @@ class LiveBackend(BackendBase):
         )
         return list(res.get("keyframes", []))
 
+    async def anim_waypoint_set(
+        self,
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        time: float,
+        value: SynfigValue | Any,
+        interpolation: str | None = None,
+        interpolation_in: str | None = None,
+        interpolation_out: str | None = None,
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        val_dict = value.model_dump() if hasattr(value, "model_dump") else value
+        params: dict[str, Any] = {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "time": time,
+            "value": val_dict,
+        }
+        if interpolation:
+            params["interpolation"] = interpolation
+        if interpolation_in:
+            params["interpolation_in"] = interpolation_in
+        if interpolation_out:
+            params["interpolation_out"] = interpolation_out
+        res = await client.call("anim.waypoint_set", params)
+        return dict(res)
+
+    async def anim_waypoint_remove(
+        self, doc_id: str, layer_id: str, param_name: str, time: float
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "anim.waypoint_remove",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": param_name,
+                "time": time,
+            },
+        )
+        return dict(res)
+
+    async def anim_animate_param(
+        self,
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        waypoints: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        serialized_wps = []
+        for wp in waypoints:
+            w_copy = dict(wp)
+            val = w_copy.get("value")
+            if val is not None and hasattr(val, "model_dump"):
+                w_copy["value"] = val.model_dump()
+            serialized_wps.append(w_copy)
+        res = await client.call(
+            "anim.animate_param",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": param_name,
+                "waypoints": serialized_wps,
+            },
+        )
+        return dict(res)
+
+    async def anim_interpolation_set(
+        self,
+        doc_id: str,
+        interpolation: str,
+        layer_id: str | None = None,
+        param_name: str | None = None,
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        params: dict[str, Any] = {
+            "doc_id": doc_id,
+            "interpolation": interpolation,
+        }
+        if layer_id:
+            params["layer_id"] = layer_id
+        if param_name:
+            params["param_name"] = param_name
+        res = await client.call("anim.interpolation_set", params)
+        return dict(res)
+
     async def undo(self, doc_id: str) -> bool:
         client = await self._ensure_client()
         res = await client.call("history.undo", {"doc_id": doc_id})
@@ -356,10 +523,11 @@ class LiveBackend(BackendBase):
         height: int | None = None,
         target: str = "png",
     ) -> bool:
+        safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
         client = await self._ensure_client()
         p: dict[str, Any] = {
             "doc_id": doc_id,
-            "output_path": output_path,
+            "output_path": str(safe_output),
             "time": time,
             "target": target,
         }
@@ -369,3 +537,87 @@ class LiveBackend(BackendBase):
             p["height"] = height
         res = await client.call("render.frame", p)
         return bool(res.get("success", True))
+
+    @property
+    def pipeline(self) -> Any:
+        if not hasattr(self, "_pipeline") or self._pipeline is None:
+            from synfig_mcp.render.pipeline import RenderPipeline
+
+            self._pipeline = RenderPipeline(backend=self)
+        return self._pipeline
+
+    async def render_sequence(
+        self,
+        doc_id: str,
+        output_dir: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        target: str = "png",
+    ) -> list[str]:
+        safe_dir = validate_path(output_dir)
+        res = await self.pipeline.render_sequence(
+            doc_id=doc_id,
+            output_dir=str(safe_dir),
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+            width=width,
+            height=height,
+            target=target,
+        )
+        return cast(list[str], res)
+
+    async def render_video(
+        self,
+        doc_id: str,
+        output_path: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> bool:
+        safe_output = validate_path(
+            output_path,
+            allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
+        )
+        ok = await self.pipeline.render_video(
+            doc_id=doc_id,
+            output_path=str(safe_output),
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+            width=width,
+            height=height,
+        )
+        return bool(ok)
+
+    async def render_contact_sheet(
+        self,
+        doc_id: str,
+        output_path: str,
+        cols: int = 4,
+        rows: int = 3,
+        width: int | None = None,
+        height: int | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> bool:
+        safe_output = validate_path(
+            output_path,
+            allowed_extensions={".png", ".jpg", ".jpeg"},
+        )
+        ok = await self.pipeline.render_contact_sheet(
+            doc_id=doc_id,
+            output_path=str(safe_output),
+            cols=cols,
+            rows=rows,
+            width=width,
+            height=height,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        return bool(ok)

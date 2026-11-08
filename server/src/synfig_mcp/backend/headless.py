@@ -8,12 +8,13 @@ lossless file round-tripping, atomic snapshot-based undo/redo stacks, and CLI re
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
 from synfig_mcp.cli.runner import CliRunner
 from synfig_mcp.errors import DocumentNotFoundError, SynfigError
 from synfig_mcp.protocol.models import SynfigValue
+from synfig_mcp.security.sandbox import validate_path
 from synfig_mcp.sif.parser import SifDocument, parse_synfig_time
 from synfig_mcp.sif.writer import save_sif
 
@@ -30,6 +31,7 @@ class HeadlessBackend(BackendBase):
         self._redo_stacks: dict[str, list[bytes]] = {}
         self._current_time: dict[str, float] = {}
         self._dirty: dict[str, bool] = {}
+        self._pipeline: Any = None
 
     @property
     def name(self) -> str:
@@ -87,6 +89,15 @@ class HeadlessBackend(BackendBase):
         """List all currently loaded documents."""
         return [self._sync_doc_info(d_id) for d_id in self._documents]
 
+    async def get_doc_state(self, doc_id: str) -> str:
+        """Return a hash representing current document DOM state."""
+        import hashlib
+
+        sif = self._documents.get(doc_id)
+        if sif:
+            return hashlib.sha256(sif.to_xml_bytes()).hexdigest()
+        return doc_id
+
     async def doc_new(
         self, width: int = 1920, height: int = 1080, fps: float = 24.0
     ) -> DocumentInfo:
@@ -105,9 +116,9 @@ class HeadlessBackend(BackendBase):
 
     async def doc_open(self, file_path: str) -> DocumentInfo:
         """Open a .sif/.sifz/.sfg document from disk."""
-        path = Path(file_path)
-        if not path.is_file():
-            raise DocumentNotFoundError(f"File not found: {file_path}")
+        path = validate_path(
+            file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, must_exist=True
+        )
 
         doc_id = f"doc_{uuid.uuid4().hex[:8]}"
         doc = SifDocument.from_file(path)
@@ -126,9 +137,13 @@ class HeadlessBackend(BackendBase):
         if doc_id not in self._documents:
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
 
-        target = Path(file_path) if file_path else self._doc_paths.get(doc_id)
-        if not target:
-            target = Path.cwd() / f"{doc_id}.sifz"
+        target: Path
+        if file_path:
+            target = validate_path(file_path, allowed_extensions={".sif", ".sifz", ".sfg"})
+        elif doc_id in self._doc_paths:
+            target = self._doc_paths[doc_id]
+        else:
+            target = validate_path(Path.cwd() / f"{doc_id}.sifz")
 
         save_sif(self._documents[doc_id], target)
         self._doc_paths[doc_id] = target.resolve()
@@ -177,6 +192,27 @@ class HeadlessBackend(BackendBase):
             start_time=start_time,
             end_time=end_time,
         )
+        return self._sync_doc_info(doc_id)
+
+    async def doc_set_time_range(
+        self,
+        doc_id: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+    ) -> DocumentInfo:
+        """Update canvas timeline range."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        doc = self._documents[doc_id]
+        if start_time is not None:
+            doc.start_time = start_time
+        if end_time is not None:
+            doc.end_time = end_time
+        if fps is not None:
+            doc.fps = fps
         return self._sync_doc_info(doc_id)
 
     # -----------------------------------------------------------------------
@@ -340,7 +376,8 @@ class HeadlessBackend(BackendBase):
         if layer is None:
             raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
 
-        return layer.get_param(param_name)
+        curr_t = self._current_time.get(doc_id, 0.0)
+        return layer.get_interpolated_param(param_name, curr_t) or layer.get_param(param_name)
 
     async def param_set(
         self,
@@ -374,6 +411,79 @@ class HeadlessBackend(BackendBase):
                 "created": [],
                 "modified": [f"{layer_id}:{param_name}"],
                 "deleted": [],
+            },
+        }
+
+    async def param_convert(
+        self, doc_id: str, layer_id: str, param_name: str, type: str
+    ) -> dict[str, Any]:
+        """Convert a parameter to a linkable ValueNode type."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        layer = self._documents[doc_id].get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        layer.convert_param(param_name, type)
+        return {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "type": type,
+            "diff": {
+                "action": "param.convert",
+                "created": [],
+                "modified": [f"{layer_id}:{param_name}"],
+                "deleted": [],
+            },
+        }
+
+    async def param_export(
+        self, doc_id: str, layer_id: str, param_name: str, name: str
+    ) -> dict[str, Any]:
+        """Export a parameter to canvas value node library."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        doc = self._documents[doc_id]
+        layer = doc.get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        layer.export_param(param_name, name, doc.root)
+        return {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "name": name,
+            "diff": {
+                "action": "param.export",
+                "created": [name],
+                "modified": [f"{layer_id}:{param_name}"],
+                "deleted": [],
+            },
+        }
+
+    async def param_unexport(self, doc_id: str, name: str) -> dict[str, Any]:
+        """Unexport a previously exported ValueNode."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        ok = self._documents[doc_id].unexport_valuenode(name)
+        if not ok:
+            raise SynfigError(f"Exported ValueNode '{name}' not found.")
+        return {
+            "doc_id": doc_id,
+            "name": name,
+            "diff": {
+                "action": "param.unexport",
+                "created": [],
+                "modified": [],
+                "deleted": [name],
             },
         }
 
@@ -429,6 +539,141 @@ class HeadlessBackend(BackendBase):
         if doc_id not in self._documents:
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
         return self._documents[doc_id].list_keyframes(canvas_path)
+
+    async def anim_waypoint_set(
+        self,
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        time: float,
+        value: SynfigValue | Any,
+        interpolation: str | None = None,
+        interpolation_in: str | None = None,
+        interpolation_out: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert or update a waypoint at a specific time."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        layer = self._documents[doc_id].get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        interp = interpolation or "linear"
+        layer.set_waypoint(
+            name=param_name,
+            time=time,
+            value=value,
+            interpolation=interp,
+            interpolation_in=interpolation_in,
+            interpolation_out=interpolation_out,
+        )
+        return {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "time": time,
+            "value": value
+            if isinstance(value, dict)
+            else value.model_dump()
+            if hasattr(value, "model_dump")
+            else str(value),
+            "interpolation_in": interpolation_in or interp,
+            "interpolation_out": interpolation_out or interp,
+            "diff": {
+                "action": "anim.waypoint_set",
+                "created": [],
+                "modified": [f"{layer_id}:{param_name}"],
+                "deleted": [],
+            },
+        }
+
+    async def anim_waypoint_remove(
+        self, doc_id: str, layer_id: str, param_name: str, time: float
+    ) -> dict[str, Any]:
+        """Remove a waypoint at a specific time."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        layer = self._documents[doc_id].get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        layer.remove_waypoint(param_name, time)
+        return {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "time": time,
+            "diff": {
+                "action": "anim.waypoint_remove",
+                "created": [],
+                "modified": [f"{layer_id}:{param_name}"],
+                "deleted": [],
+            },
+        }
+
+    async def anim_animate_param(
+        self,
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        waypoints: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Apply bulk waypoints as a single undo step."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        layer = self._documents[doc_id].get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        for wp in waypoints:
+            t = float(wp.get("time", 0.0))
+            val = wp.get("value", {})
+            interp = wp.get("interpolation", "linear")
+            interp_in = wp.get("interpolation_in")
+            interp_out = wp.get("interpolation_out")
+            layer.set_waypoint(
+                name=param_name,
+                time=t,
+                value=val,
+                interpolation=interp,
+                interpolation_in=interp_in,
+                interpolation_out=interp_out,
+            )
+
+        return {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "waypoint_count": len(waypoints),
+            "diff": {
+                "action": "anim.animate_param",
+                "created": [],
+                "modified": [f"{layer_id}:{param_name}"],
+                "deleted": [],
+            },
+        }
+
+    async def anim_interpolation_set(
+        self,
+        doc_id: str,
+        interpolation: str,
+        layer_id: str | None = None,  # noqa: ARG002
+        param_name: str | None = None,  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """Set default interpolation."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        return {
+            "doc_id": doc_id,
+            "interpolation": interpolation,
+        }
 
     # -----------------------------------------------------------------------
     # History (Undo / Redo) Operations
@@ -496,6 +741,8 @@ class HeadlessBackend(BackendBase):
         if doc_id not in self._documents:
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
 
+        safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
+
         doc = self._documents[doc_id]
         # Write to temporary .sif file for CLI render
         with tempfile.NamedTemporaryFile(suffix=".sif", delete=False) as tmp:
@@ -507,7 +754,7 @@ class HeadlessBackend(BackendBase):
             render_h = height or doc.height
             return await self.runner.render_frame(
                 sif_path=tmp_path,
-                output_path=Path(output_path),
+                output_path=safe_output,
                 time=time,
                 width=render_w,
                 height=render_h,
@@ -515,3 +762,87 @@ class HeadlessBackend(BackendBase):
             )
         finally:
             tmp_path.unlink(missing_ok=True)
+
+    @property
+    def pipeline(self) -> Any:
+        if not hasattr(self, "_pipeline") or self._pipeline is None:
+            from synfig_mcp.render.pipeline import RenderPipeline
+
+            self._pipeline = RenderPipeline(backend=self)
+        return self._pipeline
+
+    async def render_sequence(
+        self,
+        doc_id: str,
+        output_dir: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        target: str = "png",
+    ) -> list[str]:
+        safe_dir = validate_path(output_dir)
+        res = await self.pipeline.render_sequence(
+            doc_id=doc_id,
+            output_dir=str(safe_dir),
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+            width=width,
+            height=height,
+            target=target,
+        )
+        return cast(list[str], res)
+
+    async def render_video(
+        self,
+        doc_id: str,
+        output_path: str,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        fps: float | None = None,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> bool:
+        safe_output = validate_path(
+            output_path,
+            allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
+        )
+        ok = await self.pipeline.render_video(
+            doc_id=doc_id,
+            output_path=str(safe_output),
+            start_time=start_time,
+            end_time=end_time,
+            fps=fps,
+            width=width,
+            height=height,
+        )
+        return bool(ok)
+
+    async def render_contact_sheet(
+        self,
+        doc_id: str,
+        output_path: str,
+        cols: int = 4,
+        rows: int = 3,
+        width: int | None = None,
+        height: int | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> bool:
+        safe_output = validate_path(
+            output_path,
+            allowed_extensions={".png", ".jpg", ".jpeg"},
+        )
+        ok = await self.pipeline.render_contact_sheet(
+            doc_id=doc_id,
+            output_path=str(safe_output),
+            cols=cols,
+            rows=rows,
+            width=width,
+            height=height,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        return bool(ok)

@@ -24,9 +24,24 @@
 #include <synfig/time.h>
 #include <synfig/target.h>
 #include <synfig/targetparam.h>
+#include <synfig/valuenodes/valuenode_animated.h>
+#include <synfig/valuenode_registry.h>
+#include <synfig/waypoint.h>
+#include <synfigapp/main.h>
 #endif
 
 namespace mcp_bridge {
+
+#ifndef MCP_BRIDGE_STANDALONE
+static synfig::Interpolation parse_interpolation(const std::string& str, synfig::Interpolation default_val = synfig::INTERPOLATION_TCB) {
+    if (str == "linear") return synfig::INTERPOLATION_LINEAR;
+    if (str == "constant") return synfig::INTERPOLATION_CONSTANT;
+    if (str == "halt") return synfig::INTERPOLATION_HALT;
+    if (str == "clamped") return synfig::INTERPOLATION_CLAMPED;
+    if (str == "tcb") return synfig::INTERPOLATION_TCB;
+    return default_val;
+}
+#endif
 
 const char* PROTOCOL_VERSION = "1.0";
 const char* STUDIO_VERSION = "1.5.5";
@@ -443,6 +458,68 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 {"diff", make_diff("doc.set_properties", {}, {doc_id}, {})}
             };
             return r;
+        });
+    }
+
+    if (method == "doc.set_time_range") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+
+        return run_on_main_thread([&, doc_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: doc.set_time_range");
+
+            synfig::RendDesc desc = inst->get_canvas()->rend_desc();
+            if (params.contains("start_time")) {
+                desc.set_time_start(synfig::Time(params["start_time"].get<double>()));
+            } else if (params.contains("begin_time")) {
+                desc.set_time_start(synfig::Time(params["begin_time"].get<double>()));
+            }
+            if (params.contains("end_time")) {
+                desc.set_time_end(synfig::Time(params["end_time"].get<double>()));
+            }
+            if (params.contains("fps")) {
+                desc.set_frame_rate(params["fps"].get<double>());
+            }
+
+            synfigapp::Action::Handle action = synfigapp::Action::create("CanvasRendDescSet");
+            if (action) {
+                action->set_param("canvas", inst->get_canvas());
+                action->set_param("canvas_interface", ci);
+                action->set_param("rend_desc", desc);
+                inst->perform_action(action);
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"start_time", static_cast<double>(desc.get_time_start())},
+                {"end_time", static_cast<double>(desc.get_time_end())},
+                {"fps", static_cast<double>(desc.get_frame_rate())},
+                {"diff", make_diff("doc.set_time_range", {}, {doc_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"start_time", params.value("start_time", 0.0)},
+                {"end_time", params.value("end_time", 5.0)},
+                {"fps", params.value("fps", 24.0)},
+                {"diff", make_diff("doc.set_time_range", {}, {doc_id}, {})}
+            };
+            return r;
+#endif
         });
     }
 
@@ -883,7 +960,13 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 return r;
             }
 
-            synfig::ValueBase val = layer->get_param(param_name);
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfig::Time cur_time = ci ? ci->get_time() : synfig::Time(0);
+            synfigapp::ValueDesc vd(layer, param_name);
+            synfig::ValueBase val = vd.get_value(cur_time);
+            if (!val.is_valid()) {
+                val = layer->get_param(param_name);
+            }
             if (!val.is_valid()) {
                 r["error"] = {{"code", 2003}, {"message", "Parameter not found: " + param_name}};
                 return r;
@@ -953,6 +1036,232 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    if (method == "param.convert") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+        std::string type = params.value("type", "");
+
+        return run_on_main_thread([&, doc_id, layer_id, param_name, type]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+
+            if (type.empty() || !synfig::ValueNodeRegistry::book().count(type)) {
+                r["error"] = {{"code", -32602}, {"message", "Unsupported ValueNode conversion type: " + type}};
+                return r;
+            }
+
+            synfigapp::ValueDesc vd(layer, param_name);
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: param.convert");
+
+            synfigapp::Action::Handle action = synfigapp::Action::create("ValueDescConvert");
+            if (!action) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "Failed to create ValueDescConvert action"}};
+                return r;
+            }
+
+            synfig::Time cur_time = ci ? ci->get_time() : synfig::Time(0);
+            action->set_param("canvas", inst->get_canvas());
+            action->set_param("canvas_interface", ci);
+            action->set_param("value_desc", vd);
+            action->set_param("type", type);
+            action->set_param("time", cur_time);
+
+            try {
+                if (!inst->perform_action(action)) {
+                    grouper.cancel();
+                    r["error"] = {{"code", -32000}, {"message", "ValueDescConvert action rejected for parameter: " + param_name + " to " + type}};
+                    return r;
+                }
+            } catch (const std::exception& e) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", std::string("ValueDescConvert failed: ") + e.what()}};
+                return r;
+            } catch (...) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "ValueDescConvert failed with unknown exception"}};
+                return r;
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"type", type},
+                {"diff", make_diff("param.convert", {}, {layer_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"type", type},
+                {"diff", make_diff("param.convert", {}, {layer_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "param.export") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+        std::string export_name = params.value("name", "");
+
+        return run_on_main_thread([&, doc_id, layer_id, param_name, export_name]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+
+            if (export_name.empty()) {
+                r["error"] = {{"code", -32602}, {"message", "Missing export name"}};
+                return r;
+            }
+
+            synfigapp::ValueDesc vd(layer, param_name);
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: param.export");
+
+            synfigapp::Action::Handle action = synfigapp::Action::create("ValueDescExport");
+            if (!action) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "Failed to create ValueDescExport action"}};
+                return r;
+            }
+
+            action->set_param("canvas", inst->get_canvas());
+            action->set_param("canvas_interface", ci);
+            action->set_param("value_desc", vd);
+            action->set_param("name", export_name);
+
+            if (!inst->perform_action(action)) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "ValueDescExport action failed for name: " + export_name}};
+                return r;
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"name", export_name},
+                {"diff", make_diff("param.export", {export_name}, {}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"name", export_name},
+                {"diff", make_diff("param.export", {export_name}, {}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "param.unexport") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string export_name = params.value("name", "");
+
+        return run_on_main_thread([&, doc_id, export_name]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            if (export_name.empty()) {
+                r["error"] = {{"code", -32602}, {"message", "Missing export name"}};
+                return r;
+            }
+
+            synfig::ValueNode::Handle vn = inst->get_canvas()->find_value_node(export_name, true);
+            if (!vn) {
+                r["error"] = {{"code", 2002}, {"message", "Exported ValueNode not found: " + export_name}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: param.unexport");
+
+            synfigapp::Action::Handle action = synfigapp::Action::create("ValueNodeRemove");
+            if (!action) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "Failed to create ValueNodeRemove action"}};
+                return r;
+            }
+
+            action->set_param("canvas", inst->get_canvas());
+            action->set_param("canvas_interface", ci);
+            action->set_param("value_node", vn);
+
+            if (!inst->perform_action(action)) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "ValueNodeRemove action failed for name: " + export_name}};
+                return r;
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"name", export_name},
+                {"diff", make_diff("param.unexport", {}, {}, {export_name})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"name", export_name},
+                {"diff", make_diff("param.unexport", {}, {}, {export_name})}
+            };
+            return r;
+#endif
+        });
+    }
+
     // --- 6. ANIMATION METHODS ---
     if (method == "anim.time_get" || method == "anim.time.get") {
         std::string doc_id = params.value("doc_id", "doc_0");
@@ -1009,7 +1318,7 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
             synfig::Time t(t_sec);
             if (ci) {
-                ci->seek_time(t);
+                ci->set_time(t);
             }
 
             r["result"] = {
@@ -1143,19 +1452,22 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    if (method == "anim.waypoint_set") {
+    if (method == "anim.waypoint_set" || method == "waypoint.set") {
         std::string doc_id = params.value("doc_id", "doc_0");
         std::string layer_id = params.value("layer_id", "");
         std::string param_name = params.value("param_name", "");
         double t_sec = params.value("time", 0.0);
         nlohmann::json val_json = params.value("value", nlohmann::json::object());
+        std::string interp_before_str = params.value("interpolation_in", params.value("interpolation", ""));
+        std::string interp_after_str = params.value("interpolation_out", params.value("interpolation", ""));
 
-        return run_on_main_thread([&, doc_id, layer_id, param_name, t_sec, val_json]() -> nlohmann::json {
+        return run_on_main_thread([&, doc_id, layer_id, param_name, t_sec, val_json, interp_before_str, interp_after_str]() -> nlohmann::json {
             nlohmann::json r;
             r["jsonrpc"] = "2.0";
             r["id"] = req["id"];
 
             etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
             if (!inst || !inst->get_canvas()) {
                 r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
                 return r;
@@ -1168,10 +1480,56 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             }
 
             synfig::ValueBase val = json_to_valuebase(val_json);
+            if (!val.is_valid()) {
+                r["error"] = {{"code", -32602}, {"message", "Invalid value for waypoint: " + param_name}};
+                return r;
+            }
+
             etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
             synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: anim.waypoint_set");
 
-            ci->change_value_at_time(synfigapp::ValueDesc(layer, param_name), val, synfig::Time(t_sec));
+            if (!interp_after_str.empty()) {
+                synfigapp::Main::set_interpolation(parse_interpolation(interp_after_str));
+            }
+
+            synfigapp::ValueDesc vd(layer, param_name);
+            synfigapp::Action::Handle action = synfigapp::Action::create("ValueDescSet");
+            if (action) {
+                action->set_param("canvas", inst->get_canvas());
+                action->set_param("canvas_interface", ci);
+                action->set_param("time", synfig::Time(t_sec));
+                action->set_param("value_desc", vd);
+                action->set_param("new_value", val);
+                action->set_param("animate", true);
+                inst->perform_action(action);
+            }
+
+            if (!interp_before_str.empty() || !interp_after_str.empty()) {
+                synfigapp::ValueDesc updated_vd(layer, param_name);
+                if (updated_vd.is_value_node()) {
+                    synfig::ValueNode_Animated::Handle animated =
+                        synfig::ValueNode_Animated::Handle::cast_dynamic(updated_vd.get_value_node());
+                    if (animated) {
+                        try {
+                            auto it = animated->find(synfig::Time(t_sec));
+                            if (it != animated->waypoint_list().end()) {
+                                synfig::Waypoint wp = *it;
+                                if (!interp_before_str.empty()) wp.set_before(parse_interpolation(interp_before_str));
+                                if (!interp_after_str.empty()) wp.set_after(parse_interpolation(interp_after_str));
+                                synfigapp::Action::Handle wp_action = synfigapp::Action::create("WaypointSet");
+                                if (wp_action) {
+                                    wp_action->set_param("canvas", inst->get_canvas());
+                                    wp_action->set_param("canvas_interface", ci);
+                                    wp_action->set_param("value_node", synfig::ValueNode::Handle(animated));
+                                    wp_action->set_param("waypoint", wp);
+                                    inst->perform_action(wp_action);
+                                }
+                            }
+                        } catch (...) {}
+                    }
+                }
+            }
+
             grouper.finish();
 
             r["result"] = {
@@ -1180,9 +1538,284 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 {"param_name", param_name},
                 {"time", t_sec},
                 {"value", val_json},
+                {"interpolation_in", interp_before_str.empty() ? "tcb" : interp_before_str},
+                {"interpolation_out", interp_after_str.empty() ? "tcb" : interp_after_str},
                 {"diff", make_diff("anim.waypoint_set", {}, {layer_id}, {})}
             };
             return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"time", t_sec},
+                {"value", val_json},
+                {"interpolation_in", interp_before_str.empty() ? "tcb" : interp_before_str},
+                {"interpolation_out", interp_after_str.empty() ? "tcb" : interp_after_str},
+                {"diff", make_diff("anim.waypoint_set", {}, {layer_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "anim.waypoint_remove" || method == "waypoint.remove" || method == "waypoint.delete") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+        double t_sec = params.value("time", 0.0);
+
+        return run_on_main_thread([&, doc_id, layer_id, param_name, t_sec]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+
+            synfigapp::ValueDesc vd(layer, param_name);
+            if (!vd.is_value_node()) {
+                r["error"] = {{"code", 2003}, {"message", "Parameter is not animated: " + param_name}};
+                return r;
+            }
+
+            synfig::ValueNode_Animated::Handle animated =
+                synfig::ValueNode_Animated::Handle::cast_dynamic(vd.get_value_node());
+            if (!animated) {
+                r["error"] = {{"code", 2003}, {"message", "Parameter is not animated: " + param_name}};
+                return r;
+            }
+
+            synfig::ValueNode_Animated::WaypointList::iterator iter;
+            try {
+                iter = animated->find(synfig::Time(t_sec));
+            } catch (...) {
+                r["error"] = {{"code", 2002}, {"message", "Waypoint not found at time: " + std::to_string(t_sec)}};
+                return r;
+            }
+
+            if (iter == animated->waypoint_list().end()) {
+                r["error"] = {{"code", 2002}, {"message", "Waypoint not found at time: " + std::to_string(t_sec)}};
+                return r;
+            }
+
+            synfig::Waypoint wp = *iter;
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: anim.waypoint_remove");
+
+            synfigapp::Action::Handle action = synfigapp::Action::create("WaypointRemove");
+            if (!action) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "Failed to create WaypointRemove action"}};
+                return r;
+            }
+
+            action->set_param("canvas", inst->get_canvas());
+            action->set_param("canvas_interface", ci);
+            action->set_param("value_node", synfig::ValueNode::Handle(animated));
+            action->set_param("waypoint", wp);
+
+            if (!inst->perform_action(action)) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "WaypointRemove action failed"}};
+                return r;
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"time", t_sec},
+                {"diff", make_diff("anim.waypoint_remove", {}, {layer_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"time", t_sec},
+                {"diff", make_diff("anim.waypoint_remove", {}, {layer_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "anim.animate_param") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+        nlohmann::json waypoints = params.value("waypoints", nlohmann::json::array());
+
+        return run_on_main_thread([&, doc_id, layer_id, param_name, waypoints]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: anim.animate_param");
+
+            for (const auto& wp_json : waypoints) {
+                double t = wp_json.value("time", 0.0);
+                synfig::ValueBase val = json_to_valuebase(wp_json.value("value", nlohmann::json::object()));
+                if (!val.is_valid()) continue;
+
+                std::string interp_in = wp_json.value("interpolation_in", wp_json.value("interpolation", ""));
+                std::string interp_out = wp_json.value("interpolation_out", wp_json.value("interpolation", ""));
+                if (!interp_out.empty()) {
+                    synfigapp::Main::set_interpolation(parse_interpolation(interp_out));
+                }
+
+                synfigapp::ValueDesc vd(layer, param_name);
+                synfigapp::Action::Handle action = synfigapp::Action::create("ValueDescSet");
+                if (action) {
+                    action->set_param("canvas", inst->get_canvas());
+                    action->set_param("canvas_interface", ci);
+                    action->set_param("time", synfig::Time(t));
+                    action->set_param("value_desc", vd);
+                    action->set_param("new_value", val);
+                    action->set_param("animate", true);
+                    inst->perform_action(action);
+                }
+
+                if (!interp_in.empty() || !interp_out.empty()) {
+                    synfigapp::ValueDesc updated_vd(layer, param_name);
+                    if (updated_vd.is_value_node()) {
+                        synfig::ValueNode_Animated::Handle animated =
+                            synfig::ValueNode_Animated::Handle::cast_dynamic(updated_vd.get_value_node());
+                        if (animated) {
+                            try {
+                                auto it = animated->find(synfig::Time(t));
+                                if (it != animated->waypoint_list().end()) {
+                                    if (!interp_in.empty()) it->set_before(parse_interpolation(interp_in));
+                                    if (!interp_out.empty()) it->set_after(parse_interpolation(interp_out));
+                                    synfigapp::Action::Handle wp_action = synfigapp::Action::create("WaypointSet");
+                                    if (wp_action) {
+                                        wp_action->set_param("canvas", inst->get_canvas());
+                                        wp_action->set_param("canvas_interface", ci);
+                                        wp_action->set_param("value_node", synfig::ValueNode::Handle(animated));
+                                        wp_action->set_param("waypoint", *it);
+                                        inst->perform_action(wp_action);
+                                    }
+                                }
+                            } catch (...) {}
+                        }
+                    }
+                }
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"waypoint_count", static_cast<int>(waypoints.size())},
+                {"diff", make_diff("anim.animate_param", {}, {layer_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"waypoint_count", static_cast<int>(waypoints.size())},
+                {"diff", make_diff("anim.animate_param", {}, {layer_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "anim.interpolation_set") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string interp_str = params.value("interpolation", "tcb");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+
+        return run_on_main_thread([&, doc_id, interp_str, layer_id, param_name]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Interpolation interp = parse_interpolation(interp_str);
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+
+            if (layer_id.empty() || param_name.empty()) {
+                synfigapp::Main::set_interpolation(interp);
+            } else {
+                synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+                if (layer) {
+                    synfigapp::ValueDesc vd(layer, param_name);
+                    if (vd.is_value_node()) {
+                        synfig::ValueNode_Animated::Handle animated =
+                            synfig::ValueNode_Animated::Handle::cast_dynamic(vd.get_value_node());
+                        if (animated) {
+                            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: anim.interpolation_set");
+                            for (auto it = animated->waypoint_list().begin(); it != animated->waypoint_list().end(); ++it) {
+                                synfig::Waypoint wp = *it;
+                                wp.set_before(interp);
+                                wp.set_after(interp);
+                                synfigapp::Action::Handle wp_action = synfigapp::Action::create("WaypointSet");
+                                if (wp_action) {
+                                    wp_action->set_param("canvas", inst->get_canvas());
+                                    wp_action->set_param("canvas_interface", ci);
+                                    wp_action->set_param("value_node", synfig::ValueNode::Handle(animated));
+                                    wp_action->set_param("waypoint", wp);
+                                    inst->perform_action(wp_action);
+                                }
+                            }
+                            grouper.finish();
+                        }
+                    }
+                }
+            }
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"interpolation", interp_str}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"interpolation", interp_str}
+            };
+            return r;
+#endif
         });
     }
 

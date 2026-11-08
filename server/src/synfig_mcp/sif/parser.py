@@ -190,6 +190,18 @@ def xml_to_synfig_value(elem: etree._Element) -> SynfigValue | None:
                     )
                 )
         return BLinePointListValue(points=points)
+    if tag == "animated":
+        for wp in elem:
+            if is_element_tag(wp, "waypoint"):
+                for wp_child in wp:
+                    val = xml_to_synfig_value(wp_child)
+                    if val is not None:
+                        return val
+    if tag == "waypoint":
+        for wp_child in elem:
+            val = xml_to_synfig_value(wp_child)
+            if val is not None:
+                return val
 
     return None
 
@@ -406,6 +418,155 @@ class SifLayer:
         new_val_el = synfig_value_to_xml(value)
         target_param.append(new_val_el)
 
+    def set_waypoint(
+        self,
+        name: str,
+        time: float,
+        value: SynfigValue | dict[str, Any] | Any,
+        interpolation: str = "linear",
+        interpolation_in: str | None = None,
+        interpolation_out: str | None = None,
+    ) -> None:
+        """Insert or update a waypoint at a specific time on a parameter."""
+        target_param = None
+        for param in self.element.findall("param"):
+            if param.get("name") == name:
+                target_param = param
+                break
+
+        if target_param is None:
+            target_param = etree.SubElement(self.element, "param")
+            target_param.set("name", name)
+
+        animated_el = target_param.find("animated")
+        if animated_el is None:
+            old_child = list(target_param)[0] if len(target_param) > 0 else None
+            old_type = (
+                etree.QName(str(old_child.tag)).localname if old_child is not None else "vector"
+            )
+            for child in list(target_param):
+                target_param.remove(child)
+            animated_el = etree.SubElement(target_param, "animated")
+            animated_el.set("type", old_type)
+
+        target_wp = None
+        time_str = f"{time:.4f}s" if time != int(time) else f"{int(time)}s"
+        for wp in animated_el.findall("waypoint"):
+            t_wp = parse_synfig_time(wp.get("time", "0s"))
+            if abs(t_wp - time) < 1e-4:
+                target_wp = wp
+                break
+
+        interp_before = interpolation_in or interpolation
+        interp_after = interpolation_out or interpolation
+
+        if target_wp is None:
+            target_wp = etree.SubElement(animated_el, "waypoint")
+            target_wp.set("time", time_str)
+            target_wp.set("before", interp_before)
+            target_wp.set("after", interp_after)
+        else:
+            target_wp.set("time", time_str)
+            target_wp.set("before", interp_before)
+            target_wp.set("after", interp_after)
+            for c in list(target_wp):
+                target_wp.remove(c)
+
+        val_el = synfig_value_to_xml(value)
+        target_wp.append(val_el)
+
+    def remove_waypoint(self, name: str, time: float) -> bool:
+        """Remove a waypoint at a specific time."""
+        for param in self.element.findall("param"):
+            if param.get("name") == name:
+                animated_el = param.find("animated")
+                if animated_el is not None:
+                    for wp in animated_el.findall("waypoint"):
+                        t_wp = parse_synfig_time(wp.get("time", "0s"))
+                        if abs(t_wp - time) < 1e-4:
+                            animated_el.remove(wp)
+                            return True
+        return False
+
+    def get_interpolated_param(self, name: str, time: float) -> SynfigValue | None:
+        """Get parameter value evaluated at timeline position."""
+        for param in self.element.findall("param"):
+            if param.get("name") == name:
+                animated_el = param.find("animated")
+                if animated_el is not None:
+                    wps: list[tuple[float, etree._Element]] = []
+                    for wp in animated_el.findall("waypoint"):
+                        t = parse_synfig_time(wp.get("time", "0s"))
+                        wps.append((t, wp))
+                    wps.sort(key=lambda x: x[0])
+                    if not wps:
+                        return None
+                    if time <= wps[0][0]:
+                        return xml_to_synfig_value(list(wps[0][1])[0])
+                    if time >= wps[-1][0]:
+                        return xml_to_synfig_value(list(wps[-1][1])[0])
+                    for i in range(len(wps) - 1):
+                        t0, wp0 = wps[i]
+                        t1, wp1 = wps[i + 1]
+                        if t0 <= time <= t1:
+                            val0 = xml_to_synfig_value(list(wp0)[0])
+                            val1 = xml_to_synfig_value(list(wp1)[0])
+                            if val0 is None or val1 is None:
+                                return val0 or val1
+                            alpha = (time - t0) / (t1 - t0) if t1 > t0 else 0.0
+                            if isinstance(val0, VectorValue) and isinstance(val1, VectorValue):
+                                return VectorValue(
+                                    x=val0.x + alpha * (val1.x - val0.x),
+                                    y=val0.y + alpha * (val1.y - val0.y),
+                                    unit="synfig",
+                                )
+                            if isinstance(val0, RealValue) and isinstance(val1, RealValue):
+                                return RealValue(
+                                    value=val0.value + alpha * (val1.value - val0.value)
+                                )
+                            if isinstance(val0, ColorValue) and isinstance(val1, ColorValue):
+                                return ColorValue(
+                                    r=val0.r + alpha * (val1.r - val0.r),
+                                    g=val0.g + alpha * (val1.g - val0.g),
+                                    b=val0.b + alpha * (val1.b - val0.b),
+                                    a=val0.a + alpha * (val1.a - val0.a),
+                                )
+                            return val0 if alpha < 0.5 else val1
+                for child in param:
+                    val = xml_to_synfig_value(child)
+                    if val is not None:
+                        return val
+        return None
+
+    def convert_param(self, name: str, valuenode_type: str) -> None:
+        """Wrap or convert a parameter to a linkable ValueNode type."""
+        for param in self.element.findall("param"):
+            if param.get("name") == name:
+                children = list(param)
+                for c in children:
+                    param.remove(c)
+                vn_el = etree.SubElement(param, valuenode_type)
+                for c in children:
+                    vn_el.append(c)
+                return
+
+    def export_param(self, name: str, export_name: str, canvas_root: etree._Element) -> None:
+        """Export parameter to <defs><valuenode id="...">."""
+        defs = canvas_root.find("defs")
+        if defs is None:
+            defs = etree.SubElement(canvas_root, "defs")
+        for param in self.element.findall("param"):
+            if param.get("name") == name:
+                children = list(param)
+                for c in children:
+                    param.remove(c)
+                vn = etree.SubElement(defs, "valuenode")
+                vn.set("id", export_name)
+                for c in children:
+                    vn.append(c)
+                param.set("use", export_name)
+                return
+
     def get_params(self) -> dict[str, Any]:
         """Return dictionary of all defined parameters on this layer."""
         result: dict[str, Any] = {}
@@ -586,6 +747,16 @@ class SifDocument:
     @end_time.setter
     def end_time(self, val: float) -> None:
         self.root.set("end-time", f"{val:.2f}s")
+
+    def unexport_valuenode(self, export_name: str) -> bool:
+        """Remove an exported valuenode from <defs>."""
+        defs = self.root.find("defs")
+        if defs is not None:
+            for vn in defs.findall("valuenode"):
+                if vn.get("id") == export_name:
+                    defs.remove(vn)
+                    return True
+        return False
 
     @property
     def name(self) -> str:

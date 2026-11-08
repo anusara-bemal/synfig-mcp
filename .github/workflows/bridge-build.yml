@@ -15,16 +15,34 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y \
-            cmake ninja-build pkg-config ccache intltool \
+            cmake ninja-build pkg-config ccache intltool autopoint gettext \
             libxml++2.6-dev libsigc++-2.0-dev libglibmm-2.4-dev libgtkmm-3.0-dev \
             libmlt++-dev libmlt-dev libfftw3-dev libavcodec-dev libavformat-dev \
-            libswscale-dev libmagick++-dev libopenexr-dev libboost-all-dev
+            libswscale-dev libmagick++-dev libopenexr-dev libboost-all-dev \
+            libltdl-dev libharfbuzz-dev libmng-dev nlohmann-json3-dev
 
       - name: Fetch and build Synfig Studio
         run: |
           bash bridge/scripts/fetch_synfig.sh
           bash bridge/scripts/apply_patches.sh
           bash bridge/scripts/build_linux.sh
+
+      - name: Package Linux Artifacts
+        run: |
+          PACKAGE_DIR="synfigstudio-linux-mcp-$(git rev-parse --short HEAD)"
+          mkdir -p "${PACKAGE_DIR}"
+          cp -r build_synfig/build_linux/install/* "${PACKAGE_DIR}/"
+          cp bridge/GPL_NOTICE.txt "${PACKAGE_DIR}/"
+          cp bridge/THIRD_PARTY_LICENSES.md "${PACKAGE_DIR}/"
+          mkdir -p "${PACKAGE_DIR}/patches"
+          cp -r bridge/patches/* "${PACKAGE_DIR}/patches/"
+          tar -czvf "${PACKAGE_DIR}.tar.gz" "${PACKAGE_DIR}"
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synfigstudio-linux-mcp
+          path: synfigstudio-linux-mcp-*.tar.gz
 
   build-windows:
     runs-on: windows-latest
@@ -37,7 +55,7 @@ jobs:
           msystem: UCRT64
           update: true
           install: >-
-            autoconf automake-wrapper intltool libtool make patch tar
+            autoconf automake-wrapper intltool libtool make patch tar zip
             mingw-w64-ucrt-x86_64-ccache mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-gtkmm3
@@ -52,3 +70,21 @@ jobs:
         shell: msys2 {0}
         run: |
           bash bridge/scripts/build_windows_msys2.sh
+
+      - name: Package Windows Artifacts
+        shell: msys2 {0}
+        run: |
+          PACKAGE_DIR="synfigstudio-windows-ucrt64-mcp-$(git rev-parse --short HEAD)"
+          mkdir -p "${PACKAGE_DIR}"
+          cp -r build_synfig/build_ucrt64/install/* "${PACKAGE_DIR}/"
+          cp bridge/GPL_NOTICE.txt "${PACKAGE_DIR}/"
+          cp bridge/THIRD_PARTY_LICENSES.md "${PACKAGE_DIR}/"
+          mkdir -p "${PACKAGE_DIR}/patches"
+          cp -r bridge/patches/* "${PACKAGE_DIR}/patches/"
+          zip -r "${PACKAGE_DIR}.zip" "${PACKAGE_DIR}"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: synfigstudio-windows-ucrt64-mcp
+          path: synfigstudio-windows-ucrt64-mcp-*.zip

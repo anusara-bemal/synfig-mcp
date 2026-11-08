@@ -23,6 +23,7 @@ PACKAGES=(
     make
     patch
     tar
+    zip
     mingw-w64-ucrt-x86_64-ccache
     mingw-w64-ucrt-x86_64-cmake
     mingw-w64-ucrt-x86_64-ninja

@@ -21,7 +21,7 @@ index a54f4a2..60f8274 100644
  endif()
  
 +if (WIN32)
-+	target_link_libraries(synfigstudio PRIVATE ws2_32)
++	target_link_libraries(synfigstudio PRIVATE ws2_32 advapi32)
 +endif()
 +
  install(

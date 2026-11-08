@@ -84,6 +84,13 @@ class SecuritySandboxError(SynfigError):
     message = "File path access outside allowed workspace sandbox"
 
 
+class SecurityError(SynfigError):
+    """General security violation (network bind, perimeter, or protocol security)."""
+
+    code = 1203
+    message = "Security boundary violation"
+
+
 # Execution & Render Errors (1300-1399)
 class ActionExecutionError(SynfigError):
     """Synfig action execution failed in Studio or CLI."""

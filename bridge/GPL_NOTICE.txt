@@ -1,0 +1,17 @@
+Synfig Studio with MCP Bridge Integration
+=========================================
+
+This distribution contains binaries compiled from Synfig Studio (GPL-3.0-or-later)
+with the Synfig MCP Bridge integration.
+
+License: GNU General Public License version 3 or later (GPL-3.0-or-later).
+See COPYING or https://www.gnu.org/licenses/gpl-3.0.html for the full license text.
+
+Source Code & Written Offer:
+In compliance with Section 6 of the GNU General Public License v3:
+1. The exact upstream Synfig commit used is pinned at:
+   https://github.com/synfig/synfig/tree/79bf708e2483cba678fc93f0ecf48b2178263795
+2. The exact patch and bridge source files are included in this distribution under `patches/` and in the repository.
+3. You may also obtain the full source code from the project repository at:
+   https://github.com/synfig-mcp/synfig-mcp
+   or by contacting the project maintainers.

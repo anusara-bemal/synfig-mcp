@@ -308,6 +308,154 @@ async def test_mcp_invalid_inputs_and_errors(
         assert "error" in bad_schema
 
 
+@pytest.mark.asyncio
+async def test_mcp_valuenodes_and_waypoints(
+    mcp_server: tuple[str, MCPServer],
+) -> None:
+    _, app = mcp_server
+    async with Client(app) as client:
+        new_res = await client.call_tool("doc_new", {})
+        doc = parse_tool_result(new_res)
+        doc_id = doc.get("id") or doc.get("doc_id", "doc_0")
+
+        # 1. doc_set_time_range
+        range_res = await client.call_tool(
+            "doc_set_time_range",
+            {"doc_id": doc_id, "start_time": 0.0, "end_time": 5.0, "fps": 25.0},
+        )
+        assert parse_tool_result(range_res).get("start_time") == 0.0
+
+        # Add a circle layer
+        add_res = await client.call_tool(
+            "layer_add",
+            {
+                "doc_id": doc_id,
+                "layer_type": "circle",
+                "params": {"origin": {"type": "vector", "x": 0.0, "y": 0.0}},
+            },
+        )
+        layer_id = parse_tool_result(add_res).get("layer_id", "layer_0")
+
+        # 2. anim_waypoint_set
+        wp_res = await client.call_tool(
+            "anim_waypoint_set",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": "origin",
+                "time": 0.0,
+                "value": [0.0, 0.0],
+            },
+        )
+        wp_data = parse_tool_result(wp_res)
+        assert wp_data.get("param_name") == "origin"
+
+        # 3. anim_animate_param (batch waypoints in 1 undo step)
+        anim_res = await client.call_tool(
+            "anim_animate_param",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": "origin",
+                "waypoints": [
+                    {"time": 0.0, "value": [0.0, 0.0]},
+                    {"time": 2.0, "value": [3.0, 0.0]},
+                ],
+            },
+        )
+        anim_dict = parse_tool_result(anim_res)
+        assert anim_dict.get("waypoint_count") == 2 or anim_dict.get("count") == 2
+
+        # 4. anim_interpolation_set
+        interp_res = await client.call_tool(
+            "anim_interpolation_set",
+            {"doc_id": doc_id, "interpolation": "linear"},
+        )
+        assert parse_tool_result(interp_res).get("success") is True
+
+        # 5. param_convert
+        convert_res = await client.call_tool(
+            "param_convert",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": "origin",
+                "type": "composite",
+            },
+        )
+        assert "type" in parse_tool_result(convert_res)
+
+        # 6. param_export and param_unexport
+        export_res = await client.call_tool(
+            "param_export",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": "radius",
+                "name": "SharedRadius",
+            },
+        )
+        assert parse_tool_result(export_res).get("name") == "SharedRadius"
+
+        unexport_res = await client.call_tool(
+            "param_unexport",
+            {"doc_id": doc_id, "name": "SharedRadius"},
+        )
+        assert parse_tool_result(unexport_res).get("name") == "SharedRadius"
+
+
+@pytest.mark.asyncio
+async def test_mcp_render_pipeline(mcp_server: tuple[str, MCPServer], tmp_path: Path) -> None:
+    _, app = mcp_server
+    async with Client(app) as client:
+        new_res = await client.call_tool("doc_new", {})
+        doc = parse_tool_result(new_res)
+        doc_id = doc.get("id") or doc.get("doc_id", "doc_0")
+
+        # 1. render_sequence
+        seq_dir = str(tmp_path / "seq")
+        frames = await client.call_tool(
+            "render_sequence",
+            {
+                "doc_id": doc_id,
+                "output_dir": seq_dir,
+                "start_time": 0.0,
+                "end_time": 0.1,
+                "fps": 10.0,
+            },
+        )
+        frames_list = parse_tool_result(frames)
+        assert isinstance(frames_list, list)
+
+        # 2. render_contact_sheet
+        sheet_out = str(tmp_path / "sheet.png")
+        sheet_res = await client.call_tool(
+            "render_contact_sheet",
+            {
+                "doc_id": doc_id,
+                "output_path": sheet_out,
+                "cols": 2,
+                "rows": 2,
+            },
+        )
+        sheet_data = parse_tool_result(sheet_res)
+        assert sheet_data.get("success") is True
+
+        # 3. render_video
+        vid_out = str(tmp_path / "anim.gif")
+        vid_res = await client.call_tool(
+            "render_video",
+            {
+                "doc_id": doc_id,
+                "output_path": vid_out,
+                "start_time": 0.0,
+                "end_time": 0.1,
+                "fps": 10.0,
+            },
+        )
+        assert parse_tool_result(vid_res).get("success") is True
+
+
 @pytest.mark.real_studio
 @pytest.mark.asyncio
 async def test_mcp_tools_real_studio(tmp_path: Path) -> None:

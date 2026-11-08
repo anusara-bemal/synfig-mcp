@@ -5,6 +5,7 @@ Fully implements the protocol/schema/*.json specification.
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 from synfig_mcp.logging import get_logger
@@ -521,10 +522,129 @@ class FakeBridgeServer:
             }
 
         if method == "render.frame":
+            out_path_str = params.get("output_path")
+            if out_path_str:
+                out_p = Path(out_path_str)
+                out_p.parent.mkdir(parents=True, exist_ok=True)
+                if not out_p.exists():
+                    try:
+                        from PIL import Image
+
+                        img = Image.new("RGBA", (16, 16), (100, 150, 200, 255))
+                        img.save(out_p)
+                    except Exception:
+                        out_p.write_bytes(
+                            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+                        )
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {"success": True},
+            }
+
+        if method == "doc.set_time_range":
+            doc_id = params.get("doc_id", "doc_0")
+            cached_doc = self._fake_docs.get(doc_id, {})
+            if "start_time" in params:
+                cached_doc["start_time"] = float(params["start_time"])
+            elif "begin_time" in params:
+                cached_doc["start_time"] = float(params["begin_time"])
+            if "end_time" in params:
+                cached_doc["end_time"] = float(params["end_time"])
+            if "fps" in params:
+                cached_doc["fps"] = float(params["fps"])
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": doc_id,
+                    "start_time": cached_doc.get("start_time", 0.0),
+                    "end_time": cached_doc.get("end_time", 5.0),
+                    "fps": cached_doc.get("fps", 24.0),
+                },
+            }
+
+        if method == "param.convert":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", "circle_001"),
+                    "param_name": params.get("param_name", "radius"),
+                    "type": params.get("type", "scale"),
+                },
+            }
+
+        if method == "param.export":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", "circle_001"),
+                    "param_name": params.get("param_name", "radius"),
+                    "name": params.get("name", "ExportedVal"),
+                },
+            }
+
+        if method == "param.unexport":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "name": params.get("name", "ExportedVal"),
+                },
+            }
+
+        if method in ("anim.waypoint_set", "waypoint.set"):
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", "circle_001"),
+                    "param_name": params.get("param_name", "origin"),
+                    "time": params.get("time", 0.0),
+                    "value": params.get("value", {}),
+                    "interpolation_in": params.get("interpolation_in", "linear"),
+                    "interpolation_out": params.get("interpolation_out", "linear"),
+                },
+            }
+
+        if method in ("anim.waypoint_remove", "waypoint.remove", "waypoint.delete"):
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", "circle_001"),
+                    "param_name": params.get("param_name", "origin"),
+                    "time": params.get("time", 0.0),
+                },
+            }
+
+        if method == "anim.animate_param":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", "circle_001"),
+                    "param_name": params.get("param_name", "origin"),
+                    "waypoint_count": len(params.get("waypoints", [])),
+                },
+            }
+
+        if method == "anim.interpolation_set":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "interpolation": params.get("interpolation", "tcb"),
+                },
             }
 
         # Default fallback

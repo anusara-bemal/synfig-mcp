@@ -1,6 +1,19 @@
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["server/tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "real_studio: tests requiring real patched Synfig Studio binary",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
 [tool.poe.tasks]
 check = "poe -C server check"
 lint = "poe -C server lint"
 format = "poe -C server format"
 typecheck = "poe -C server typecheck"
 test = "poe -C server test"
+live = "poe -C server live"
