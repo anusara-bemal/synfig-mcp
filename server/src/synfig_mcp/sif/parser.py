@@ -450,10 +450,11 @@ class SifLayer:
             animated_el.set("type", old_type)
 
         target_wp = None
-        time_str = f"{time:.4f}s" if time != int(time) else f"{int(time)}s"
+        time_f = parse_synfig_time(time) if isinstance(time, str) else float(time)
+        time_str = f"{time_f:.4f}s" if time_f != int(time_f) else f"{int(time_f)}s"
         for wp in animated_el.findall("waypoint"):
             t_wp = parse_synfig_time(wp.get("time", "0s"))
-            if abs(t_wp - time) < 1e-4:
+            if abs(t_wp - time_f) < 1e-4:
                 target_wp = wp
                 break
 
