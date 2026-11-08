@@ -114,6 +114,10 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "render_status": {"review", "all"},
     "render_result": {"review", "all"},
     "render_cancel": {"review", "all"},
+    # Visual Review Loop (Phase A2)
+    "review_frame": {"review", "all"},
+    "review_sequence": {"review", "all"},
+    "review_compare": {"review", "all"},
     # Schema & Introspection
     "schema_list_layers": {"all"},
     "schema_get_layer": {"all"},
@@ -999,6 +1003,93 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             end_time=end_time,
         )
         return {"success": success, "output_path": output_path}
+
+    # -----------------------------------------------------------------------
+    # Visual Review Loop (Phase A2)
+    # -----------------------------------------------------------------------
+
+    @mcp.resource("synfig://rubrics/{style}")
+    def rubric_resource(style: str) -> str:
+        """Resource providing vision critique checklists and rubrics for animation styles."""
+        from synfig_mcp.review.rubrics import get_rubric
+
+        return get_rubric(style)
+
+    @tool_for("review_frame", annotations=READ_ONLY)
+    async def review_frame(
+        doc_id: str = "doc_0",
+        time: float = 0.0,
+        focus_region: list[int] | None = None,
+        width: int = 320,
+        height: int = 240,
+    ) -> dict[str, Any]:
+        """Render a single frame paired with objective vision metrics (clipping, safe-area, empty-check, palette).
+        Returns: {image_base64, metrics: {...}, warnings: [...], rubrics_resource}.
+        Gotcha: Default 320x240 is token-optimized; use focus_region [x, y, w, h] to inspect details.
+        """
+        from synfig_mcp.review.service import ReviewService
+
+        service = ReviewService(backend=backend)
+        res = await service.review_frame(
+            doc_id=doc_id,
+            time=time,
+            focus_region=focus_region,
+            width=width,
+            height=height,
+        )
+        return wrap_untrusted(res)
+
+    @tool_for("review_sequence", annotations=READ_ONLY)
+    async def review_sequence(
+        doc_id: str = "doc_0",
+        start_time: float = 0.0,
+        end_time: float = 1.0,
+        frame_count: int = 4,
+        width: int = 320,
+        height: int = 240,
+    ) -> dict[str, Any]:
+        """Render a sequence of frames compiled into a single contact-sheet image with motion and strobe metrics.
+        Returns: {contact_sheet_base64, strobe_check, motion_stats, warnings}.
+        Gotcha: Reduces vision token usage 3-4x compared to multiple individual frame renders.
+        """
+        from synfig_mcp.review.service import ReviewService
+
+        service = ReviewService(backend=backend)
+        res = await service.review_sequence(
+            doc_id=doc_id,
+            start_time=start_time,
+            end_time=end_time,
+            frame_count=frame_count,
+            width=width,
+            height=height,
+        )
+        return wrap_untrusted(res)
+
+    @tool_for("review_compare", annotations=READ_ONLY)
+    async def review_compare(
+        doc_id_a: str = "doc_0",
+        time_a: float = 0.0,
+        doc_id_b: str = "doc_0",
+        time_b: float = 0.0,
+        width: int = 320,
+        height: int = 240,
+    ) -> dict[str, Any]:
+        """Compare two animation iterations/frames with side-by-side visual diff heatmap and SSIM score.
+        Returns: {comparison: {...}, ssim: float, pixel_change_ratio: float, heatmap_composite_base64}.
+        Gotcha: Quickly verify if an edit produced the intended visual change without rendering videos.
+        """
+        from synfig_mcp.review.service import ReviewService
+
+        service = ReviewService(backend=backend)
+        res = await service.review_compare(
+            doc_id_a=doc_id_a,
+            time_a=time_a,
+            doc_id_b=doc_id_b,
+            time_b=time_b,
+            width=width,
+            height=height,
+        )
+        return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
     # Schema & Registry Introspection

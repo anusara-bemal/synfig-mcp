@@ -7,10 +7,10 @@
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
 - **Default Profile (`core`)**: 12 tools, 9,835 bytes, **2,658 tokens** (`cl100k_base`).
-- **Full Studio Profile (`all`)**: 56 tools, 49,697 bytes, **13,700 tokens** (`cl100k_base`).
+- **Full Studio Profile (`all`)**: 59 tools, 53,048 bytes, **14,662 tokens** (`cl100k_base`).
 
 > [!NOTE]
-> `core` profile reduces initial system prompt payload from **13,700 tokens** to **2,658 tokens** (an **82.8% reduction**), well under the 3,000 token ceiling enforced by CI.
+> `core` profile reduces initial system prompt payload from **14,662 tokens** to **2,658 tokens** (an **82.8% reduction**), well under the 3,000 token ceiling enforced by CI.
 
 ### Profile Allocations & Measured Counts
 
@@ -21,8 +21,8 @@
 | `fx` | 17 | **4,042** | 4,048 | ✅ Pass (< 4500) |
 | `rig` | 12 | **2,528** | 2,533 | ✅ Pass (< 3000) |
 | `assets` | 7 | **1,420** | 1,426 | ✅ Pass (< 2000) |
-| `review` | 14 | **3,647** | 3,655 | ✅ Pass (< 4000) |
-| `all` | 56 | **13,700** | 13,715 | ✅ Pass (< 16000) |
+| `review` | 17 | **4,609** | 4,619 | ❌ Exceeds (4000) |
+| `all` | 59 | **14,662** | 14,679 | ✅ Pass (< 16000) |
 
 ---
 
@@ -85,14 +85,14 @@ Vision model consumption per single preview or contact-sheet image:
 | `render_video` | 1,274 | **374** | 374 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `anim_waypoint_set` | 1,193 | **333** | 331 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `layer_add` | 1,171 | **329** | 329 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `review_compare` | 1,128 | **325** | 327 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_frame` | 1,117 | **322** | 322 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `review_frame` | 1,102 | **321** | 321 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `review_sequence` | 1,115 | **316** | 316 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `doc_set_time_range` | 1,031 | **295** | 296 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `param_get` | 988 | **292** | 291 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `param_set` | 969 | **283** | 283 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `param_convert` | 990 | **281** | 283 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_keyframe_add` | 1,008 | **276** | 276 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_animate_param` | 1,013 | **274** | 275 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `layer_reorder` | 947 | **271** | 271 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 
