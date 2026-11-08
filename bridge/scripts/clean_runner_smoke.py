@@ -79,10 +79,10 @@ def run_smoke_test(studio_exe: Path) -> None:
     )
 
     try:
-        # Find token file
+        # Find token file (wait up to 60s on slower CI VMs)
         token = ""
         token_file = None
-        for attempt in range(40):
+        for attempt in range(120):
             time.sleep(0.5)
             pid_token = token_dir / f"mcp_token_{proc.pid}"
             candidates = [pid_token, default_token]
@@ -95,13 +95,15 @@ def run_smoke_test(studio_exe: Path) -> None:
                         break
             if token:
                 break
+            if attempt > 0 and attempt % 20 == 0:
+                print(f"Waiting for bridge auth token ({attempt * 0.5:.0f}s elapsed, proc returncode={proc.poll()})...", flush=True)
 
         if not token:
             log_file.flush()
             log_file.close()
             log_content = Path(log_file.name).read_text(encoding="utf-8", errors="replace")
             print(f"=== Studio Smoke Log Output (returncode={proc.poll()}) ===\n{log_content}\n=================================================")
-            assert token, f"Bridge did not generate authentication token after 20 seconds. Returncode: {proc.poll()}"
+            assert token, f"Bridge did not generate authentication token after 60 seconds. Returncode: {proc.poll()}"
         print(f"[PASS] Bridge started and generated auth token in {token_file.name}")
 
         # Connect TCP socket

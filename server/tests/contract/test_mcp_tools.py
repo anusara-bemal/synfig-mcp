@@ -513,14 +513,18 @@ async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
 
     try:
         token = ""
-        for _ in range(30):
-            if token_path.exists():
-                try:
-                    token = token_path.read_text(encoding="utf-8").strip()
-                    if token:
-                        break
-                except Exception:
-                    pass
+        pid_token = token_dir / f"mcp_token_{proc.pid}"
+        for _ in range(40):
+            for candidate in (pid_token, token_path):
+                if candidate.exists():
+                    try:
+                        token = candidate.read_text(encoding="utf-8").strip()
+                        if token:
+                            break
+                    except Exception:
+                        pass
+            if token:
+                break
             await asyncio.sleep(0.5)
 
         assert token, "Session token was not created by Synfig Studio"

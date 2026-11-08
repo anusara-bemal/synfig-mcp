@@ -134,6 +134,7 @@ def bundle_dependencies(install_dir: Path, ucrt_dir: Path) -> None:
     data_copies = [
         ("share/glib-2.0", "share/glib-2.0"),
         ("share/icons", "share/icons"),
+        ("share/mlt", "share/mlt"),
         ("etc/gtk-3.0", "etc/gtk-3.0"),
         ("etc/fonts", "etc/fonts"),
         ("lib/gdk-pixbuf-2.0", "lib/gdk-pixbuf-2.0"),
