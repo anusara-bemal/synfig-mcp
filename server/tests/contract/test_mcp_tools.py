@@ -27,6 +27,16 @@ async def mcp_server(request: pytest.FixtureRequest) -> AsyncIterator[tuple[str,
     mode: str = request.param
     if mode == "headless":
         backend = HeadlessBackend()
+        if not backend.runner.is_available:
+
+            async def fake_render(doc_id: str, output_path: str, **_kwargs: Any) -> bool:
+                del doc_id
+                p = Path(output_path)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_bytes")
+                return True
+
+            backend.render_frame = fake_render  # type: ignore[assignment,method-assign]
         app = create_server(backend=backend)
         yield (mode, app)
     else:
