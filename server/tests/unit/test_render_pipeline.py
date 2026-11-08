@@ -30,7 +30,12 @@ def get_mockable_backend() -> HeadlessBackend:
             del doc_id  # Unused
             p = Path(output_path)
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_bytes")
+            valid_png = (
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+                b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf"
+                b"\xc0\xf0\x1f\x00\x05\x00\x01\xff\x89\x99=\x1d\x00\x00\x00\x00IEND\xaeB`\x82"
+            )
+            p.write_bytes(valid_png)
             return True
 
         backend.render_frame = fake_render  # type: ignore[assignment,method-assign]

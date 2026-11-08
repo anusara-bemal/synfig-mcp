@@ -31,7 +31,6 @@ PACKAGES=(
     mingw-w64-ucrt-x86_64-gcc
     mingw-w64-ucrt-x86_64-gtkmm3
     mingw-w64-ucrt-x86_64-glibmm
-    mingw-w64-ucrt-x86_64-libxml++2.6
     mingw-w64-ucrt-x86_64-fftw
     mingw-w64-ucrt-x86_64-ffmpeg
     mingw-w64-ucrt-x86_64-imagemagick
@@ -47,6 +46,17 @@ PACKAGES=(
 
 echo "=== Updating MSYS2 repository databases ==="
 pacman -Sy --noconfirm
+
+echo "=== Ensuring libxml++-2.6 is installed ==="
+if ! pacman -Q mingw-w64-ucrt-x86_64-libxml++2.6 >/dev/null 2>&1; then
+    if pacman -Si mingw-w64-ucrt-x86_64-libxml++2.6 >/dev/null 2>&1; then
+        pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-libxml++2.6
+    else
+        echo "=== Downloading libxml++2.6 directly from official mirror ==="
+        curl -fsSL -o /tmp/libxmlpp26.pkg.tar.zst "https://mirror.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-libxml%2B%2B2.6-2.42.3-5-any.pkg.tar.zst"
+        pacman -U --noconfirm --needed /tmp/libxmlpp26.pkg.tar.zst
+    fi
+fi
 
 echo "=== Verifying MSYS2 packages ==="
 pacman -S --needed --noconfirm --color=auto "${PACKAGES[@]}"
