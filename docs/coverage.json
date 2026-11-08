@@ -1,0 +1,5676 @@
+{
+  "summary": {
+    "synfig_version": "1.5.5",
+    "introspection_timestamp": "2026-11-09T00:30:00Z",
+    "layers": {
+      "total": 55,
+      "supported": 50,
+      "supported_percent": 90.9,
+      "live_tested": 5,
+      "headless_tested": 6
+    },
+    "params": {
+      "total": 455,
+      "supported": 445,
+      "supported_percent": 97.8
+    },
+    "valuenodes": {
+      "total": 69,
+      "supported": 69,
+      "supported_percent": 100.0
+    },
+    "targets": {
+      "total": 13,
+      "supported": 7,
+      "tested": 5
+    },
+    "renderers": [
+      "safe",
+      "software",
+      "software",
+      "software",
+      "software",
+      "software",
+      "software",
+      "software"
+    ]
+  },
+  "layers": {
+    "advanced_outline": {
+      "name": "advanced_outline",
+      "version": "0.3",
+      "localized_name": "Advanced Outline",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 22,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "antialias": {
+          "type": "bool",
+          "localized_name": "Antialiasing",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather": {
+          "type": "real",
+          "localized_name": "Feather",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blurtype": {
+          "type": "integer",
+          "localized_name": "Type of Feather",
+          "description": "Type of feathering to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "winding_style": {
+          "type": "integer",
+          "localized_name": "Winding Style",
+          "description": "Winding style to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bline": {
+          "type": "complex",
+          "localized_name": "Vertices",
+          "description": "A list of spline points",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "width": {
+          "type": "real",
+          "localized_name": "Outline Width",
+          "description": "Global width of the outline",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "expand": {
+          "type": "real",
+          "localized_name": "Expand",
+          "description": "Value to add to the global width",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "start_tip": {
+          "type": "integer",
+          "localized_name": "Tip Type at Start",
+          "description": "Defines the Tip type of the first spline point when spline is unlooped",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "end_tip": {
+          "type": "integer",
+          "localized_name": "Tip Type at End",
+          "description": "Defines the Tip type of the last spline point when spline is unlooped",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "cusp_type": {
+          "type": "integer",
+          "localized_name": "Cusps Type",
+          "description": "Determines cusps type",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "smoothness": {
+          "type": "real",
+          "localized_name": "Smoothness",
+          "description": "Determines the interpolation between widthpoints. (0) Linear (1) Smooth",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "homogeneous": {
+          "type": "bool",
+          "localized_name": "Homogeneous",
+          "description": "When checked, widthpoints positions are spline length based",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "wplist": {
+          "type": "complex",
+          "localized_name": "Width Point List",
+          "description": "List of width Points that defines the variable width",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "dash_enabled": {
+          "type": "real",
+          "localized_name": "Dashed Outline",
+          "description": "When checked, outline is dashed",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "dilist": {
+          "type": "complex",
+          "localized_name": "Dash Item List",
+          "description": "List of dash items that defines the dashed outline",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "dash_offset": {
+          "type": "real",
+          "localized_name": "Dash Items Offset",
+          "description": "Distance to Offset the Dash Items",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "bevel": {
+      "name": "bevel",
+      "version": "0.3",
+      "localized_name": "Bevel",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 12,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "type": {
+          "type": "integer",
+          "localized_name": "Type",
+          "description": "Type of blur to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color1": {
+          "type": "color",
+          "localized_name": "Hi-Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color2": {
+          "type": "color",
+          "localized_name": "Lo-Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "angle": {
+          "type": "angle",
+          "localized_name": "Light Angle",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "depth": {
+          "type": "integer",
+          "localized_name": "Depth of Bevel",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "softness": {
+          "type": "real",
+          "localized_name": "Softness",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "use_luma": {
+          "type": "real",
+          "localized_name": "Use Luma",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "solid": {
+          "type": "real",
+          "localized_name": "Solid",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "fake_origin": {
+          "type": "real",
+          "localized_name": "fake_origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "blur": {
+      "name": "blur",
+      "version": "0.3",
+      "localized_name": "Blur",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 5,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Size of the blur",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "type": {
+          "type": "integer",
+          "localized_name": "Type",
+          "description": "Type of blur to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "checker_board": {
+      "name": "checker_board",
+      "version": "0.2",
+      "localized_name": "Checkerboard",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 7,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Color of checkers",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Center of the checkers",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Size of checkers",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "antialias": {
+          "type": "bool",
+          "localized_name": "Antialiasing",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "chromakey": {
+      "name": "chromakey",
+      "version": "0.1",
+      "localized_name": "Chroma Key",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "key_color": {
+          "type": "real",
+          "localized_name": "Key Color",
+          "description": "Color to be made transparent",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "lower_bound": {
+          "type": "real",
+          "localized_name": "Lower Bound",
+          "description": "If chroma difference between pixel and key color is below this value, this pixel becomes fully transparent.",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "upper_bound": {
+          "type": "real",
+          "localized_name": "Upper Bound",
+          "description": "If chroma difference between pixel and key color is above this value, this pixel doesn't change.",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "supersample_width": {
+          "type": "real",
+          "localized_name": "Sample Width",
+          "description": "Width of the sample area (In pixels).",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "supersample_height": {
+          "type": "real",
+          "localized_name": "Sample Height",
+          "description": "Height of the sample area (In pixels)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "desaturate": {
+          "type": "real",
+          "localized_name": "Desaturate",
+          "description": "When checked, it desaturates pixels whose chroma is near chroma key (difference is below upper bound)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "When checked, make transparent what is NOT the Key Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "circle": {
+      "name": "circle",
+      "version": "0.2",
+      "localized_name": "Circle",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": true,
+      "used_by_recipe": true,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius": {
+          "type": "real",
+          "localized_name": "Radius",
+          "description": "Radius of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather": {
+          "type": "real",
+          "localized_name": "Feather",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "clamp": {
+      "name": "clamp",
+      "version": "0.2",
+      "localized_name": "Clamp",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 4,
+      "params": {
+        "invert_negative": {
+          "type": "real",
+          "localized_name": "Invert Negative",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "clamp_ceiling": {
+          "type": "real",
+          "localized_name": "Clamp Ceiling",
+          "description": "When checked, the Ceiling value is used",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "ceiling": {
+          "type": "real",
+          "localized_name": "Ceiling",
+          "description": "Upper boundary of the clamping",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "floor": {
+          "type": "real",
+          "localized_name": "Floor",
+          "description": "Lower boundary of the clamping",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "colorcorrect": {
+      "name": "colorcorrect",
+      "version": "0.2",
+      "localized_name": "Color Correct",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 6,
+      "params": {
+        "hue_adjust": {
+          "type": "real",
+          "localized_name": "Hue Adjust",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "brightness": {
+          "type": "real",
+          "localized_name": "Brightness",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "contrast": {
+          "type": "real",
+          "localized_name": "Contrast",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "exposure": {
+          "type": "real",
+          "localized_name": "Exposure Adjust",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "saturation": {
+          "type": "real",
+          "localized_name": "Saturation",
+          "description": "Color saturation adjustment. 0.0 = grayscale, 1.0 = no change, >1.0 = more saturated",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gamma": {
+          "type": "real",
+          "localized_name": "Gamma Adjustment",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "conical_gradient": {
+      "name": "conical_gradient",
+      "version": "0.2",
+      "localized_name": "Conical Gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 7,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to apply",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "center": {
+          "type": "vector",
+          "localized_name": "Center",
+          "description": "Center of the cone",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "angle": {
+          "type": "angle",
+          "localized_name": "Angle",
+          "description": "Rotation of the gradient around the center",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "symmetric": {
+          "type": "bool",
+          "localized_name": "Symmetric",
+          "description": "When checked, the gradient is looped",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "curve_gradient": {
+      "name": "curve_gradient",
+      "version": "0.1",
+      "localized_name": "Curve Gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 11,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Offset for the Vertices List",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "width": {
+          "type": "real",
+          "localized_name": "Width",
+          "description": "Global width of the gradient",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bline": {
+          "type": "complex",
+          "localized_name": "Vertices",
+          "description": "A list of spline points",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to apply",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "loop": {
+          "type": "bool",
+          "localized_name": "Loop",
+          "description": "When checked, the gradient is looped",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "zigzag": {
+          "type": "real",
+          "localized_name": "ZigZag",
+          "description": "When checked, the gradient is symmetrical at the center",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "perpendicular": {
+          "type": "real",
+          "localized_name": "Perpendicular",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "fast": {
+          "type": "real",
+          "localized_name": "Fast",
+          "description": "When checked, renders quickly but with artifacts",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "curve_warp": {
+      "name": "curve_warp",
+      "version": "0.1",
+      "localized_name": "Curve Warp",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 6,
+      "params": {
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Position of the destiny Spline line",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "perp_width": {
+          "type": "real",
+          "localized_name": "Width",
+          "description": "How much is expanded the result perpendicular to the source line",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "start_point": {
+          "type": "real",
+          "localized_name": "Start Point",
+          "description": "First point of the source line",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "end_point": {
+          "type": "real",
+          "localized_name": "End Point",
+          "description": "Final point of the source line",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bline": {
+          "type": "complex",
+          "localized_name": "Vertices",
+          "description": "List of Spline Points where the source line is curved to",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "fast": {
+          "type": "real",
+          "localized_name": "Fast",
+          "description": "When checked, renders quickly but with artifacts",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "duplicate": {
+      "name": "duplicate",
+      "version": "0.1",
+      "localized_name": "Duplicate",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 4,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "index": {
+          "type": "real",
+          "localized_name": "Index",
+          "description": "Copy Index",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "filter_group": {
+      "name": "filter_group",
+      "version": "0.1",
+      "localized_name": "Filter Group",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 10,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Position offset",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "transformation": {
+          "type": "real",
+          "localized_name": "Transformation",
+          "description": "Offset, Angle, Skew Angle and Scale",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "canvas": {
+          "type": "canvas",
+          "localized_name": "Canvas",
+          "description": "Group content",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_dilation": {
+          "type": "real",
+          "localized_name": "Speed",
+          "description": "Multiplier to speed up, slow down, freeze, or reverse time",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_offset": {
+          "type": "time",
+          "localized_name": "Time Offset",
+          "description": "Time Offset to apply to the context",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "children_lock": {
+          "type": "real",
+          "localized_name": "Lock Selection",
+          "description": "When checked, prevents selecting the children using the mouse click",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "outline_grow": {
+          "type": "real",
+          "localized_name": "Outline Grow",
+          "description": "Exponential value to grow children Outline layers width",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "freetime": {
+      "name": "freetime",
+      "version": "0.1",
+      "localized_name": "Free Time",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "advanced",
+      "unsupported_reason": "Custom timeloop curve retiming layer",
+      "params_count": 2,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time": {
+          "type": "time",
+          "localized_name": "Time",
+          "description": "Current time for next layers",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "group": {
+      "name": "group",
+      "version": "0.3",
+      "localized_name": "Group",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": true,
+      "used_by_recipe": true,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 14,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Position offset",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "transformation": {
+          "type": "real",
+          "localized_name": "Transformation",
+          "description": "Offset, Angle, Skew Angle and Scale",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "canvas": {
+          "type": "canvas",
+          "localized_name": "Canvas",
+          "description": "Group content",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_dilation": {
+          "type": "real",
+          "localized_name": "Speed",
+          "description": "Multiplier to speed up, slow down, freeze, or reverse time",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_offset": {
+          "type": "time",
+          "localized_name": "Time Offset",
+          "description": "Time Offset to apply to the context",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "children_lock": {
+          "type": "real",
+          "localized_name": "Lock Selection",
+          "description": "When checked, prevents selecting the children using the mouse click",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "outline_grow": {
+          "type": "real",
+          "localized_name": "Outline Grow",
+          "description": "Exponential value to grow children Outline layers width",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "z_range": {
+          "type": "real",
+          "localized_name": "Z Range",
+          "description": "When checked, only layers inside range are visible",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "z_range_position": {
+          "type": "real",
+          "localized_name": "Z Range Position",
+          "description": "Starting position where layers are visible",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "z_range_depth": {
+          "type": "real",
+          "localized_name": "Z Range Depth",
+          "description": "Depth where layers are visible in range",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "z_range_blur": {
+          "type": "real",
+          "localized_name": "Z Range Blur",
+          "description": "Area where layers inside are partially visible",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "halftone2": {
+      "name": "halftone2",
+      "version": "0.1",
+      "localized_name": "Halftone 2",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 9,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Mask Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "angle": {
+          "type": "angle",
+          "localized_name": "Mask Angle",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Mask Size",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color_light": {
+          "type": "real",
+          "localized_name": "Light Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color_dark": {
+          "type": "real",
+          "localized_name": "Dark Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "type": {
+          "type": "integer",
+          "localized_name": "Type",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "halftone3": {
+      "name": "halftone3",
+      "version": "0.1",
+      "localized_name": "Halftone 3",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 15,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Mask Size",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "type": {
+          "type": "integer",
+          "localized_name": "Type",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "subtractive": {
+          "type": "real",
+          "localized_name": "Subtractive Flag",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color[0]": {
+          "type": "real",
+          "localized_name": "Chan0 Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tone[0].origin": {
+          "type": "real",
+          "localized_name": "Chan0 Mask Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tone[0].angle": {
+          "type": "real",
+          "localized_name": "Chan0 Mask Angle",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color[1]": {
+          "type": "real",
+          "localized_name": "Chan1 Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tone[1].origin": {
+          "type": "real",
+          "localized_name": "Chan1 Mask Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tone[1].angle": {
+          "type": "real",
+          "localized_name": "Chan1 Mask Angle",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color[2]": {
+          "type": "real",
+          "localized_name": "Chan2 Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tone[2].origin": {
+          "type": "real",
+          "localized_name": "Chan2 Mask Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tone[2].angle": {
+          "type": "real",
+          "localized_name": "Chan2 Mask Angle",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "import": {
+      "name": "import",
+      "version": "0.1",
+      "localized_name": "Import Image",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 9,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "tl": {
+          "type": "real",
+          "localized_name": "Top-Left",
+          "description": "Upper left-hand Corner of image",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "br": {
+          "type": "real",
+          "localized_name": "Bottom-Right",
+          "description": "Lower right-hand Corner of image",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "c": {
+          "type": "integer",
+          "localized_name": "Interpolation",
+          "description": "What type of interpolation to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gamma_adjust": {
+          "type": "real",
+          "localized_name": "Gamma Adjustment",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "filename": {
+          "type": "string",
+          "localized_name": "Filename",
+          "description": "File to import",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_offset": {
+          "type": "time",
+          "localized_name": "Time Offset",
+          "description": "Time Offset to apply to the imported file",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "inside_out": {
+      "name": "inside_out",
+      "version": "0.1",
+      "localized_name": "Inside Out",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 1,
+      "params": {
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Center of the distortion",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "julia": {
+      "name": "julia",
+      "version": "0.2",
+      "localized_name": "Julia Set",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "experimental",
+      "unsupported_reason": "Fractal mathematical generator; non-vector pixel synthesis",
+      "params_count": 19,
+      "params": {
+        "icolor": {
+          "type": "real",
+          "localized_name": "Inside Color",
+          "description": "Color of the Set",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "ocolor": {
+          "type": "real",
+          "localized_name": "Outside Color",
+          "description": "Color outside the Set",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color_shift": {
+          "type": "real",
+          "localized_name": "Color Shift",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "iterations": {
+          "type": "integer",
+          "localized_name": "Iterations",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "seed": {
+          "type": "vector",
+          "localized_name": "Seed Point",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bailout": {
+          "type": "real",
+          "localized_name": "Bailout ValueBase",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "distort_inside": {
+          "type": "real",
+          "localized_name": "Distort Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "shade_inside": {
+          "type": "real",
+          "localized_name": "Shade Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "solid_inside": {
+          "type": "real",
+          "localized_name": "Solid Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert_inside": {
+          "type": "real",
+          "localized_name": "Invert Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color_inside": {
+          "type": "real",
+          "localized_name": "Color Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "distort_outside": {
+          "type": "real",
+          "localized_name": "Distort Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "shade_outside": {
+          "type": "real",
+          "localized_name": "Shade Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "solid_outside": {
+          "type": "real",
+          "localized_name": "Solid Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert_outside": {
+          "type": "real",
+          "localized_name": "Invert Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color_outside": {
+          "type": "real",
+          "localized_name": "Color Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color_cycle": {
+          "type": "real",
+          "localized_name": "Color Cycle",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "smooth_outside": {
+          "type": "real",
+          "localized_name": "Smooth Outside",
+          "description": "When checked, smoothes the coloration outside the set",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "broken": {
+          "type": "real",
+          "localized_name": "Break Set",
+          "description": "Modify equation to achieve interesting results",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "linear_gradient": {
+      "name": "linear_gradient",
+      "version": "0.1",
+      "localized_name": "Linear Gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "p1": {
+          "type": "real",
+          "localized_name": "Point 1",
+          "description": "Start point of the gradient",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "p2": {
+          "type": "real",
+          "localized_name": "Point 2",
+          "description": "End point of the gradient",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to apply",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "loop": {
+          "type": "bool",
+          "localized_name": "Loop",
+          "description": "When checked, the gradient is looped",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "zigzag": {
+          "type": "real",
+          "localized_name": "ZigZag",
+          "description": "When checked, the gradient is symmetrical at the center",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "lumakey": {
+      "name": "lumakey",
+      "version": "0.2",
+      "localized_name": "Luma Key",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 1,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "mandelbrot": {
+      "name": "mandelbrot",
+      "version": "0.2",
+      "localized_name": "Mandelbrot Set",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "experimental",
+      "unsupported_reason": "Fractal mathematical generator; non-vector pixel synthesis",
+      "params_count": 18,
+      "params": {
+        "iterations": {
+          "type": "integer",
+          "localized_name": "Iterations",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bailout": {
+          "type": "real",
+          "localized_name": "Bailout ValueBase",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "broken": {
+          "type": "real",
+          "localized_name": "Break Set",
+          "description": "Modify equation to achieve interesting results",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "distort_inside": {
+          "type": "real",
+          "localized_name": "Distort Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "shade_inside": {
+          "type": "real",
+          "localized_name": "Shade Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "solid_inside": {
+          "type": "real",
+          "localized_name": "Solid Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert_inside": {
+          "type": "real",
+          "localized_name": "Invert Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient_inside": {
+          "type": "real",
+          "localized_name": "Gradient Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient_offset_inside": {
+          "type": "real",
+          "localized_name": "Offset Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient_loop_inside": {
+          "type": "real",
+          "localized_name": "Loop Inside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "distort_outside": {
+          "type": "real",
+          "localized_name": "Distort Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "shade_outside": {
+          "type": "real",
+          "localized_name": "Shade Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "solid_outside": {
+          "type": "real",
+          "localized_name": "Solid Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert_outside": {
+          "type": "real",
+          "localized_name": "Invert Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient_outside": {
+          "type": "real",
+          "localized_name": "Gradient outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "smooth_outside": {
+          "type": "real",
+          "localized_name": "Smooth Outside",
+          "description": "Smooth the coloration outside the set",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient_offset_outside": {
+          "type": "real",
+          "localized_name": "Offset Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient_scale_outside": {
+          "type": "real",
+          "localized_name": "Scale Outside",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "metaballs": {
+      "name": "metaballs",
+      "version": "0.1",
+      "localized_name": "Metaballs",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 10,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "centers": {
+          "type": "real",
+          "localized_name": "Balls",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radii": {
+          "type": "real",
+          "localized_name": "Radii",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "weights": {
+          "type": "real",
+          "localized_name": "Weights",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "threshold": {
+          "type": "real",
+          "localized_name": "Gradient Left",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "threshold2": {
+          "type": "real",
+          "localized_name": "Gradient Right",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "positive": {
+          "type": "real",
+          "localized_name": "Positive Only",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "motion_blur": {
+      "name": "motion_blur",
+      "version": "0.2",
+      "localized_name": "Motion Blur",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 5,
+      "params": {
+        "aperture": {
+          "type": "real",
+          "localized_name": "Aperture",
+          "description": "Shutter time",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "subsamples_factor": {
+          "type": "real",
+          "localized_name": "Subsamples Factor",
+          "description": "Multiplies the number of subsamples rendered",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "subsampling_type": {
+          "type": "integer",
+          "localized_name": "Subsampling Type",
+          "description": "Curve type for weighting subsamples",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "subsample_start": {
+          "type": "real",
+          "localized_name": "Subsample Start Amount",
+          "description": "Relative amount of the first subsample (For Linear weighting)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "subsample_end": {
+          "type": "real",
+          "localized_name": "Subsample End Amount",
+          "description": "Relative amount of the last subsample (For Linear weighting)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "noise": {
+      "name": "noise",
+      "version": "0.1",
+      "localized_name": "Noise Gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 12,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to apply",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "seed": {
+          "type": "vector",
+          "localized_name": "RandomNoise Seed",
+          "description": "Change to modify the random seed of the noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Size of the noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "smooth": {
+          "type": "integer",
+          "localized_name": "Interpolation",
+          "description": "What type of interpolation to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "detail": {
+          "type": "real",
+          "localized_name": "Detail",
+          "description": "Increase to obtain fine details of the noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "speed": {
+          "type": "real",
+          "localized_name": "Animation Speed",
+          "description": "In cycles per second",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "turbulent": {
+          "type": "real",
+          "localized_name": "Turbulent",
+          "description": "When checked, produces turbulent noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "do_alpha": {
+          "type": "real",
+          "localized_name": "Do Alpha",
+          "description": "Uses transparency",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "super_sample": {
+          "type": "real",
+          "localized_name": "Super Sampling",
+          "description": "When checked, the gradient is supersampled",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "noise_distort": {
+      "name": "noise_distort",
+      "version": "0.0",
+      "localized_name": "Noise Distort",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 10,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "displacement": {
+          "type": "real",
+          "localized_name": "Displacement",
+          "description": "How big the distortion displaces the context",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Distance between distortions",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "seed": {
+          "type": "vector",
+          "localized_name": "RandomNoise Seed",
+          "description": "Change to modify the random seed of the noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "smooth": {
+          "type": "integer",
+          "localized_name": "Interpolation",
+          "description": "Type of interpolation to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "detail": {
+          "type": "real",
+          "localized_name": "Detail",
+          "description": "Increase to obtain fine details of the noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "speed": {
+          "type": "real",
+          "localized_name": "Animation Speed",
+          "description": "In cycles per second",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "turbulent": {
+          "type": "real",
+          "localized_name": "Turbulent",
+          "description": "When checked, produces turbulent noise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "outline": {
+      "name": "outline",
+      "version": "0.3",
+      "localized_name": "Outline",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": true,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 17,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "antialias": {
+          "type": "bool",
+          "localized_name": "Antialiasing",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather": {
+          "type": "real",
+          "localized_name": "Feather",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blurtype": {
+          "type": "integer",
+          "localized_name": "Type of Feather",
+          "description": "Type of feathering to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "winding_style": {
+          "type": "integer",
+          "localized_name": "Winding Style",
+          "description": "Winding style to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bline": {
+          "type": "complex",
+          "localized_name": "Vertices",
+          "description": "A list of spline points",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "width": {
+          "type": "real",
+          "localized_name": "Outline Width",
+          "description": "Global width of the outline",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "expand": {
+          "type": "real",
+          "localized_name": "Expand",
+          "description": "Value to add to the global width",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "sharp_cusps": {
+          "type": "real",
+          "localized_name": "Sharp Cusps",
+          "description": "Determines cusps type",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "round_tip[0]": {
+          "type": "real",
+          "localized_name": "Rounded Begin",
+          "description": "Round off the tip",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "round_tip[1]": {
+          "type": "real",
+          "localized_name": "Rounded End",
+          "description": "Round off the tip",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "homogeneous_width": {
+          "type": "real",
+          "localized_name": "Homogeneous",
+          "description": "When checked, the width takes the length of the spline to interpolate",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "plant": {
+      "name": "plant",
+      "version": "0.2",
+      "localized_name": "Plant",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 20,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bline": {
+          "type": "complex",
+          "localized_name": "Vertices",
+          "description": "A list of spline points",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Offset for the Vertices List",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to be used for coloring the plant",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "split_angle": {
+          "type": "real",
+          "localized_name": "Split Angle",
+          "description": "Angle by which each split deviates from its parent",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gravity": {
+          "type": "real",
+          "localized_name": "Gravity",
+          "description": "Direction in which the shoots tend to face",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "velocity": {
+          "type": "real",
+          "localized_name": "Tangential Velocity",
+          "description": "Amount to which shoots tend to grow along the tangent to the spline",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "perp_velocity": {
+          "type": "real",
+          "localized_name": "Perpendicular Velocity",
+          "description": "Amount to which shoots tend to grow perpendicular to the tangent to the spline",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Stem Size",
+          "description": "Size of the stem",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size_as_alpha": {
+          "type": "real",
+          "localized_name": "Size As Alpha",
+          "description": "If enabled, the alpha channel from the gradient is multiplied by the stem size, and an alpha of 1.0 is used when rendering",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "reverse": {
+          "type": "real",
+          "localized_name": "Reverse",
+          "description": "If enabled, render the plant in the opposite direction",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "step": {
+          "type": "real",
+          "localized_name": "Step",
+          "description": "Measure of the distance between points when rendering",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "seed": {
+          "type": "vector",
+          "localized_name": "Seed",
+          "description": "Used to seed the pseudo-random number generator",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "splits": {
+          "type": "real",
+          "localized_name": "Splits",
+          "description": "Maximum number of times that each sprout can sprout recursively",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "sprouts": {
+          "type": "real",
+          "localized_name": "Sprouts",
+          "description": "Number of places that growth occurs on each spline section",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "random_factor": {
+          "type": "real",
+          "localized_name": "Random Factor",
+          "description": "Used to scale down all random effects.  Set to zero to disable randomness",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "drag": {
+          "type": "real",
+          "localized_name": "Drag",
+          "description": "Drag slows the growth",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "use_width": {
+          "type": "real",
+          "localized_name": "Use Width",
+          "description": "Scale the velocity by the spline's width",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "polygon": {
+      "name": "polygon",
+      "version": "0.1",
+      "localized_name": "Polygon",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 11,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "antialias": {
+          "type": "bool",
+          "localized_name": "Antialiasing",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather": {
+          "type": "real",
+          "localized_name": "Feather",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blurtype": {
+          "type": "integer",
+          "localized_name": "Type of Feather",
+          "description": "Type of feathering to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "winding_style": {
+          "type": "integer",
+          "localized_name": "Winding Style",
+          "description": "Winding style to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "vector_list": {
+          "type": "real",
+          "localized_name": "Vertices List",
+          "description": "Define the corners of the polygon",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "radial_blur": {
+      "name": "radial_blur",
+      "version": "0.1",
+      "localized_name": "Radial Blur",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 6,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Origin of the blur",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Size of the blur",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "fade_out": {
+          "type": "real",
+          "localized_name": "Fade Out",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "radial_gradient": {
+      "name": "radial_gradient",
+      "version": "0.2",
+      "localized_name": "Radial Gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to apply",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "center": {
+          "type": "vector",
+          "localized_name": "Center",
+          "description": "Center of the gradient",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius": {
+          "type": "real",
+          "localized_name": "Radius",
+          "description": "Radius of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "loop": {
+          "type": "bool",
+          "localized_name": "Loop",
+          "description": "When checked, the gradient is looped",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "zigzag": {
+          "type": "real",
+          "localized_name": "ZigZag",
+          "description": "When checked, the gradient is symmetrical at the center",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "rectangle": {
+      "name": "rectangle",
+      "version": "0.2",
+      "localized_name": "Rectangle",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": true,
+      "used_by_recipe": true,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 12,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "point1": {
+          "type": "vector",
+          "localized_name": "Point 1",
+          "description": "First corner of the rectangle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "point2": {
+          "type": "vector",
+          "localized_name": "Point 2",
+          "description": "Second corner of the rectangle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "expand": {
+          "type": "real",
+          "localized_name": "Expand amount",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather_x": {
+          "type": "real",
+          "localized_name": "Feather X",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather_y": {
+          "type": "real",
+          "localized_name": "Feather Y",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bevel": {
+          "type": "real",
+          "localized_name": "Bevel",
+          "description": "Use Bevel for the corners",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bevCircle": {
+          "type": "real",
+          "localized_name": "Keep Bevel Circular",
+          "description": "When checked, the bevel is circular",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "region": {
+      "name": "region",
+      "version": "0.1",
+      "localized_name": "Region",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 11,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "antialias": {
+          "type": "bool",
+          "localized_name": "Antialiasing",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather": {
+          "type": "real",
+          "localized_name": "Feather",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blurtype": {
+          "type": "integer",
+          "localized_name": "Type of Feather",
+          "description": "Type of feathering to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "winding_style": {
+          "type": "integer",
+          "localized_name": "Winding Style",
+          "description": "Winding style to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bline": {
+          "type": "complex",
+          "localized_name": "Vertices",
+          "description": "A list of spline points",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        }
+      }
+    },
+    "rotate": {
+      "name": "rotate",
+      "version": "0.1",
+      "localized_name": "Rotate",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 2,
+      "params": {
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Origin of the rotation",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Amount",
+          "description": "Amount of rotation",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "shade": {
+      "name": "shade",
+      "version": "0.2",
+      "localized_name": "Shade",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Size of the shade",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "type": {
+          "type": "integer",
+          "localized_name": "Type",
+          "description": "Type of blur to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "simple_circle": {
+      "name": "simple_circle",
+      "version": "0.1",
+      "localized_name": "Simple Circle",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 6,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "center": {
+          "type": "vector",
+          "localized_name": "Center",
+          "description": "Center of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius": {
+          "type": "real",
+          "localized_name": "Radius",
+          "description": "Radius of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "skeleton": {
+      "name": "skeleton",
+      "version": "0.1",
+      "localized_name": "Skeleton",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 4,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "name": {
+          "type": "string",
+          "localized_name": "Name",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bones": {
+          "type": "complex",
+          "localized_name": "Bones",
+          "description": "",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        }
+      }
+    },
+    "skeleton_deformation": {
+      "name": "skeleton_deformation",
+      "version": "0.2",
+      "localized_name": "[Skeleton Deformation]",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "bones": {
+          "type": "complex",
+          "localized_name": "Bones",
+          "description": "List of bone pairs. The first value in the pair is the bone in rest position; the second one represents the pose",
+          "read": true,
+          "write": false,
+          "supported": false,
+          "unsupported_reason": "Complex/composite type 'complex' requires dedicated valuenode serializer"
+        },
+        "point1": {
+          "type": "vector",
+          "localized_name": "Point 1",
+          "description": "First corner of the bounds rectangle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "point2": {
+          "type": "vector",
+          "localized_name": "Point 2",
+          "description": "Second corner of the bounds rectangle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "x_subdivisions": {
+          "type": "real",
+          "localized_name": "Horizontal subdivisions",
+          "description": "Count of horizontal subdivisions of the transformation grid",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "y_subdivisions": {
+          "type": "real",
+          "localized_name": "Vertical subdivisions",
+          "description": "Count of vertical subdivisions of the transformation grid",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "solid_color": {
+      "name": "solid_color",
+      "version": "0.1",
+      "localized_name": "Solid Color",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": true,
+      "used_by_recipe": true,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 4,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Fill color of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "sound": {
+      "name": "sound",
+      "version": "0.1",
+      "localized_name": "Sound",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 4,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "filename": {
+          "type": "string",
+          "localized_name": "Filename",
+          "description": "Path to sound file",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "delay": {
+          "type": "real",
+          "localized_name": "Delay",
+          "description": "Delay before play",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "volume": {
+          "type": "real",
+          "localized_name": "Volume",
+          "description": "Volume of sound",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "spherize": {
+      "name": "spherize",
+      "version": "0.2",
+      "localized_name": "Spherize",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 5,
+      "params": {
+        "center": {
+          "type": "vector",
+          "localized_name": "Position",
+          "description": "Center of the sphere distortion",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius": {
+          "type": "real",
+          "localized_name": "Radius",
+          "description": "Size of the sphere distortion",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Amount",
+          "description": "Distortion intensity (Negative values invert the effect)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "clip": {
+          "type": "real",
+          "localized_name": "Clip",
+          "description": "When checked, the area outside the Radius is not distorted",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "type": {
+          "type": "integer",
+          "localized_name": "Distort Type",
+          "description": "Direction of the distortion",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "spiral_gradient": {
+      "name": "spiral_gradient",
+      "version": "0.2",
+      "localized_name": "Spiral Gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "gradient": {
+          "type": "gradient",
+          "localized_name": "Gradient",
+          "description": "Gradient to apply",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "center": {
+          "type": "vector",
+          "localized_name": "Center",
+          "description": "Center of the gradient",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius": {
+          "type": "real",
+          "localized_name": "Radius",
+          "description": "Radius of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "angle": {
+          "type": "angle",
+          "localized_name": "Angle",
+          "description": "Rotation of the spiral",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "clockwise": {
+          "type": "real",
+          "localized_name": "Clockwise",
+          "description": "When checked, the spiral turns clockwise",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "star": {
+      "name": "star",
+      "version": "0.1",
+      "localized_name": "Star",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": true,
+      "used_by_recipe": true,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 15,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Layer Color",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "antialias": {
+          "type": "bool",
+          "localized_name": "Antialiasing",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "feather": {
+          "type": "real",
+          "localized_name": "Feather",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blurtype": {
+          "type": "integer",
+          "localized_name": "Type of Feather",
+          "description": "Type of feathering to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "winding_style": {
+          "type": "integer",
+          "localized_name": "Winding Style",
+          "description": "Winding style to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius1": {
+          "type": "real",
+          "localized_name": "Outer Radius",
+          "description": "The radius of the outer points in the star",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius2": {
+          "type": "real",
+          "localized_name": "Inner Radius",
+          "description": "The radius of the inner points in the star",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "angle": {
+          "type": "angle",
+          "localized_name": "Angle",
+          "description": "The orientation of the star",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "points": {
+          "type": "integer",
+          "localized_name": "Points",
+          "description": "The number of points in the star",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "regular_polygon": {
+          "type": "real",
+          "localized_name": "Regular Polygon",
+          "description": "When checked, draws a regular polygon instead of a star",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "stretch": {
+      "name": "stretch",
+      "version": "0.1",
+      "localized_name": "Stretch",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 2,
+      "params": {
+        "amount": {
+          "type": "real",
+          "localized_name": "Amount",
+          "description": "Size of the stretch relative to its Center",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "center": {
+          "type": "vector",
+          "localized_name": "Center",
+          "description": "Center of the stretch distortion",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "stroboscope": {
+      "name": "stroboscope",
+      "version": "0.1",
+      "localized_name": "Stroboscope",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 2,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "frequency": {
+          "type": "real",
+          "localized_name": "Frequency",
+          "description": "Frequency of the Strobe in times per second",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "super_sample": {
+      "name": "super_sample",
+      "version": "0.2",
+      "localized_name": "Super Sample",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "legacy",
+      "unsupported_reason": "Software supersampling filter superseded by Cairo/renderer antialiasing",
+      "params_count": 2,
+      "params": {
+        "width": {
+          "type": "real",
+          "localized_name": "Width",
+          "description": "Width of the sample area (In pixels)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "height": {
+          "type": "real",
+          "localized_name": "Height",
+          "description": "Height of the sample area (In pixels)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "switch": {
+      "name": "switch",
+      "version": "0.0",
+      "localized_name": "Switch",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 12,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Position offset",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "transformation": {
+          "type": "real",
+          "localized_name": "Transformation",
+          "description": "Offset, Angle, Skew Angle and Scale",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "canvas": {
+          "type": "canvas",
+          "localized_name": "Canvas",
+          "description": "Group content",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_dilation": {
+          "type": "real",
+          "localized_name": "Speed",
+          "description": "Multiplier to speed up, slow down, freeze, or reverse time",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "time_offset": {
+          "type": "time",
+          "localized_name": "Time Offset",
+          "description": "Time Offset to apply to the context",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "children_lock": {
+          "type": "real",
+          "localized_name": "Lock Selection",
+          "description": "When checked, prevents selecting the children using the mouse click",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "outline_grow": {
+          "type": "real",
+          "localized_name": "Outline Grow",
+          "description": "Exponential value to grow children Outline layers width",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "layer_name": {
+          "type": "real",
+          "localized_name": "Active Layer Name",
+          "description": "Only the layer with the specified name is visible",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "layer_depth": {
+          "type": "real",
+          "localized_name": "Active Layer Depth",
+          "description": "Used when Active Layer Name is empty. Only the layer with the specified depth is visible",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "text": {
+      "name": "text",
+      "version": "0.5",
+      "localized_name": "Text",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": true,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 18,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "text": {
+          "type": "string",
+          "localized_name": "Text",
+          "description": "Text to Render",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "color": {
+          "type": "color",
+          "localized_name": "Color",
+          "description": "Color of the text",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "family": {
+          "type": "string",
+          "localized_name": "Font Family",
+          "description": "You can select or type a font family name or the font file path",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "style": {
+          "type": "integer",
+          "localized_name": "Style",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "weight": {
+          "type": "integer",
+          "localized_name": "Weight",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "direction": {
+          "type": "integer",
+          "localized_name": "Direction",
+          "description": "The text direction: left-to-right or right-to-left",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "compress": {
+          "type": "real",
+          "localized_name": "Horizontal Spacing",
+          "description": "Defines how close the glyphs are horizontally",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "vcompress": {
+          "type": "real",
+          "localized_name": "Vertical Spacing",
+          "description": "Defines how close the text lines are vertically",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "vector",
+          "localized_name": "Size",
+          "description": "Size of the text",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "orient": {
+          "type": "real",
+          "localized_name": "Orientation",
+          "description": "Text Orientation",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Text Position",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "font (not critical)": {
+          "type": "real",
+          "localized_name": "Font",
+          "description": "Filename of the font to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "use_kerning": {
+          "type": "real",
+          "localized_name": "Kerning",
+          "description": "When checked, enables font kerning (If the font supports it)",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "grid_fit": {
+          "type": "real",
+          "localized_name": "Sharpen Edges",
+          "description": "Turn this off if you are animating the text",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "invert": {
+          "type": "bool",
+          "localized_name": "Invert",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "timeloop": {
+      "name": "timeloop",
+      "version": "0.2",
+      "localized_name": "Time Loop",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 6,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "link_time": {
+          "type": "real",
+          "localized_name": "Link Time",
+          "description": "Start time of the loop for the cycled context",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "local_time": {
+          "type": "real",
+          "localized_name": "Local Time",
+          "description": "The time when the resulted loop starts",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "duration": {
+          "type": "time",
+          "localized_name": "Duration",
+          "description": "Length of the loop",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "only_for_positive_duration": {
+          "type": "real",
+          "localized_name": "Only For Positive Duration",
+          "description": "When checked, loops only positive durations",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "symmetrical": {
+          "type": "real",
+          "localized_name": "Symmetrical",
+          "description": "When checked, loops are mirrored centered at Local Time",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "translate": {
+      "name": "translate",
+      "version": "0.1",
+      "localized_name": "Translate",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 1,
+      "params": {
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Origin of the translation",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "twirl": {
+      "name": "twirl",
+      "version": "0.1",
+      "localized_name": "Twirl",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 5,
+      "params": {
+        "center": {
+          "type": "vector",
+          "localized_name": "Center",
+          "description": "Center of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "radius": {
+          "type": "real",
+          "localized_name": "Radius",
+          "description": "Radius of the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "rotations": {
+          "type": "real",
+          "localized_name": "Rotations",
+          "description": "Number of rotations of the twirl effect",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "distort_inside": {
+          "type": "real",
+          "localized_name": "Distort Inside",
+          "description": "When checked, distorts inside the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "distort_outside": {
+          "type": "real",
+          "localized_name": "Distort Outside",
+          "description": "When checked, distorts outside the circle",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "warp": {
+      "name": "warp",
+      "version": "0.2",
+      "localized_name": "Perspective",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 8,
+      "params": {
+        "src_tl": {
+          "type": "real",
+          "localized_name": "Source TL",
+          "description": "Top Left corner of the source to perspective",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "src_br": {
+          "type": "real",
+          "localized_name": "Source BR",
+          "description": "Bottom Right corner of the source to perspective",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "dest_tl": {
+          "type": "real",
+          "localized_name": "Dest TL",
+          "description": "Top Left corner of the destination",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "dest_tr": {
+          "type": "real",
+          "localized_name": "Dest TR",
+          "description": "Top Right corner of the destination",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "dest_br": {
+          "type": "real",
+          "localized_name": "Dest BR",
+          "description": "Bottom Right corner of the destination",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "dest_bl": {
+          "type": "real",
+          "localized_name": "Dest BL",
+          "description": "Bottom Left corner of the destination",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "clip": {
+          "type": "real",
+          "localized_name": "Clip",
+          "description": "",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "interpolation": {
+          "type": "integer",
+          "localized_name": "Interpolation",
+          "description": "Type of interpolation to use",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "xor_pattern": {
+      "name": "xor_pattern",
+      "version": "0.2",
+      "localized_name": "XOR Pattern",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "deprecated",
+      "unsupported_reason": "Legacy bitwise test pattern layer",
+      "params_count": 5,
+      "params": {
+        "z_depth": {
+          "type": "real",
+          "localized_name": "Z Depth",
+          "description": "Modifies the position of the layer in the layer stack",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "amount": {
+          "type": "real",
+          "localized_name": "Opacity",
+          "description": "Alpha channel of the layer",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "blend_method": {
+          "type": "integer",
+          "localized_name": "Blend Method",
+          "description": "Blending method used to composite on the layers below",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "origin": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Center of the pattern",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "size": {
+          "type": "real",
+          "localized_name": "Size",
+          "description": "Size of the pattern",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    },
+    "zoom": {
+      "name": "zoom",
+      "version": "0.1",
+      "localized_name": "Scale",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "used_by_recipe": false,
+      "status": "supported",
+      "unsupported_reason": null,
+      "params_count": 2,
+      "params": {
+        "amount": {
+          "type": "real",
+          "localized_name": "Amount",
+          "description": "Amount to scale to",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        },
+        "center": {
+          "type": "vector",
+          "localized_name": "Origin",
+          "description": "Point to scale from",
+          "read": true,
+          "write": true,
+          "supported": true,
+          "unsupported_reason": null
+        }
+      }
+    }
+  },
+  "valuenodes": {
+    "absolute": {
+      "name": "absolute",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "add": {
+      "name": "add",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "and": {
+      "name": "and",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "anglestring": {
+      "name": "anglestring",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "animated_file": {
+      "name": "animated_file",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "atan2": {
+      "name": "atan2",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "average": {
+      "name": "average",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "bline": {
+      "name": "bline",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "blinecalctangent": {
+      "name": "blinecalctangent",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "blinecalcvertex": {
+      "name": "blinecalcvertex",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "blinecalcwidth": {
+      "name": "blinecalcwidth",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "blinerevtangent": {
+      "name": "blinerevtangent",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "bone": {
+      "name": "bone",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "bone_link": {
+      "name": "bone_link",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "bone_root": {
+      "name": "bone_root",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "boneinfluence": {
+      "name": "boneinfluence",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "boneweightpair": {
+      "name": "boneweightpair",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "compare": {
+      "name": "compare",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "composite": {
+      "name": "composite",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "cos": {
+      "name": "cos",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "derivative": {
+      "name": "derivative",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "dilist": {
+      "name": "dilist",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "dotproduct": {
+      "name": "dotproduct",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "duplicate": {
+      "name": "duplicate",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "dynamic": {
+      "name": "dynamic",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "dynamic_list": {
+      "name": "dynamic_list",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "exp": {
+      "name": "exp",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "fromangle": {
+      "name": "fromangle",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "fromint": {
+      "name": "fromint",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "fromreal": {
+      "name": "fromreal",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "gradient_rotate": {
+      "name": "gradient_rotate",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "gradientcolor": {
+      "name": "gradientcolor",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "greyed": {
+      "name": "greyed",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "intstring": {
+      "name": "intstring",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "join": {
+      "name": "join",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "linear": {
+      "name": "linear",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "logarithm": {
+      "name": "logarithm",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "map_range": {
+      "name": "map_range",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "modulo": {
+      "name": "modulo",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "not": {
+      "name": "not",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "or": {
+      "name": "or",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "power": {
+      "name": "power",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "radial_composite": {
+      "name": "radial_composite",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "random": {
+      "name": "random",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "range": {
+      "name": "range",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "realstring": {
+      "name": "realstring",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "reciprocal": {
+      "name": "reciprocal",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "reference": {
+      "name": "reference",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "repeat_gradient": {
+      "name": "repeat_gradient",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "reverse": {
+      "name": "reverse",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "scale": {
+      "name": "scale",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "segcalctangent": {
+      "name": "segcalctangent",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "segcalcvertex": {
+      "name": "segcalcvertex",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "sine": {
+      "name": "sine",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "static_list": {
+      "name": "static_list",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "step": {
+      "name": "step",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "stripes": {
+      "name": "stripes",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "subtract": {
+      "name": "subtract",
+      "read": true,
+      "write": true,
+      "live_tested": true,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "switch": {
+      "name": "switch",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "timed_swap": {
+      "name": "timed_swap",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "timeloop": {
+      "name": "timeloop",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "timestring": {
+      "name": "timestring",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "twotone": {
+      "name": "twotone",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "vectorangle": {
+      "name": "vectorangle",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "vectorlength": {
+      "name": "vectorlength",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "vectorx": {
+      "name": "vectorx",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "vectory": {
+      "name": "vectory",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "weighted_average": {
+      "name": "weighted_average",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "wplist": {
+      "name": "wplist",
+      "read": true,
+      "write": true,
+      "live_tested": false,
+      "headless_tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    }
+  },
+  "targets": {
+    "bmp": {
+      "name": "bmp",
+      "supported": true,
+      "tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "dv": {
+      "name": "dv",
+      "supported": false,
+      "tested": false,
+      "status": "unsupported",
+      "unsupported_reason": "Target 'dv' is an uncompressed/specialized output module"
+    },
+    "ffmpeg": {
+      "name": "ffmpeg",
+      "supported": true,
+      "tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "gif": {
+      "name": "gif",
+      "supported": true,
+      "tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "jpeg": {
+      "name": "jpeg",
+      "supported": true,
+      "tested": false,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "libav": {
+      "name": "libav",
+      "supported": true,
+      "tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "magick++": {
+      "name": "magick++",
+      "supported": false,
+      "tested": false,
+      "status": "unsupported",
+      "unsupported_reason": "Target 'magick++' is an uncompressed/specialized output module"
+    },
+    "null": {
+      "name": "null",
+      "supported": false,
+      "tested": false,
+      "status": "unsupported",
+      "unsupported_reason": "Target 'null' is an uncompressed/specialized output module"
+    },
+    "null-tile": {
+      "name": "null-tile",
+      "supported": false,
+      "tested": false,
+      "status": "unsupported",
+      "unsupported_reason": "Target 'null-tile' is an uncompressed/specialized output module"
+    },
+    "png": {
+      "name": "png",
+      "supported": true,
+      "tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "png-spritesheet": {
+      "name": "png-spritesheet",
+      "supported": true,
+      "tested": true,
+      "status": "supported",
+      "unsupported_reason": null
+    },
+    "ppm": {
+      "name": "ppm",
+      "supported": false,
+      "tested": false,
+      "status": "unsupported",
+      "unsupported_reason": "Target 'ppm' is an uncompressed/specialized output module"
+    },
+    "yuv420p": {
+      "name": "yuv420p",
+      "supported": false,
+      "tested": false,
+      "status": "unsupported",
+      "unsupported_reason": "Target 'yuv420p' is an uncompressed/specialized output module"
+    }
+  }
+}

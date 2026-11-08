@@ -5,6 +5,7 @@ and validates doc.info, doc.list, scene.tree, param.get, anim.time_get, and sele
 """
 
 import asyncio
+import contextlib
 import os
 import subprocess
 from pathlib import Path
@@ -14,7 +15,13 @@ import pytest
 from synfig_mcp.protocol.client import BridgeClient
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-BIN_PATH = REPO_ROOT / "build_synfig" / "build_ucrt64" / "install" / "bin" / "synfigstudio.exe"
+env_bin = os.environ.get("SYNFIG_STUDIO_PATH")
+if env_bin and Path(env_bin).exists():
+    BIN_PATH = Path(env_bin)
+else:
+    BIN_PATH = REPO_ROOT / "build_synfig" / "build_ucrt64" / "install" / "bin" / "synfigstudio.exe"
+    if not BIN_PATH.exists():
+        BIN_PATH = REPO_ROOT / "build_synfig" / "build_linux" / "install" / "bin" / "synfigstudio"
 SAMPLE_SIF = REPO_ROOT / "server" / "tests" / "fixtures" / "sample_project.sif"
 TEST_PORT = 19997
 
@@ -29,11 +36,17 @@ async def test_live_bridge_read_path(tmp_path: Path) -> None:
     env["MSYS2_ARG_CONV_EXCL"] = "*"
     env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
     env["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+    if not BIN_PATH.name.endswith(".exe"):
+        lib_dir = str(BIN_PATH.parent.parent / "lib")
+        existing_ld = env.get("LD_LIBRARY_PATH", "")
+        env["LD_LIBRARY_PATH"] = f"{lib_dir}:{existing_ld}" if existing_ld else lib_dir
+        env["SYNFIG_MODULE_DIR"] = str(BIN_PATH.parent.parent / "lib" / "synfig" / "modules")
 
     token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
-    token_path = token_dir / "mcp_token"
-    if token_path.exists():
-        token_path.unlink()
+    if token_dir.is_dir():
+        for tf in token_dir.glob("mcp_token*"):
+            with contextlib.suppress(Exception):
+                tf.unlink()
 
     log_path = tmp_path / "studio_test.log"
     with open(log_path, "w", encoding="utf-8") as log_file:
@@ -48,14 +61,18 @@ async def test_live_bridge_read_path(tmp_path: Path) -> None:
     try:
         # 1. Wait for token file to be generated
         token = ""
-        for _ in range(30):
-            if token_path.exists():
-                try:
-                    token = token_path.read_text(encoding="utf-8").strip()
-                    if token:
-                        break
-                except Exception:
-                    pass
+        for _ in range(40):
+            if token_dir.is_dir():
+                for tf in token_dir.glob("mcp_token*"):
+                    if tf.is_file() and tf.stat().st_size > 0:
+                        try:
+                            token = tf.read_text(encoding="utf-8").strip()
+                            if token:
+                                break
+                        except Exception:
+                            pass
+            if token:
+                break
 
             await asyncio.sleep(0.5)
 

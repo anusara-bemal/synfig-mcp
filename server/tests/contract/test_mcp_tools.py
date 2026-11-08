@@ -483,7 +483,17 @@ async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
     import subprocess
 
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    bin_path = repo_root / "build_synfig" / "build_ucrt64" / "install" / "bin" / "synfigstudio.exe"
+    env_bin = os.environ.get("SYNFIG_STUDIO_PATH")
+    if env_bin and Path(env_bin).exists():
+        bin_path = Path(env_bin)
+    else:
+        bin_path = (
+            repo_root / "build_synfig" / "build_ucrt64" / "install" / "bin" / "synfigstudio.exe"
+        )
+        if not bin_path.exists():
+            bin_path = (
+                repo_root / "build_synfig" / "build_linux" / "install" / "bin" / "synfigstudio"
+            )
     sample_sif = repo_root / "server" / "tests" / "fixtures" / "sample_project.sif"
     if not bin_path.exists():
         pytest.skip("Patched Synfig Studio binary not found")
@@ -495,11 +505,17 @@ async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
     env["MSYS2_ARG_CONV_EXCL"] = "*"
     env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
     env["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+    if not bin_path.name.endswith(".exe"):
+        lib_dir = str(bin_path.parent.parent / "lib")
+        existing_ld = env.get("LD_LIBRARY_PATH", "")
+        env["LD_LIBRARY_PATH"] = f"{lib_dir}:{existing_ld}" if existing_ld else lib_dir
+        env["SYNFIG_MODULE_DIR"] = str(bin_path.parent.parent / "lib" / "synfig" / "modules")
 
     token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
-    token_path = token_dir / "mcp_token"
-    if token_path.exists():
-        token_path.unlink()
+    if token_dir.is_dir():
+        for tf in token_dir.glob("mcp_token*"):
+            with contextlib.suppress(Exception):
+                tf.unlink()
 
     log_path = tmp_path / "studio_mcp_test.log"
     with open(log_path, "w", encoding="utf-8") as log_file:
@@ -513,16 +529,16 @@ async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
 
     try:
         token = ""
-        pid_token = token_dir / f"mcp_token_{proc.pid}"
         for _ in range(40):
-            for candidate in (pid_token, token_path):
-                if candidate.exists():
-                    try:
-                        token = candidate.read_text(encoding="utf-8").strip()
-                        if token:
-                            break
-                    except Exception:
-                        pass
+            if token_dir.is_dir():
+                for tf in token_dir.glob("mcp_token*"):
+                    if tf.is_file() and tf.stat().st_size > 0:
+                        try:
+                            token = tf.read_text(encoding="utf-8").strip()
+                            if token:
+                                break
+                        except Exception:
+                            pass
             if token:
                 break
             await asyncio.sleep(0.5)

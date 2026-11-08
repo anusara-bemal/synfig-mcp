@@ -59,14 +59,21 @@ def run_smoke_test(studio_exe: Path) -> None:
     bin_dir = str(studio_exe.parent.resolve())
     env["PATH"] = bin_dir + os.pathsep + env.get("PATH", "")
 
-    # Clean stale default token file before launching
+    # For Linux, ensure LD_LIBRARY_PATH and SYNFIG_MODULE_DIR include the extracted lib dir
+    lib_dir = str(studio_exe.parent.parent.resolve() / "lib")
+    existing_ld = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = f"{lib_dir}:{existing_ld}" if existing_ld else lib_dir
+    env["SYNFIG_MODULE_DIR"] = str(studio_exe.parent.parent.resolve() / "lib" / "synfig" / "modules")
+    env["SYNFIG_DATA_DIR"] = str(studio_exe.parent.parent.resolve() / "share")
+
+    # Clean all stale token files before launching
     token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
-    default_token = token_dir / "mcp_token"
-    if default_token.exists():
-        try:
-            default_token.unlink()
-        except Exception:
-            pass
+    if token_dir.is_dir():
+        for tf in token_dir.glob("mcp_token*"):
+            try:
+                tf.unlink()
+            except Exception:
+                pass
 
     log_file = open(temp_dir / "studio_smoke.log", "w", encoding="utf-8")
     print(f"Launching {studio_exe} (logging to {log_file.name})...", flush=True)
@@ -84,16 +91,21 @@ def run_smoke_test(studio_exe: Path) -> None:
         token_file = None
         for attempt in range(120):
             time.sleep(0.5)
-            pid_token = token_dir / f"mcp_token_{proc.pid}"
-            candidates = [pid_token, default_token]
-            for tf in candidates:
-                if tf.is_file() and tf.stat().st_size > 0:
-                    t = tf.read_text(encoding="utf-8").strip()
-                    if t:
-                        token = t
-                        token_file = tf
-                        break
+            if token_dir.is_dir():
+                for tf in token_dir.glob("mcp_token*"):
+                    if tf.is_file() and tf.stat().st_size > 0:
+                        try:
+                            t = tf.read_text(encoding="utf-8").strip()
+                            if t:
+                                token = t
+                                token_file = tf
+                                break
+                        except Exception:
+                            pass
             if token:
+                break
+            if proc.poll() is not None and attempt > 5:
+                print(f"Studio process exited prematurely with returncode {proc.poll()}", flush=True)
                 break
             if attempt > 0 and attempt % 20 == 0:
                 print(f"Waiting for bridge auth token ({attempt * 0.5:.0f}s elapsed, proc returncode={proc.poll()})...", flush=True)
@@ -102,9 +114,9 @@ def run_smoke_test(studio_exe: Path) -> None:
             log_file.flush()
             log_file.close()
             log_content = Path(log_file.name).read_text(encoding="utf-8", errors="replace")
-            print(f"=== Studio Smoke Log Output (returncode={proc.poll()}) ===\n{log_content}\n=================================================")
+            print(f"=== Studio Smoke Log Output (returncode={proc.poll()}) ===\n{log_content}\n=================================================", flush=True)
             assert token, f"Bridge did not generate authentication token after 60 seconds. Returncode: {proc.poll()}"
-        print(f"[PASS] Bridge started and generated auth token in {token_file.name}")
+        print(f"[PASS] Bridge started and generated auth token in {token_file.name}", flush=True)
 
         # Connect TCP socket
         sock = None
