@@ -46,7 +46,11 @@ synfig-mcp doctor
 
 1. Download the latest `synfigstudio-windows-ucrt64-mcp-*.zip` from GitHub Releases.
 2. Extract the archive (e.g. to `C:\SynfigStudio-MCP`).
-3. Launch `synfigstudio.exe`. On startup, it writes a secure token to `%USERPROFILE%\.synfig\mcp_token` and listens for local MCP connections on port `19991`.
+3. Launch `synfigstudio.exe`.
+   - **Bridge Opt-in**: The bridge is opt-in. In Synfig Studio, toggle **Tools -> MCP Bridge: On/Off**, or launch with environment variable `SYNFIG_MCP_ENABLE=1`.
+   - When active, the status is indicated in the Studio UI menu and listens on loopback TCP port range `19998..20007` (default `19998`).
+   - On startup, it writes a secure session token with owner-only ACL (inheritance stripped) to `%USERPROFILE%\.synfig\mcp_token_<pid>`.
+   - Default workspace files are isolated to `%USERPROFILE%\Documents\SynfigMCP` (override via `SYNFIG_MCP_WORKSPACE_ROOTS`).
 
 ### Option B: Compiling from Source (MSYS2 UCRT64)
 

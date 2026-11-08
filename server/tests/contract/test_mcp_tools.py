@@ -486,6 +486,7 @@ async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
 
     test_port = 19991
     env = os.environ.copy()
+    env["SYNFIG_MCP_ENABLE"] = "1"
     env["SYNFIG_MCP_PORT"] = str(test_port)
     env["MSYS2_ARG_CONV_EXCL"] = "*"
     env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"

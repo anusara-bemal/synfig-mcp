@@ -137,3 +137,32 @@ async def test_headless_backend_rejects_escapes(tmp_path: Path) -> None:
 
         with pytest.raises(SecuritySandboxError):
             await backend.render_frame(doc.id, output_path=str(outside))
+
+
+def test_sandbox_rejects_junction_escape(tmp_path: Path) -> None:
+    import os
+    import subprocess
+
+    root = tmp_path / "workspace"
+    root.mkdir()
+    outside_dir = tmp_path / "outside_dir"
+    outside_dir.mkdir()
+    outside_file = outside_dir / "target.sif"
+    outside_file.write_text("secret", encoding="utf-8")
+
+    junction_path = root / "junction_to_outside"
+    if os.name == "nt":
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(junction_path), str(outside_dir)], check=True
+        )
+    else:
+        os.symlink(str(outside_dir), str(junction_path))
+
+    path_through_junction = junction_path / "target.sif"
+    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+        validate_path(path_through_junction, [root])
+
+    # Write target through junction
+    write_target = junction_path / "payload.png"
+    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+        validate_path(write_target, [root], allowed_extensions={".png"})

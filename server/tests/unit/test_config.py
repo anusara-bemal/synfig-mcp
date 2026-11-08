@@ -12,10 +12,17 @@ def test_settings_defaults() -> None:
     assert settings.backend_mode == "auto"
     assert settings.bridge_host == "127.0.0.1"
     assert settings.bridge_port == 19998
-    assert len(settings.workspace_roots) >= 1
-    # Check that dedicated project root is always present
+    # Check that dedicated project root is the only default root
     doc_root = (Path.home() / "Documents" / "SynfigMCP").resolve()
-    assert doc_root in settings.workspace_roots
+    assert settings.workspace_roots == [doc_root]
+    # Verify repo / cwd is NOT in workspace_roots
+    assert Path.cwd().resolve() not in settings.workspace_roots
+
+
+def test_cwd_never_included_by_default() -> None:
+    roots = get_default_workspace_roots()
+    doc_root = (Path.home() / "Documents" / "SynfigMCP").resolve()
+    assert roots == [doc_root]
 
 
 def test_broad_cwd_rejected_in_default_roots() -> None:

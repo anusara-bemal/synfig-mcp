@@ -1,8 +1,9 @@
-name: Bridge Build
+name: Bridge Build & Release
 
 on:
   push:
     branches: [main, v*]
+    tags: ['v*']
   pull_request:
     branches: [main, v*]
 
@@ -93,3 +94,97 @@ jobs:
         with:
           name: synfigstudio-windows-ucrt64-mcp
           path: synfigstudio-windows-ucrt64-mcp-*.zip
+
+  smoke-test-linux:
+    needs: build-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install minimal runtime dependencies (xvfb only)
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: synfigstudio-linux-mcp
+          path: download_linux
+
+      - name: Extract and Run Headless Smoke Test
+        run: |
+          mkdir -p extracted_linux
+          tar -xzf download_linux/*.tar.gz -C extracted_linux
+          STUDIO_BIN=$(find extracted_linux -name synfigstudio -type f -perm /111 | head -n 1)
+          echo "Found studio binary at: ${STUDIO_BIN}"
+          xvfb-run -a python3 bridge/scripts/clean_runner_smoke.py "${STUDIO_BIN}"
+
+  smoke-test-windows:
+    needs: build-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: synfigstudio-windows-ucrt64-mcp
+          path: download_windows
+
+      - name: Extract and Run Clean-Runner Smoke Test
+        shell: powershell
+        run: |
+          $zip = (Get-ChildItem -Path download_windows -Filter *.zip).FullName
+          Expand-Archive -Path $zip -DestinationPath extracted_windows
+          $studioBin = (Get-ChildItem -Path extracted_windows -Recurse -Filter synfigstudio.exe).FullName
+          Write-Host "Found studio binary at: $studioBin"
+          python bridge/scripts/clean_runner_smoke.py $studioBin
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [smoke-test-linux, smoke-test-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download Windows & Linux Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Build GPL Source Bundle & Python Distributions
+        run: |
+          pip install uv
+          mkdir -p dist
+          python bridge/scripts/package_gpl_source.py
+          uv build --directory server --out-dir dist
+          find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} dist/ \;
+          sha256sum dist/* > dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+
+      - name: Create GitHub Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          files: |
+            dist/*
+          body_path: docs/gpl-compliance.md

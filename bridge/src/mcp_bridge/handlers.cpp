@@ -330,24 +330,20 @@ static void ensure_default_workspace_roots() {
     }
 
 #ifdef _WIN32
-    char cwd[MAX_PATH];
-    if (GetCurrentDirectoryA(MAX_PATH, cwd)) {
-        std::string reason;
-        if (!is_overly_broad_root(cwd, reason)) {
-            s_workspace_roots.push_back(normalize_path_str(cwd));
-        }
+    const char* home = std::getenv("USERPROFILE");
+    if (home && *home) {
+        std::string def_dir = std::string(home) + "\\Documents\\SynfigMCP";
+        s_workspace_roots.push_back(normalize_path_str(def_dir));
     }
     char tmp[MAX_PATH];
     if (GetTempPathA(MAX_PATH, tmp)) {
         s_workspace_roots.push_back(normalize_path_str(tmp));
     }
 #else
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd))) {
-        std::string reason;
-        if (!is_overly_broad_root(cwd, reason)) {
-            s_workspace_roots.push_back(normalize_path_str(cwd));
-        }
+    const char* home = std::getenv("HOME");
+    if (home && *home) {
+        std::string def_dir = std::string(home) + "/Documents/SynfigMCP";
+        s_workspace_roots.push_back(normalize_path_str(def_dir));
     }
     const char* tmp = std::getenv("TMPDIR");
     s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));

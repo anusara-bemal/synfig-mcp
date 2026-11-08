@@ -19,10 +19,12 @@ SAMPLE_SIF = REPO_ROOT / "server" / "tests" / "fixtures" / "sample_project.sif"
 TEST_PORT = 19997
 
 
+@pytest.mark.real_studio
 @pytest.mark.skipif(not BIN_PATH.exists(), reason="Patched Synfig Studio binary not found")
 @pytest.mark.asyncio
 async def test_live_bridge_read_path(tmp_path: Path) -> None:
     env = os.environ.copy()
+    env["SYNFIG_MCP_ENABLE"] = "1"
     env["SYNFIG_MCP_PORT"] = str(TEST_PORT)
     env["MSYS2_ARG_CONV_EXCL"] = "*"
     env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"

@@ -14,9 +14,10 @@ mkdir -p "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge"
 cp -r "${ROOT_DIR}/bridge/src/mcp_bridge/"* "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge/"
 
 # Inject build commit SHA and version
-COMMIT_SHA=$(git -C "${ROOT_DIR}" rev-parse HEAD 2>/dev/null || echo "dev")
+COMMIT_SHA="${SYNFIG_MCP_COMMIT_SHA:-$(git -C "${ROOT_DIR}" rev-parse HEAD 2>/dev/null || echo "dev")}"
+VERSION="${SYNFIG_MCP_VERSION:-0.7.0-rc3}"
 sed -i "s/#define BUILD_COMMIT_SHA .*/#define BUILD_COMMIT_SHA \"${COMMIT_SHA}\"/" "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge/bridge_init.cpp"
-sed -i "s/#define BUILD_VERSION .*/#define BUILD_VERSION \"0.7.0-rc2\"/" "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge/bridge_init.cpp"
+sed -i "s/#define BUILD_VERSION .*/#define BUILD_VERSION \"${VERSION}\"/" "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge/bridge_init.cpp"
 
 # Apply git patches
 cd "${SRC_DIR}"

@@ -8,15 +8,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from synfig_mcp.security.sandbox import is_overly_broad_root
-
 
 def get_default_workspace_roots() -> list[Path]:
     """
     Resolve default workspace roots defensively.
     1. SYNFIG_MCP_WORKSPACE_ROOTS env var (if set, os.pathsep or comma separated).
-    2. Dedicated ~/Documents/SynfigMCP directory (created on first run).
-    3. Include Path.cwd() only if it is not dangerously broad (e.g. drive root, system dir, home dir).
+    2. Dedicated ~/Documents/SynfigMCP directory only (created on first run).
+       cwd is NEVER included by default to prevent leaking repositories or arbitrary launch directories.
     """
     env_roots = os.environ.get("SYNFIG_MCP_WORKSPACE_ROOTS")
     if env_roots:
@@ -37,18 +35,7 @@ def get_default_workspace_roots() -> list[Path]:
         default_dir = Path.home() / ".synfig" / "workspace"
         default_dir.mkdir(parents=True, exist_ok=True)
 
-    roots = [default_dir.resolve()]
-
-    # Safely evaluate cwd: if it's not overly broad, also include it
-    try:
-        cwd = Path.cwd().resolve()
-        broad, _ = is_overly_broad_root(cwd)
-        if not broad and cwd not in roots:
-            roots.append(cwd)
-    except Exception:
-        pass
-
-    return roots
+    return [default_dir.resolve()]
 
 
 class Settings(BaseModel):

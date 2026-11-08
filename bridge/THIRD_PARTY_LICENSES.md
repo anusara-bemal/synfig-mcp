@@ -2,7 +2,7 @@
 
 > **Notice**: *This document is provided for open-source license compliance and source-availability transparency under the GNU General Public License v3 (GPL-3.0). It does not constitute formal legal counsel.*
 
-This distribution of **Synfig Studio with MCP Bridge Integration** bundles **75 shared libraries (DLLs)**, including core Synfig binaries and runtime libraries from **48 MSYS2 UCRT64 software packages**.
+This distribution of **Synfig Studio with MCP Bridge Integration** bundles **79 shared libraries (DLLs)**, including core Synfig binaries and runtime libraries from **49 MSYS2 UCRT64 software packages**.
 
 ---
 
@@ -20,7 +20,7 @@ The following dynamic libraries are built directly from the Synfig Studio source
 
 ## 2. Bundled Third-Party Runtime Dependencies
 
-All 73 third-party DLLs distributed in the Windows UCRT64 release archive are mapped below to their originating MSYS2 package, version, and license:
+All 77 third-party DLLs distributed in the Windows UCRT64 release archive are mapped below to their originating MSYS2 package, version, and license:
 
 | Package | Version | Bundled DLL(s) | License | Upstream Project | MSYS2 Source Recipe |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -32,6 +32,7 @@ All 73 third-party DLLs distributed in the Windows UCRT64 release archive are ma
 | `cairomm` | 1.14.6-1 | `libcairomm-1.0-1.dll` | spdx:GPL-2.0-or-later | [cairomm](https://cairographics.org/cairomm/) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-cairomm) |
 | `dlfcn` | 1.4.2-1 | `libdl.dll` | spdx:MIT | [dlfcn](https://github.com/dlfcn-win32/dlfcn-win32) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-dlfcn) |
 | `expat` | 2.8.1-2 | `libexpat-1.dll` | spdx:MIT | [expat](https://libexpat.github.io/) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-expat) |
+| `ffmpeg` | 8.1.1-2 | `avcodec-62.dll`<br>`avformat-62.dll`<br>`avutil-60.dll`<br>`swscale-9.dll` | spdx:GPL-3.0-or-later | [ffmpeg](https://ffmpeg.org/) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-ffmpeg) |
 | `fftw` | 3.3.11-1 | `libfftw3-3.dll`<br>`libfftw3f-3.dll` | spdx:GPL-2.0-or-later | [fftw](https://www.fftw.org/) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-fftw) |
 | `fontconfig` | 2.18.1-1 | `libfontconfig-1.dll` | custom | [fontconfig](https://wiki.freedesktop.org/www/Software/fontconfig/) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-fontconfig) |
 | `freetype` | 2.14.3-1 | `libfreetype-6.dll` | spdx:GPL-2.0-or-later OR FTL | [freetype](https://www.freetype.org/) | [MSYS2 PKGBUILD](https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-freetype) |
@@ -78,10 +79,9 @@ All 73 third-party DLLs distributed in the Windows UCRT64 release archive are ma
 ## 3. Analysis of GPL and LGPL Implications (FFmpeg, MLT, and ImageMagick)
 
 ### A. FFmpeg (`mingw-w64-ucrt-x86_64-ffmpeg`)
-- **License**: GPL-3.0-or-later (compiled with `--enable-gpl --enable-version3`, without `--enable-nonfree`).
-- **Implication**: FFmpeg includes GPL-licensed components (e.g. `libpostproc`, `libx264`). Distributing FFmpeg binaries alongside Synfig Studio binds the collective binary distribution to the copyleft terms of the **GNU General Public License v3 (GPL-3.0)**.
+- **License**: GPL-3.0-or-later (compiled with `--enable-gpl --enable-version3`).
+- **Implication**: FFmpeg includes GPL-licensed components (e.g. `libpostproc`, `libx264`). Distributing FFmpeg binaries alongside Synfig Studio binds the collective binary distribution to the full copyleft terms of the **GNU General Public License v3 (GPL-3.0)**.
 - **Compliance**: Because Synfig Studio and the MCP bridge are licensed under GPL-3.0-or-later, license compatibility is preserved. In accordance with GPL-3.0 Section 6, full machine-readable source code for all components is provided or made available via upstream repositories and written offer.
-- **Patent Licensing Distinction**: Copyright licensing under GPL-3.0 and patent licensing for proprietary media codecs (such as MPEG LA / Via Licensing patent pools covering H.264/AVC, H.265/HEVC, or AAC) are separate legal and regulatory matters. Users and distributors deploying commercial video rendering solutions must independently verify their codec patent licensing obligations. *Not legal advice.*
 
 ### B. MLT Multimedia Framework (`mingw-w64-ucrt-x86_64-mlt`)
 - **License**: LGPL-2.1-or-later (core engine) with optional GPL modules.

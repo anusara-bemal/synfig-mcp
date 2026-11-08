@@ -17,12 +17,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DIST_DIR = REPO_ROOT / "dist"
 SYNFIG_SRC = REPO_ROOT / "build_synfig" / "synfig_src"
-OUTPUT_TAR = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0.tar.gz"
+OUTPUT_TAR = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0-rc3.tar.gz"
 
 
 def main() -> None:
     DIST_DIR.mkdir(parents=True, exist_ok=True)
-    temp_bundle_dir = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0"
+    temp_bundle_dir = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0-rc3"
     if temp_bundle_dir.exists():
         shutil.rmtree(temp_bundle_dir)
     temp_bundle_dir.mkdir(parents=True)
@@ -35,14 +35,11 @@ def main() -> None:
     if (SYNFIG_SRC / ".git").exists():
         print(f"[gpl_package] Exporting pinned git commit {pinned_commit}...")
         upstream_target.mkdir(parents=True)
-        # Use git archive to export clean tree without large .git history
-        archive_proc = subprocess.run(
-            ["git", "-C", str(SYNFIG_SRC), "archive", "--format=tar", pinned_commit],
-            capture_output=True,
+        tar_path = temp_bundle_dir / "upstream.tar"
+        subprocess.run(
+            ["git", "-C", str(SYNFIG_SRC), "archive", "--format=tar", "-o", str(tar_path), pinned_commit],
             check=True,
         )
-        tar_path = temp_bundle_dir / "upstream.tar"
-        tar_path.write_bytes(archive_proc.stdout)
         with tarfile.open(tar_path, "r") as t:
             t.extractall(path=upstream_target)
         tar_path.unlink()
@@ -62,12 +59,14 @@ def main() -> None:
     docs_target.mkdir(parents=True, exist_ok=True)
     shutil.copy(REPO_ROOT / "docs" / "gpl-compliance.md", docs_target / "gpl-compliance.md")
     shutil.copy(REPO_ROOT / "bridge" / "THIRD_PARTY_LICENSES.md", temp_bundle_dir / "THIRD_PARTY_LICENSES.md")
+    if (REPO_ROOT / "bridge" / "MSYS2_SOURCE_MANIFEST.md").exists():
+        shutil.copy(REPO_ROOT / "bridge" / "MSYS2_SOURCE_MANIFEST.md", temp_bundle_dir / "MSYS2_SOURCE_MANIFEST.md")
     shutil.copy(REPO_ROOT / "LICENSE", temp_bundle_dir / "LICENSE")
 
     # 4. Create tar.gz archive
     print(f"[gpl_package] Writing tarball {OUTPUT_TAR}...")
     with tarfile.open(OUTPUT_TAR, "w:gz") as tar:
-        tar.add(temp_bundle_dir, arcname="synfig-mcp-gpl-source-v0.7.0")
+        tar.add(temp_bundle_dir, arcname="synfig-mcp-gpl-source-v0.7.0-rc3")
 
     shutil.rmtree(temp_bundle_dir)
     size_mb = OUTPUT_TAR.stat().st_size / (1024 * 1024)
