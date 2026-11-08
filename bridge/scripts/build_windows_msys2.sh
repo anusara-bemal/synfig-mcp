@@ -45,6 +45,9 @@ PACKAGES=(
     mingw-w64-ucrt-x86_64-nlohmann-json
 )
 
+echo "=== Updating MSYS2 repository databases ==="
+pacman -Sy --noconfirm
+
 echo "=== Verifying MSYS2 packages ==="
 pacman -S --needed --noconfirm --color=auto "${PACKAGES[@]}"
 

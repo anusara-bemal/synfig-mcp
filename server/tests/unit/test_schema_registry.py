@@ -76,9 +76,12 @@ def test_schema_cache() -> None:
 
 @pytest.mark.asyncio
 async def test_probe_synfig_cli_with_cache() -> None:
+    runner = CliRunner()
+    if not runner.is_available:
+        pytest.skip("synfig binary not available on this system")
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         cache = SchemaCache(cache_dir=Path(tmp_dir))
-        runner = CliRunner()
         registry = SchemaRegistry()
 
         await probe_synfig_cli(runner, registry, cache=cache, use_cache=True)

@@ -6,6 +6,7 @@ Unit tests for RenderPipeline:
 """
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -21,10 +22,24 @@ def tmp_cache(tmp_path: Path) -> RenderCache:
     return RenderCache(cache_dir=tmp_path / "cache")
 
 
+def get_mockable_backend() -> HeadlessBackend:
+    backend = HeadlessBackend()
+    if not backend.runner.is_available:
+
+        async def fake_render(_doc_id: str, output_path: str, **_kwargs: Any) -> bool:
+            p = Path(output_path)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_bytes")
+            return True
+
+        backend.render_frame = fake_render  # type: ignore[assignment,method-assign]
+    return backend
+
+
 @pytest.mark.asyncio
 async def test_render_progress_notifications(tmp_path: Path, tmp_cache: RenderCache) -> None:
     """Assert progress callback is called with accurate frame counts and percentage."""
-    backend = HeadlessBackend()
+    backend = get_mockable_backend()
     doc = await backend.doc_new(width=160, height=120, fps=10.0)
     await backend.doc_set_time_range(doc.id, start_time=0.0, end_time=0.4, fps=10.0)
 
@@ -54,7 +69,7 @@ async def test_render_progress_notifications(tmp_path: Path, tmp_cache: RenderCa
 @pytest.mark.asyncio
 async def test_render_cancellation_and_cleanup(tmp_path: Path, tmp_cache: RenderCache) -> None:
     """Assert cancelling mid-render raises SynfigError and cleans up partial files when requested."""
-    backend = HeadlessBackend()
+    backend = get_mockable_backend()
     doc = await backend.doc_new(width=160, height=120, fps=10.0)
     await backend.doc_set_time_range(doc.id, start_time=0.0, end_time=1.0, fps=10.0)
 
@@ -87,7 +102,7 @@ async def test_render_cancellation_and_cleanup(tmp_path: Path, tmp_cache: Render
 @pytest.mark.asyncio
 async def test_render_cancellation_partial_reported(tmp_path: Path, tmp_cache: RenderCache) -> None:
     """Assert cancellation with cleanup_on_cancel=False leaves partial rendered frames intact."""
-    backend = HeadlessBackend()
+    backend = get_mockable_backend()
     doc = await backend.doc_new(width=160, height=120, fps=10.0)
     await backend.doc_set_time_range(doc.id, start_time=0.0, end_time=1.0, fps=10.0)
 
@@ -127,7 +142,7 @@ async def test_render_disk_cache_hits_and_invalidation(
     3. Modifying the document invalidates the cache key.
     4. Changing render parameters (e.g. width/height/time) produces a cache miss.
     """
-    backend = HeadlessBackend()
+    backend = get_mockable_backend()
     doc = await backend.doc_new(width=160, height=120, fps=10.0)
     pipeline = RenderPipeline(backend=backend, cache=tmp_cache)
 
