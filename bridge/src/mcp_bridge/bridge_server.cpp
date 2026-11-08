@@ -51,7 +51,7 @@ bool BridgeServer::start() {
 
     int opt = 1;
 #ifdef _WIN32
-    setsockopt(m_listen_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+    setsockopt(m_listen_sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (const char*)&opt, sizeof(opt));
 #else
     setsockopt(m_listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 #endif

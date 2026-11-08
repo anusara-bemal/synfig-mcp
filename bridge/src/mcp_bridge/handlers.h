@@ -19,8 +19,9 @@ void set_session_token(const std::string& token);
 std::string get_session_token();
 
 /**
- * Configure allowed workspace sandbox roots.
+ * Configure allowed workspace sandbox roots. Rejects overly broad roots.
  */
+bool set_workspace_roots(const std::vector<std::string>& roots, std::string& error_msg);
 void set_workspace_roots(const std::vector<std::string>& roots);
 
 /**

@@ -14,11 +14,19 @@ namespace mcp_bridge {
 static std::unique_ptr<BridgeServer> s_server;
 
 bool start(int port) {
+    const char* env_disable = std::getenv("SYNFIG_MCP_DISABLE");
+    if (env_disable && (*env_disable == '1' || *env_disable == 't' || *env_disable == 'T')) {
+        std::cout << "[mcp_bridge] Synfig MCP Bridge disabled via SYNFIG_MCP_DISABLE" << std::endl;
+        return false;
+    }
+
     // Check if port overridden by environment variable
+    bool explicit_port = false;
     const char* env_port = std::getenv("SYNFIG_MCP_PORT");
     if (env_port && *env_port) {
         try {
             port = std::stoi(env_port);
+            explicit_port = true;
         } catch (...) {}
     }
 
@@ -36,11 +44,21 @@ bool start(int port) {
     // 2. Initialize GTK main thread dispatcher
     init_dispatcher();
 
-    // 3. Create and start TCP server
-    s_server.reset(new BridgeServer(port));
-    if (!s_server->start()) {
-        std::cerr << "[mcp_bridge] Error: Failed to start TCP server on port " << port << std::endl;
+    // 3. Create and start TCP server (with multi-instance auto-port probing)
+    int max_attempts = explicit_port ? 1 : 10;
+    int bound_port = -1;
+    for (int i = 0; i < max_attempts; ++i) {
+        int try_port = port + i;
+        s_server.reset(new BridgeServer(try_port));
+        if (s_server->start()) {
+            bound_port = try_port;
+            break;
+        }
         s_server.reset();
+    }
+
+    if (bound_port < 0) {
+        std::cerr << "[mcp_bridge] Error: Failed to start TCP server on port " << port << std::endl;
         return false;
     }
 

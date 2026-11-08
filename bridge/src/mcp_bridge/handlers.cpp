@@ -230,6 +230,81 @@ static bool is_within_root(const std::string& target_canon, const std::string& r
     return false;
 }
 
+static bool is_overly_broad_root(const std::string& path_str, std::string& reason) {
+    std::string p = normalize_path_str(path_str);
+    if (p.empty()) {
+        reason = "path is empty";
+        return true;
+    }
+
+#ifdef _WIN32
+    // 1. Drive roots (e.g. "c:", "c:\", "d:")
+    if (p.length() <= 3 && p.length() >= 2 && p[1] == ':') {
+        reason = "drive root is overly broad; specify a project-specific directory";
+        return true;
+    }
+
+    // 2. Windows / System directory
+    char win_dir[MAX_PATH];
+    if (GetWindowsDirectoryA(win_dir, MAX_PATH)) {
+        std::string s_win = normalize_path_str(win_dir);
+        if (p == s_win || is_within_root(p, s_win)) {
+            reason = "Windows system directory is not allowed as a workspace root";
+            return true;
+        }
+    }
+
+    // 3. Program Files
+    const char* pf = std::getenv("ProgramFiles");
+    if (pf && *pf) {
+        std::string s_pf = normalize_path_str(pf);
+        if (p == s_pf || is_within_root(p, s_pf)) {
+            reason = "Program Files directory is not allowed as a workspace root";
+            return true;
+        }
+    }
+    const char* pf86 = std::getenv("ProgramFiles(x86)");
+    if (pf86 && *pf86) {
+        std::string s_pf86 = normalize_path_str(pf86);
+        if (p == s_pf86 || is_within_root(p, s_pf86)) {
+            reason = "Program Files (x86) directory is not allowed as a workspace root";
+            return true;
+        }
+    }
+
+    // 4. User home directory directly (e.g. C:\Users\username or C:\Users)
+    const char* up = std::getenv("USERPROFILE");
+    if (up && *up) {
+        std::string s_up = normalize_path_str(up);
+        if (p == s_up) {
+            reason = "User home directory directly is overly broad; specify a dedicated project subfolder";
+            return true;
+        }
+        size_t last_slash = s_up.find_last_of("\\/");
+        if (last_slash != std::string::npos) {
+            std::string s_users = s_up.substr(0, last_slash);
+            if (p == s_users) {
+                reason = "Users directory is overly broad";
+                return true;
+            }
+        }
+    }
+#else
+    if (p == "/" || p == "/root" || p == "/home" || p == "/Users" ||
+        p == "/etc" || p == "/usr" || p == "/bin" || p == "/sbin" || p == "/var") {
+        reason = "system directory is overly broad";
+        return true;
+    }
+    const char* home = std::getenv("HOME");
+    if (home && *home && p == normalize_path_str(home)) {
+        reason = "User home directory directly is overly broad; specify a dedicated project subfolder";
+        return true;
+    }
+#endif
+
+    return false;
+}
+
 static void ensure_default_workspace_roots() {
     if (!s_workspace_roots.empty()) return;
 
@@ -245,7 +320,10 @@ static void ensure_default_workspace_roots() {
 #endif
         while (std::getline(ss, item, delim)) {
             if (!item.empty()) {
-                s_workspace_roots.push_back(normalize_path_str(item));
+                std::string reason;
+                if (!is_overly_broad_root(item, reason)) {
+                    s_workspace_roots.push_back(normalize_path_str(item));
+                }
             }
         }
     }
@@ -253,7 +331,10 @@ static void ensure_default_workspace_roots() {
 #ifdef _WIN32
     char cwd[MAX_PATH];
     if (GetCurrentDirectoryA(MAX_PATH, cwd)) {
-        s_workspace_roots.push_back(normalize_path_str(cwd));
+        std::string reason;
+        if (!is_overly_broad_root(cwd, reason)) {
+            s_workspace_roots.push_back(normalize_path_str(cwd));
+        }
     }
     char tmp[MAX_PATH];
     if (GetTempPathA(MAX_PATH, tmp)) {
@@ -262,20 +343,29 @@ static void ensure_default_workspace_roots() {
 #else
     char cwd[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd))) {
-        s_workspace_roots.push_back(normalize_path_str(cwd));
+        std::string reason;
+        if (!is_overly_broad_root(cwd, reason)) {
+            s_workspace_roots.push_back(normalize_path_str(cwd));
+        }
     }
     const char* tmp = std::getenv("TMPDIR");
     s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
 #endif
 }
 
-void set_workspace_roots(const std::vector<std::string>& roots) {
-    s_workspace_roots.clear();
+bool set_workspace_roots(const std::vector<std::string>& roots, std::string& error_msg) {
+    std::vector<std::string> valid_roots;
     for (const auto& r : roots) {
         if (!r.empty()) {
-            s_workspace_roots.push_back(normalize_path_str(r));
+            std::string reason;
+            if (is_overly_broad_root(r, reason)) {
+                error_msg = "Overly broad workspace root rejected: '" + r + "' (" + reason + ")";
+                return false;
+            }
+            valid_roots.push_back(normalize_path_str(r));
         }
     }
+    s_workspace_roots = valid_roots;
 #ifdef _WIN32
     char tmp[MAX_PATH];
     if (GetTempPathA(MAX_PATH, tmp)) {
@@ -285,6 +375,12 @@ void set_workspace_roots(const std::vector<std::string>& roots) {
     const char* tmp = std::getenv("TMPDIR");
     s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
 #endif
+    return true;
+}
+
+void set_workspace_roots(const std::vector<std::string>& roots) {
+    std::string err;
+    set_workspace_roots(roots, err);
 }
 
 static bool is_safe_bridge_path(const std::string& path, const std::vector<std::string>& allowed_exts, std::string& out_err) {
@@ -394,7 +490,14 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 }
             }
             if (!roots.empty()) {
-                set_workspace_roots(roots);
+                std::string err_reason;
+                if (!set_workspace_roots(roots, err_reason)) {
+                    res["error"] = {
+                        {"code", 1203},
+                        {"message", err_reason}
+                    };
+                    return res;
+                }
             }
         }
 

@@ -145,6 +145,7 @@ class BackendBase(ABC):
         layer_type: str,
         canvas_path: str = "",
         params: dict[str, Any] | None = None,
+        description: str = "",
     ) -> dict[str, Any]:
         """Add a new layer to the specified canvas/group."""
         ...
@@ -192,6 +193,13 @@ class BackendBase(ABC):
     @abstractmethod
     async def layer_ungroup(self, doc_id: str, layer_id: str, canvas_path: str = "") -> list[str]:
         """Ungroup a PasteCanvas layer."""
+        ...
+
+    @abstractmethod
+    async def import_asset(
+        self, doc_id: str, file_path: str, canvas_path: str = ""
+    ) -> dict[str, Any]:
+        """Import an external image or media asset into the canvas."""
         ...
 
     # -----------------------------------------------------------------------
@@ -365,6 +373,7 @@ class BackendBase(ABC):
         width: int | None = None,
         height: int | None = None,
         target: str = "png",
+        progress_cb: Any = None,
     ) -> list[str]:
         """Render an image sequence for the document timeline to an output directory."""
         ...

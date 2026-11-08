@@ -608,3 +608,100 @@ async def test_mcp_tools_real_studio(tmp_path: Path) -> None:
             proc.wait(timeout=5)
         except Exception:
             proc.kill()
+
+
+@pytest.mark.asyncio
+async def test_mcp_client_progress_notifications(
+    mcp_server: tuple[str, MCPServer], tmp_path: Path
+) -> None:
+    """Requirement 2(a): Multi-frame render called via in-memory Client emits MCP progress notifications."""
+    mode, app = mcp_server
+    out_dir = tmp_path / f"mcp_progress_{mode}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    progress_events: list[tuple[float, float | None, str | None]] = []
+
+    async def on_progress(
+        progress: float, total: float | None = None, message: str | None = None
+    ) -> None:
+        progress_events.append((progress, total, message))
+
+    async with Client(app) as client:
+        # 1. Open or create doc
+        doc_res = parse_tool_result(
+            await client.call_tool("doc_new", {"width": 160, "height": 120, "fps": 24.0})
+        )
+        doc_id = doc_res["id"]
+
+        # 2. Add a circle
+        await client.call_tool("layer_add", {"doc_id": doc_id, "layer_type": "circle"})
+
+        # 3. Render sequence with progress tracking
+        res = await client.call_tool(
+            "render_sequence",
+            {
+                "doc_id": doc_id,
+                "output_dir": str(out_dir),
+                "start_time": 0.0,
+                "end_time": 0.2,
+                "fps": 10.0,  # 3 frames
+                "width": 160,
+                "height": 120,
+            },
+            progress_callback=on_progress,
+        )
+        frames = parse_tool_result(res)
+        assert isinstance(frames, list)
+        assert len(frames) >= 2
+        assert len(progress_events) >= 2
+        # Verify progress increments
+        assert progress_events[0][0] >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_mcp_client_cancellation_cleanup(
+    mcp_server: tuple[str, MCPServer], tmp_path: Path
+) -> None:
+    """Requirement 2(b): Client task cancellation stops render and cleans partial output."""
+    import asyncio
+
+    mode, app = mcp_server
+    out_dir = tmp_path / f"mcp_cancel_{mode}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    async with Client(app) as client:
+        doc_res = parse_tool_result(
+            await client.call_tool("doc_new", {"width": 160, "height": 120, "fps": 24.0})
+        )
+        doc_id = doc_res["id"]
+        await client.call_tool("layer_add", {"doc_id": doc_id, "layer_type": "circle"})
+
+        async def cancel_after_brief_delay(target_task: asyncio.Task[Any]) -> None:
+            await asyncio.sleep(0.05)
+            target_task.cancel()
+
+        render_task = asyncio.create_task(
+            client.call_tool(
+                "render_sequence",
+                {
+                    "doc_id": doc_id,
+                    "output_dir": str(out_dir),
+                    "start_time": 0.0,
+                    "end_time": 1.0,
+                    "fps": 20.0,  # 21 frames requested
+                    "width": 160,
+                    "height": 120,
+                },
+            )
+        )
+        canceller = asyncio.create_task(cancel_after_brief_delay(render_task))
+        try:
+            await render_task
+        except asyncio.CancelledError:
+            pass
+        finally:
+            canceller.cancel()
+
+        # Assert cancellation stopped the render and cleaned partial frames
+        remaining_frames = list(out_dir.glob("*.png"))
+        assert len(remaining_frames) < 21

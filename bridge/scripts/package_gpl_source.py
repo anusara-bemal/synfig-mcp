@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""
+Packages the complete and corresponding GPL-3.0 source bundle for Synfig Studio MCP release.
+
+Includes:
+- Upstream Synfig source tree at pinned commit 1b623cf577e163d0c3ebf4922dc9fb28e7c1f8fa
+- MCP bridge source code, patches, and build scripts
+- Third-party licensing manifests and GPL compliance documentation
+"""
+
+import os
+import shutil
+import subprocess
+import tarfile
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+DIST_DIR = REPO_ROOT / "dist"
+SYNFIG_SRC = REPO_ROOT / "build_synfig" / "synfig_src"
+OUTPUT_TAR = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0.tar.gz"
+
+
+def main() -> None:
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+    temp_bundle_dir = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0"
+    if temp_bundle_dir.exists():
+        shutil.rmtree(temp_bundle_dir)
+    temp_bundle_dir.mkdir(parents=True)
+
+    pinned_commit = (REPO_ROOT / "bridge" / "PINNED_COMMIT").read_text().strip()
+    print(f"[gpl_package] Packaging GPL source bundle into {OUTPUT_TAR} (pinned commit: {pinned_commit})...")
+
+    # 1. Export or copy upstream Synfig at pinned commit
+    upstream_target = temp_bundle_dir / "synfig-upstream"
+    if (SYNFIG_SRC / ".git").exists():
+        print(f"[gpl_package] Exporting pinned git commit {pinned_commit}...")
+        upstream_target.mkdir(parents=True)
+        # Use git archive to export clean tree without large .git history
+        archive_proc = subprocess.run(
+            ["git", "-C", str(SYNFIG_SRC), "archive", "--format=tar", pinned_commit],
+            capture_output=True,
+            check=True,
+        )
+        tar_path = temp_bundle_dir / "upstream.tar"
+        tar_path.write_bytes(archive_proc.stdout)
+        with tarfile.open(tar_path, "r") as t:
+            t.extractall(path=upstream_target)
+        tar_path.unlink()
+    else:
+        print("[gpl_package] Warning: synfig_src not found; creating stub upstream instructions.")
+        upstream_target.mkdir(parents=True)
+        (upstream_target / "SOURCE_README.txt").write_text(
+            f"Clone https://github.com/synfig/synfig.git at commit {pinned_commit}\n"
+        )
+
+    # 2. Copy bridge directory (patches, src, scripts)
+    bridge_target = temp_bundle_dir / "bridge"
+    shutil.copytree(REPO_ROOT / "bridge", bridge_target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
+
+    # 3. Copy documentation and license files
+    docs_target = temp_bundle_dir / "docs"
+    docs_target.mkdir(parents=True, exist_ok=True)
+    shutil.copy(REPO_ROOT / "docs" / "gpl-compliance.md", docs_target / "gpl-compliance.md")
+    shutil.copy(REPO_ROOT / "bridge" / "THIRD_PARTY_LICENSES.md", temp_bundle_dir / "THIRD_PARTY_LICENSES.md")
+    shutil.copy(REPO_ROOT / "LICENSE", temp_bundle_dir / "LICENSE")
+
+    # 4. Create tar.gz archive
+    print(f"[gpl_package] Writing tarball {OUTPUT_TAR}...")
+    with tarfile.open(OUTPUT_TAR, "w:gz") as tar:
+        tar.add(temp_bundle_dir, arcname="synfig-mcp-gpl-source-v0.7.0")
+
+    shutil.rmtree(temp_bundle_dir)
+    size_mb = OUTPUT_TAR.stat().st_size / (1024 * 1024)
+    print(f"[gpl_package] Successfully generated {OUTPUT_TAR.name} ({size_mb:.2f} MB)")
+
+
+if __name__ == "__main__":
+    main()

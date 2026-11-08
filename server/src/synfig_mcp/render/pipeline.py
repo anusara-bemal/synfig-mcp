@@ -5,6 +5,7 @@ contact sheet generation, progress notifications, cancellation, and cache integr
 
 import asyncio
 import contextlib
+import inspect
 import os
 import shutil
 import subprocess
@@ -147,11 +148,13 @@ class RenderPipeline:
 
                 if progress_cb:
                     pct = round((i + 1) / total_frames * 100.0, 1)
-                    progress_cb(i + 1, total_frames, pct)
+                    res = progress_cb(i + 1, total_frames, pct)
+                    if inspect.isawaitable(res):
+                        await res
 
             return generated_files
-        except SynfigError:
-            if cancel_token and cancel_token.is_cancelled and cleanup_on_cancel:
+        except (SynfigError, asyncio.CancelledError):
+            if cleanup_on_cancel:
                 for f in generated_files:
                     with contextlib.suppress(Exception):
                         Path(f).unlink(missing_ok=True)

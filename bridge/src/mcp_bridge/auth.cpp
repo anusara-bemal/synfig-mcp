@@ -160,6 +160,25 @@ bool write_token_file(const std::string& token) {
     chmod(path.c_str(), 0600);
 #endif
 
+    // Also write per-PID token file to distinguish multiple concurrent Studio instances
+    unsigned long pid = 0;
+#ifdef _WIN32
+    pid = (unsigned long)GetCurrentProcessId();
+#else
+    pid = (unsigned long)getpid();
+#endif
+    std::string pid_path = path + "_" + std::to_string(pid);
+    std::ofstream ofs_pid(pid_path.c_str(), std::ios::out | std::ios::trunc);
+    if (ofs_pid.is_open()) {
+        ofs_pid << token << std::endl;
+        ofs_pid.close();
+#ifdef _WIN32
+        set_windows_owner_only_acl(pid_path);
+#else
+        chmod(pid_path.c_str(), 0600);
+#endif
+    }
+
     return true;
 }
 
