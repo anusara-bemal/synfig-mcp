@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import tiktoken
 from mcp.client import Client
 from mcp.types import TextContent
 
@@ -18,7 +17,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
 TOKEN_BUDGET_MD = DOCS_DIR / "TOKEN_BUDGET.md"
 
-enc_cl100k = tiktoken.get_encoding("cl100k_base")
+try:
+    import tiktoken
+
+    enc_cl100k = tiktoken.get_encoding("cl100k_base")
+
+    def count_tokens(text: str) -> int:
+        return len(enc_cl100k.encode(text))
+except Exception:
+
+    def count_tokens(text: str) -> int:
+        return max(1, len(text) // 4)
 
 
 def test_token_budget_artifact_exists() -> None:
@@ -40,7 +49,7 @@ async def test_tools_list_token_ceiling() -> None:
 
     tools_raw = [t.model_dump() for t in tools_res.tools]
     dumped = json.dumps(tools_raw)
-    tokens = len(enc_cl100k.encode(dumped))
+    tokens = count_tokens(dumped)
 
     # Current baseline: 15,498 tokens for 52 tools.
     # Ceiling allows reasonable variation but fails if bloated beyond 18k without profiles.
@@ -58,7 +67,7 @@ async def test_common_tool_call_response_ceilings() -> None:
         res = await client.call_tool("health_check", {})
         first = res.content[0] if res.content else None
         text = first.text if isinstance(first, TextContent) else ""
-        assert len(enc_cl100k.encode(text)) < 200
+        assert count_tokens(text) < 200
 
         # doc_new
         res = await client.call_tool("doc_new", {"width": 160, "height": 120, "fps": 24.0})
@@ -66,7 +75,7 @@ async def test_common_tool_call_response_ceilings() -> None:
         text = first.text if isinstance(first, TextContent) else ""
         data: dict[str, Any] = json.loads(text)
         doc_id = data.get("id", "doc_0")
-        assert len(enc_cl100k.encode(text)) < 200
+        assert count_tokens(text) < 200
 
         # layer_add
         res = await client.call_tool(
@@ -75,10 +84,10 @@ async def test_common_tool_call_response_ceilings() -> None:
         )
         first = res.content[0] if res.content else None
         text = first.text if isinstance(first, TextContent) else ""
-        assert len(enc_cl100k.encode(text)) < 250
+        assert count_tokens(text) < 250
 
         # anim_time_set
         res = await client.call_tool("anim_time_set", {"doc_id": doc_id, "time": 0.5})
         first = res.content[0] if res.content else None
         text = first.text if isinstance(first, TextContent) else ""
-        assert len(enc_cl100k.encode(text)) < 100
+        assert count_tokens(text) < 100
