@@ -77,6 +77,11 @@ jobs:
         run: |
           bash bridge/scripts/build_windows_msys2.sh
 
+      - name: Bundle Windows Runtime Dependencies
+        shell: msys2 {0}
+        run: |
+          python3 bridge/scripts/bundle_windows_deps.py --install-dir build_synfig/build_ucrt64/install --ucrt-dir /ucrt64
+
       - name: Package Windows Artifacts
         shell: msys2 {0}
         run: |
@@ -106,9 +111,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install minimal runtime dependencies (xvfb only)
+      - name: Install minimal runtime dependencies (xvfb and GTK runtime)
         run: |
-          sudo apt-get update && sudo apt-get install -y xvfb
+          sudo apt-get update && sudo apt-get install -y xvfb \
+            libgtkmm-3.0-1v5 libxml++2.6-2v5 libglibmm-2.4-1v5 libsigc++-2.0-0v5 \
+            libfftw3-double3 libmng2 libharfbuzz0b || \
+          sudo apt-get install -y xvfb
 
       - name: Download Linux Artifact
         uses: actions/download-artifact@v4
@@ -122,6 +130,9 @@ jobs:
           tar -xzf download_linux/*.tar.gz -C extracted_linux
           STUDIO_BIN=$(find extracted_linux -name synfigstudio -type f -perm /111 | head -n 1)
           echo "Found studio binary at: ${STUDIO_BIN}"
+          STUDIO_DIR="$(cd "$(dirname "${STUDIO_BIN}")/.." && pwd)"
+          export LD_LIBRARY_PATH="${STUDIO_DIR}/lib:${LD_LIBRARY_PATH}"
+          export SYNFIG_MODULE_DIR="${STUDIO_DIR}/lib/synfig/modules"
           xvfb-run -a python3 bridge/scripts/clean_runner_smoke.py "${STUDIO_BIN}"
 
   smoke-test-windows:

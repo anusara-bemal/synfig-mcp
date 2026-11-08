@@ -3,6 +3,7 @@ Parametrized contract tests for all MCP tools across both backends (Headless and
 Exercises tools in-memory through mcp.client.Client.
 """
 
+import contextlib
 import json
 import os
 from collections.abc import AsyncIterator
@@ -675,11 +676,19 @@ async def test_mcp_client_cancellation_cleanup(
             await client.call_tool("doc_new", {"width": 160, "height": 120, "fps": 24.0})
         )
         doc_id = doc_res["id"]
-        await client.call_tool("layer_add", {"doc_id": doc_id, "layer_type": "circle"})
+        await client.call_tool(
+            "layer_add",
+            {"doc_id": doc_id, "layer_type": "circle", "description": f"cancel_unique_{mode}"},
+        )
 
-        async def cancel_after_brief_delay(target_task: asyncio.Task[Any]) -> None:
-            await asyncio.sleep(0.05)
-            target_task.cancel()
+        render_task: asyncio.Task[Any] | None = None
+
+        async def cancel_on_progress(
+            progress: float, total: float | None = None, message: str | None = None
+        ) -> None:
+            del total, message
+            if progress >= 2 and render_task is not None and not render_task.done():
+                render_task.cancel()
 
         render_task = asyncio.create_task(
             client.call_tool(
@@ -688,21 +697,18 @@ async def test_mcp_client_cancellation_cleanup(
                     "doc_id": doc_id,
                     "output_dir": str(out_dir),
                     "start_time": 0.0,
-                    "end_time": 1.0,
-                    "fps": 20.0,  # 21 frames requested
+                    "end_time": 2.0,  # 41 frames requested
+                    "fps": 20.0,
                     "width": 160,
                     "height": 120,
                 },
+                progress_callback=cancel_on_progress,
             )
         )
-        canceller = asyncio.create_task(cancel_after_brief_delay(render_task))
-        try:
+
+        with contextlib.suppress(asyncio.CancelledError):
             await render_task
-        except asyncio.CancelledError:
-            pass
-        finally:
-            canceller.cancel()
 
         # Assert cancellation stopped the render and cleaned partial frames
         remaining_frames = list(out_dir.glob("*.png"))
-        assert len(remaining_frames) < 21
+        assert len(remaining_frames) < 41

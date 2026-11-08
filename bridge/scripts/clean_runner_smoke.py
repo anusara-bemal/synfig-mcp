@@ -38,6 +38,7 @@ def send_req(sock: socket.socket, req_id: int, method: str, params: dict) -> dic
 
 
 def run_smoke_test(studio_exe: Path) -> None:
+    studio_exe = studio_exe.resolve()
     print(f"=== Starting Clean Runner Smoke Test with {studio_exe} ===")
     assert studio_exe.is_file(), f"Binary not found: {studio_exe}"
 
@@ -95,7 +96,12 @@ def run_smoke_test(studio_exe: Path) -> None:
             if token:
                 break
 
-        assert token, f"Bridge did not generate authentication token after 20 seconds. Returncode: {proc.poll()}"
+        if not token:
+            log_file.flush()
+            log_file.close()
+            log_content = Path(log_file.name).read_text(encoding="utf-8", errors="replace")
+            print(f"=== Studio Smoke Log Output (returncode={proc.poll()}) ===\n{log_content}\n=================================================")
+            assert token, f"Bridge did not generate authentication token after 20 seconds. Returncode: {proc.poll()}"
         print(f"[PASS] Bridge started and generated auth token in {token_file.name}")
 
         # Connect TCP socket
