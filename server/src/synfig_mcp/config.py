@@ -38,23 +38,54 @@ def get_default_workspace_roots() -> list[Path]:
     return [default_dir.resolve()]
 
 
+def get_default_backend_mode() -> Literal["auto", "live", "headless"]:
+    mode = os.environ.get("SYNFIG_MCP_BACKEND", "auto").lower()
+    if mode in ("live", "headless", "auto"):
+        return mode  # type: ignore[return-value]
+    return "auto"
+
+
+def get_default_bridge_port() -> int:
+    try:
+        return int(os.environ.get("SYNFIG_MCP_PORT", "19998"))
+    except ValueError:
+        return 19998
+
+
+def get_default_token_path() -> Path:
+    env_token = os.environ.get("SYNFIG_MCP_TOKEN_PATH")
+    if env_token:
+        return Path(env_token).expanduser().resolve()
+    synfig_dir = Path.home() / ".synfig"
+    default_token = synfig_dir / "mcp_token"
+    if default_token.is_file():
+        return default_token
+    # If default token is missing, find the most recently modified mcp_token_<pid>
+    candidates = sorted(
+        synfig_dir.glob("mcp_token_*"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
+    if candidates:
+        return candidates[0]
+    return default_token
+
+
 class Settings(BaseModel):
     """Runtime configuration for synfig-mcp."""
 
     backend_mode: Literal["auto", "live", "headless"] = Field(
-        default="auto",
+        default_factory=get_default_backend_mode,
         description="Backend selection mode: 'live' (Studio), 'headless' (CLI/sif), or 'auto'.",
     )
     bridge_host: str = Field(
-        default="127.0.0.1",
+        default_factory=lambda: os.environ.get("SYNFIG_MCP_HOST", "127.0.0.1"),
         description="Host for the Synfig Studio native bridge socket.",
     )
     bridge_port: int = Field(
-        default=19998,
+        default_factory=get_default_bridge_port,
         description="TCP port for the Synfig Studio native bridge.",
     )
     bridge_token_path: Path = Field(
-        default=Path.home() / ".synfig" / "mcp_token",
+        default_factory=get_default_token_path,
         description="Path to session authentication token written by patched Studio.",
     )
     bridge_connect_timeout_seconds: float = Field(
