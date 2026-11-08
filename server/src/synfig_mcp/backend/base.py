@@ -374,6 +374,7 @@ class BackendBase(ABC):
         height: int | None = None,
         target: str = "png",
         progress_cb: Any = None,
+        cancel_token: Any = None,
     ) -> list[str]:
         """Render an image sequence for the document timeline to an output directory."""
         ...

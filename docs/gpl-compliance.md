@@ -19,9 +19,18 @@ In full compliance with Section 6 of the GPL-3.0 ("Conveying Non-Source Forms"),
 
 ## 2. Bundled FFmpeg Configuration & Verification
 
-Synfig Studio links dynamically to FFmpeg libraries (`libavcodec`, `libavformat`, `libavutil`, `libswscale`, `libswresample`, `libavfilter`, `libavdevice`) for multimedia import and video export.
+Synfig Studio dynamically loads its multimedia export module (`lib/synfig/modules/libmod_libavcodec.dll`), which links against the following four FFmpeg shared libraries:
+- `avcodec-62.dll` (owned by `mingw-w64-ucrt-x86_64-ffmpeg 8.1.1-2`)
+- `avformat-62.dll` (owned by `mingw-w64-ucrt-x86_64-ffmpeg 8.1.1-2`)
+- `avutil-60.dll` (owned by `mingw-w64-ucrt-x86_64-ffmpeg 8.1.1-2`)
+- `swscale-9.dll` (owned by `mingw-w64-ucrt-x86_64-ffmpeg 8.1.1-2`)
 
-The bundled FFmpeg binary distributed in our Windows packages is built directly by the MSYS2 UCRT64 project. We have explicitly queried the configuration from the runtime binary (`ffmpeg -buildconf`):
+Verified package metadata (`pacman -Qi mingw-w64-ucrt-x86_64-ffmpeg`):
+- **Version**: 8.1.1-2
+- **License**: `spdx:GPL-3.0-or-later`
+- **Upstream URL**: https://ffmpeg.org/
+
+The build configuration of this exact packaged binary was queried directly via `ffmpeg -buildconf`:
 
 ```text
 ffmpeg version 8.1.1 Copyright (c) 2000-2026 the FFmpeg developers
@@ -36,10 +45,11 @@ ffmpeg version 8.1.1 Copyright (c) 2000-2026 the FFmpeg developers
   libswresample   6.  3.101 /  6.  3.101
 ```
 
-### Verification Findings:
-1. **GPL-3.0 Compatibility**: `--enable-gpl` and `--enable-version3` are enabled; `--enable-nonfree` is NOT enabled. This confirms that all bundled codec libraries are fully compliant with GPL-3.0 redistribution.
-2. **Shared Libraries**: `--enable-shared` is used; all components link dynamically against standard DLLs.
-3. **Hardware Acceleration**: `--enable-nvenc` and `--enable-amf` are present as open header loaders without proprietary runtime blobs statically bundled.
+### Factual Verification & Licensing Notes:
+1. **Compilation Flags**: The binary is built with `--enable-gpl --enable-version3`, and without `--enable-nonfree`.
+2. **Shared Libraries**: `--enable-shared` is enabled; runtime components link dynamically against the shared DLLs listed above.
+3. **Patent Licensing Distinction**: Copyright licensing under GPL-3.0 and patent licensing for proprietary media codecs (such as MPEG LA / Via Licensing patent pools covering H.264/AVC, H.265/HEVC, or AAC) are separate legal and regulatory matters. Users and distributors deploying commercial video rendering solutions must independently verify their codec patent licensing obligations.
+4. **Legal Disclaimer**: *Not legal advice.*
 
 ---
 

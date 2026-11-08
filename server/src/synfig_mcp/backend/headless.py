@@ -805,6 +805,7 @@ class HeadlessBackend(BackendBase):
         height: int | None = None,
         target: str = "png",
         progress_cb: Any = None,
+        cancel_token: Any = None,
     ) -> list[str]:
         safe_dir = validate_path(output_dir)
         res = await self.pipeline.render_sequence(
@@ -817,6 +818,7 @@ class HeadlessBackend(BackendBase):
             height=height,
             target=target,
             progress_cb=progress_cb,
+            cancel_token=cancel_token,
         )
         return cast(list[str], res)
 

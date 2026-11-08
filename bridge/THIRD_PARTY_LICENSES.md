@@ -78,9 +78,10 @@ All 73 third-party DLLs distributed in the Windows UCRT64 release archive are ma
 ## 3. Analysis of GPL and LGPL Implications (FFmpeg, MLT, and ImageMagick)
 
 ### A. FFmpeg (`mingw-w64-ucrt-x86_64-ffmpeg`)
-- **License**: GPL-3.0-or-later (compiled with `--enable-gpl --enable-version3`).
-- **Implication**: FFmpeg includes GPL-licensed components (e.g. `libpostproc`, `libx264`). Distributing FFmpeg binaries alongside Synfig Studio binds the collective binary distribution to the full copyleft terms of the **GNU General Public License v3 (GPL-3.0)**.
+- **License**: GPL-3.0-or-later (compiled with `--enable-gpl --enable-version3`, without `--enable-nonfree`).
+- **Implication**: FFmpeg includes GPL-licensed components (e.g. `libpostproc`, `libx264`). Distributing FFmpeg binaries alongside Synfig Studio binds the collective binary distribution to the copyleft terms of the **GNU General Public License v3 (GPL-3.0)**.
 - **Compliance**: Because Synfig Studio and the MCP bridge are licensed under GPL-3.0-or-later, license compatibility is preserved. In accordance with GPL-3.0 Section 6, full machine-readable source code for all components is provided or made available via upstream repositories and written offer.
+- **Patent Licensing Distinction**: Copyright licensing under GPL-3.0 and patent licensing for proprietary media codecs (such as MPEG LA / Via Licensing patent pools covering H.264/AVC, H.265/HEVC, or AAC) are separate legal and regulatory matters. Users and distributors deploying commercial video rendering solutions must independently verify their codec patent licensing obligations. *Not legal advice.*
 
 ### B. MLT Multimedia Framework (`mingw-w64-ucrt-x86_64-mlt`)
 - **License**: LGPL-2.1-or-later (core engine) with optional GPL modules.

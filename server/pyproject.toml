@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "synfig-mcp"
-version = "0.7.0rc1"
+version = "0.7.0rc2"
 description = "Live MCP control of Synfig Studio (native bridge + headless fallback)"
 readme = "README.md"
 requires-python = ">=3.12"

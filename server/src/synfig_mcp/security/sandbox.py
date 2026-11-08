@@ -8,7 +8,6 @@ import os
 import tempfile
 from pathlib import Path
 
-from synfig_mcp.config import settings
 from synfig_mcp.errors import SecuritySandboxError
 
 
@@ -54,6 +53,8 @@ def is_overly_broad_root(path: Path | str) -> tuple[bool, str]:
 
 def get_default_allowed_roots() -> list[Path]:
     """Return default allowed workspace roots, ensuring roots are narrow and secure."""
+    from synfig_mcp.config import settings
+
     roots: list[Path] = []
     for r in settings.workspace_roots:
         resolved = r.resolve()

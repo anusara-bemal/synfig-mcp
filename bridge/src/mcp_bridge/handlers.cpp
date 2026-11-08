@@ -1,5 +1,6 @@
 #include "handlers.h"
 #include "auth.h"
+#include "bridge_init.h"
 #include "dispatcher.h"
 #include "types_serializer.h"
 
@@ -504,6 +505,8 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         res["result"] = {
             {"protocol_version", PROTOCOL_VERSION},
             {"studio_version", STUDIO_VERSION},
+            {"bridge_version", get_build_version()},
+            {"commit_sha", get_build_commit_sha()},
             {"capabilities", {
                 "doc.read",
                 "doc.write",

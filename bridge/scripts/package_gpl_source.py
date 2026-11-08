@@ -73,6 +73,13 @@ def main() -> None:
     size_mb = OUTPUT_TAR.stat().st_size / (1024 * 1024)
     print(f"[gpl_package] Successfully generated {OUTPUT_TAR.name} ({size_mb:.2f} MB)")
 
+    import hashlib
+
+    sha256 = hashlib.sha256(OUTPUT_TAR.read_bytes()).hexdigest()
+    sha_file = OUTPUT_TAR.with_name(f"{OUTPUT_TAR.name}.sha256")
+    sha_file.write_text(f"{sha256}  {OUTPUT_TAR.name}\n", encoding="utf-8")
+    print(f"[gpl_package] Checksum: {sha256} saved to {sha_file.name}")
+
 
 if __name__ == "__main__":
     main()

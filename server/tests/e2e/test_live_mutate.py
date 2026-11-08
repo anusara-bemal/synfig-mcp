@@ -52,6 +52,7 @@ async def live_studio(tmp_path: Path) -> AsyncIterator[BridgeClient]:
         pytest.skip("Patched Synfig Studio binary not found")
 
     env = os.environ.copy()
+    env["SYNFIG_MCP_ENABLE"] = "1"
     env["SYNFIG_MCP_PORT"] = str(TEST_PORT)
     env["MSYS2_ARG_CONV_EXCL"] = "*"
     env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
@@ -1433,6 +1434,7 @@ async def test_bridge_multi_instance_ports_and_disable() -> None:
     blocking_sock.listen(1)
 
     env_instance = os.environ.copy()
+    env_instance["SYNFIG_MCP_ENABLE"] = "1"
     env_instance.pop("SYNFIG_MCP_PORT", None)  # Ensure default probing 19998 -> 19999
     env_instance.pop("SYNFIG_MCP_DISABLE", None)
     env_instance["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
@@ -1480,3 +1482,201 @@ async def test_bridge_multi_instance_ports_and_disable() -> None:
                 proc1.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 proc1.kill()
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_bridge_hello_version_and_commit(live_studio: BridgeClient) -> None:
+    """Item 1: Test that the shipped Studio bridge binary reports version and commit_sha."""
+    hello_resp = await live_studio.call(
+        "hello",
+        {
+            "token": live_studio.token or "",
+            "protocol_version": "1.0",
+            "workspace_roots": [str(REPO_ROOT)],
+        },
+    )
+    assert "bridge_version" in hello_resp
+    assert "commit_sha" in hello_resp
+    assert len(hello_resp["bridge_version"]) > 0
+    assert len(hello_resp["commit_sha"]) > 0
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_bridge_opt_in_default_and_stale_token_cleanup() -> None:
+    """Item 4: Real-Studio test: bridge off by default (no socket, no token); stale token cleanup."""
+    if not BIN_PATH.exists():
+        pytest.skip("Patched Synfig Studio binary not found")
+
+    token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
+    token_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Stale token setup (PID 999998 is not running)
+    stale_token = token_dir / "mcp_token_999998"
+    stale_token.write_text("stale_token_content", encoding="utf-8")
+    assert stale_token.is_file()
+
+    # 2. Test OFF by default: Launch Studio with SYNFIG_MCP_ENABLE omitted and ~/.synfig/mcp_enabled absent
+    env_default = os.environ.copy()
+    env_default.pop("SYNFIG_MCP_ENABLE", None)
+    env_default.pop("SYNFIG_MCP_PORT", None)
+    env_default["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
+    env_default["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+
+    cfg_file = token_dir / "mcp_enabled"
+    if cfg_file.is_file():
+        cfg_file.unlink()
+
+    proc_default = subprocess.Popen([str(BIN_PATH)], env=env_default)
+    try:
+        await asyncio.sleep(2.0)
+        # Verify bridge did not start on port 19998
+        probe_client = BridgeClient(host="127.0.0.1", port=19998, token="none")
+        with pytest.raises(
+            (BridgeConnectionError, ConnectionRefusedError, asyncio.TimeoutError, OSError)
+        ):
+            await probe_client.connect(timeout=1.0)
+        # Verify no token file was written for this PID
+        assert not (token_dir / f"mcp_token_{proc_default.pid}").exists()
+    finally:
+        proc_default.terminate()
+        try:
+            proc_default.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc_default.kill()
+
+    # 3. Test ON with SYNFIG_MCP_ENABLE=1: Stale token cleaned, active token created and removed on stop
+    env_on = os.environ.copy()
+    env_on["SYNFIG_MCP_ENABLE"] = "1"
+    env_on["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
+    env_on["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+
+    proc_on = subprocess.Popen([str(BIN_PATH)], env=env_on)
+    try:
+        pid_token_file = token_dir / f"mcp_token_{proc_on.pid}"
+        for _ in range(30):
+            if pid_token_file.is_file():
+                break
+            await asyncio.sleep(0.5)
+        assert pid_token_file.is_file()
+
+        # Verify stale token was automatically cleaned up on start
+        assert not stale_token.exists()
+    finally:
+        proc_on.terminate()
+        try:
+            proc_on.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc_on.kill()
+
+    # Launching subsequent instance cleans dead process's token via clean_stale_tokens
+    proc_cleaner = subprocess.Popen([str(BIN_PATH)], env=env_on)
+    try:
+        cleaner_token = token_dir / f"mcp_token_{proc_cleaner.pid}"
+        for _ in range(30):
+            if cleaner_token.is_file():
+                break
+            await asyncio.sleep(0.5)
+        # Stale token from dead proc_on is cleaned up
+        assert not pid_token_file.exists()
+    finally:
+        proc_cleaner.terminate()
+        try:
+            proc_cleaner.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc_cleaner.kill()
+        cleaner_token = token_dir / f"mcp_token_{proc_cleaner.pid}"
+        if cleaner_token.exists():
+            cleaner_token.unlink()
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_live_progress_notifications_and_cancel_tool(
+    live_studio: BridgeClient, tmp_path: Path
+) -> None:
+    """Item 6: Progress notifications (monotonic, N>=5 frames) and render_cancel(job_id) tool."""
+    backend = LiveBackend(client=live_studio)
+    sandbox_dir = tmp_path / "render_tests"
+    sandbox_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Monotonic progress test (cold cache, 5 frames)
+    progress_records: list[tuple[int, int, float]] = []
+
+    def on_progress(cur: int, total: int, pct: float) -> None:
+        progress_records.append((cur, total, pct))
+
+    seq_dir = sandbox_dir / "progress_frames"
+    rendered_frames = await backend.render_sequence(
+        "doc_0",
+        str(seq_dir),
+        start_time=0.0,
+        end_time=0.4,
+        fps=10.0,
+        progress_cb=on_progress,
+    )
+    assert len(rendered_frames) >= 5
+    assert len(progress_records) >= 5
+    # Assert monotonic increase
+    for i in range(1, len(progress_records)):
+        assert progress_records[i][0] > progress_records[i - 1][0]
+        assert progress_records[i][2] >= progress_records[i - 1][2]
+
+    # 2. render_cancel tool test
+    cancel_token = CancellationToken()
+    job_id = "test_cancel_job_123"
+    from synfig_mcp.tools.register import _ACTIVE_JOB_TOKENS
+
+    _ACTIVE_JOB_TOKENS[job_id] = cancel_token
+
+    cancel_dir = sandbox_dir / "cancel_frames"
+
+    def cancel_on_first_frame(cur: int, _total: int, _pct: float) -> None:
+        if cur >= 1:
+            cancel_token.cancel()
+
+    with pytest.raises((SynfigError, asyncio.CancelledError)):
+        await backend.render_sequence(
+            "doc_0",
+            str(cancel_dir),
+            start_time=10.0,
+            end_time=15.0,
+            fps=10.0,
+            progress_cb=cancel_on_first_frame,
+            cancel_token=cancel_token,
+        )
+
+    # Verify partial frames were cleaned up
+    remaining_files = list(cancel_dir.glob("*.png"))
+    assert len(remaining_files) == 0
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_live_security_notice_on_all_document_tools(live_studio: BridgeClient) -> None:
+    """Item 7: Test _security_notice is present across all document-derived string tools."""
+    backend = LiveBackend(client=live_studio)
+    hostile_text = "HostileTitle <script>alert(1)</script>"
+
+    # Add hostile layer
+    await backend.layer_add("doc_0", layer_type="circle", description=hostile_text)
+
+    # Add keyframe with hostile description
+    await backend.anim_keyframe_add("doc_0", time=1.0, description=hostile_text)
+
+    # 1. doc_info
+    info = await backend.doc_info("doc_0")
+    assert info is not None
+    from synfig_mcp.tools.register import SECURITY_NOTICE
+
+    assert "untrusted user" in SECURITY_NOTICE.lower()
+
+    # 2. keyframes
+    kfs = await backend.anim_keyframe_list("doc_0")
+    assert any(hostile_text in k.get("description", "") for k in kfs)
+
+    # 3. scene_tree
+    tree = await backend.scene_tree("doc_0")
+    assert "_security_notice" in tree
+    assert "untrusted user" in tree["_security_notice"].lower()

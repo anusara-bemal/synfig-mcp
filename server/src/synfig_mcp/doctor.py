@@ -5,6 +5,7 @@ Checks Studio binary, bridge responsiveness, token file ACL, synfig CLI, ffmpeg,
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import socket
@@ -176,31 +177,91 @@ def check_token_file() -> CheckResult:
 
 
 def check_bridge_connection() -> CheckResult:
-    host = os.environ.get("SYNFIG_MCP_HOST", "127.0.0.1")
-    port = int(os.environ.get("SYNFIG_MCP_PORT", "19991"))
+    import json
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(0.5)
-    try:
-        sock.connect((host, port))
-        sock.close()
-        return CheckResult(
-            name="Bridge Connectivity",
-            status="PASS",
-            message=f"Bridge TCP socket responding at {host}:{port}",
-        )
-    except (ConnectionRefusedError, TimeoutError, OSError):
-        return CheckResult(
-            name="Bridge Connectivity",
-            status="INFO",
-            message=f"No active bridge listening on {host}:{port}",
-            hint="Launch Synfig Studio to enable the live bridge. If Studio is not running, synfig-mcp runs in headless mode.",
-        )
+    host = os.environ.get("SYNFIG_MCP_HOST", "127.0.0.1")
+    custom_port = os.environ.get("SYNFIG_MCP_PORT")
+    ports_to_try = [int(custom_port)] if custom_port else list(range(19998, 20008))
+
+    token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
+    token = ""
+    token_file = token_dir / "mcp_token"
+    if token_file.is_file():
+        with contextlib.suppress(Exception):
+            token = token_file.read_text(encoding="utf-8").strip()
+    if not token:
+        for tf in token_dir.glob("mcp_token_*"):
+            with contextlib.suppress(Exception):
+                token = tf.read_text(encoding="utf-8").strip()
+                if token:
+                    break
+
+    for port in ports_to_try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.5)
+        try:
+            sock.connect((host, port))
+            commit_sha = ""
+            bridge_ver = ""
+            if token:
+                try:
+                    req = (
+                        json.dumps(
+                            {
+                                "id": 1,
+                                "method": "hello",
+                                "params": {"client_name": "synfig-mcp-doctor", "token": token},
+                            }
+                        )
+                        + "\n"
+                    )
+                    sock.sendall(req.encode("utf-8"))
+                    resp_data = sock.recv(4096).decode("utf-8")
+                    resp = json.loads(resp_data)
+                    res = resp.get("result", {})
+                    commit_sha = res.get("commit_sha", "")
+                    bridge_ver = res.get("bridge_version", "")
+                except Exception:
+                    pass
+            sock.close()
+
+            details = f"at {host}:{port}"
+            if bridge_ver or commit_sha:
+                details += (
+                    f" (version: {bridge_ver or 'unknown'}, commit: {commit_sha or 'unknown'})"
+                )
+            return CheckResult(
+                name="Bridge Connectivity",
+                status="PASS",
+                message=f"Bridge TCP socket responding {details}",
+            )
+        except (ConnectionRefusedError, TimeoutError, OSError):
+            continue
+
+    return CheckResult(
+        name="Bridge Connectivity",
+        status="INFO",
+        message=f"No active bridge listening on {host}:{ports_to_try[0]}..{ports_to_try[-1]}",
+        hint="Launch Synfig Studio with MCP bridge enabled (toggle MCP Bridge in Studio or set SYNFIG_MCP_ENABLE=1).",
+    )
+
+
+def check_workspace_roots() -> CheckResult:
+    from synfig_mcp.config import settings
+
+    roots = settings.workspace_roots
+    roots_str = ", ".join(f"'{r}'" for r in roots)
+    return CheckResult(
+        name="Workspace Roots",
+        status="PASS" if roots else "WARN",
+        message=f"Effective allowed roots: [{roots_str}]",
+        hint="Configure via SYNFIG_MCP_WORKSPACE_ROOTS (e.g. export SYNFIG_MCP_WORKSPACE_ROOTS='/path/to/project1;/path/to/project2')",
+    )
 
 
 def check_config() -> CheckResult:
     backend = os.environ.get("SYNFIG_MCP_BACKEND", "auto")
-    port = os.environ.get("SYNFIG_MCP_PORT", "19991")
+    port = os.environ.get("SYNFIG_MCP_PORT", "19998")
     host = os.environ.get("SYNFIG_MCP_HOST", "127.0.0.1")
 
     valid_backends = {"auto", "live", "headless"}
@@ -235,6 +296,7 @@ def run_doctor() -> int:
     checks = [
         check_studio_binary(),
         check_bridge_connection(),
+        check_workspace_roots(),
         check_token_file(),
         check_synfig_cli(),
         check_ffmpeg(),

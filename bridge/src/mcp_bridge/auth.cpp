@@ -182,6 +182,126 @@ bool write_token_file(const std::string& token) {
     return true;
 }
 
+std::string get_config_file_path() {
+    const char* home = nullptr;
+#ifdef _WIN32
+    home = std::getenv("USERPROFILE");
+    if (!home) {
+        home = std::getenv("APPDATA");
+    }
+#else
+    home = std::getenv("HOME");
+#endif
+    if (!home) {
+        return "mcp_enabled";
+    }
+
+    std::string path = home;
+#ifdef _WIN32
+    path += "\\.synfig\\mcp_enabled";
+#else
+    path += "/.synfig/mcp_enabled";
+#endif
+    return path;
+}
+
+void clean_stale_tokens() {
+    const char* home = nullptr;
+#ifdef _WIN32
+    home = std::getenv("USERPROFILE");
+    if (!home) home = std::getenv("APPDATA");
+    if (!home) return;
+    std::string token_dir = std::string(home) + "\\.synfig";
+
+    std::string pattern = token_dir + "\\mcp_token_*";
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA(pattern.c_str(), &fd);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                std::string fname = fd.cFileName;
+                size_t idx = fname.rfind('_');
+                if (idx != std::string::npos && idx + 1 < fname.size()) {
+                    std::string pid_str = fname.substr(idx + 1);
+                    try {
+                        DWORD pid = (DWORD)std::stoul(pid_str);
+                        HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+                        bool is_alive = false;
+                        if (hProcess) {
+                            DWORD exit_code = 0;
+                            if (GetExitCodeProcess(hProcess, &exit_code) && exit_code == STILL_ACTIVE) {
+                                is_alive = true;
+                            }
+                            CloseHandle(hProcess);
+                        }
+                        if (!is_alive) {
+                            std::string file_path = token_dir + "\\" + fname;
+                            DeleteFileA(file_path.c_str());
+                        }
+                    } catch (...) {}
+                }
+            }
+        } while (FindNextFileA(hFind, &fd));
+        FindClose(hFind);
+    }
+#else
+    home = std::getenv("HOME");
+    if (!home) return;
+    std::string token_dir = std::string(home) + "/.synfig";
+    DIR* dir = opendir(token_dir.c_str());
+    if (!dir) return;
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        std::string fname = ent->d_name;
+        if (fname.find("mcp_token_") == 0) {
+            std::string pid_str = fname.substr(10);
+            try {
+                pid_t pid = (pid_t)std::stol(pid_str);
+                if (kill(pid, 0) == -1 && errno == ESRCH) {
+                    std::string fpath = token_dir + "/" + fname;
+                    unlink(fpath.c_str());
+                }
+            } catch (...) {}
+        }
+    }
+    closedir(dir);
+#endif
+}
+
+void remove_session_token_files() {
+    std::string token_path = get_token_file_path();
+    unsigned long pid = 0;
+#ifdef _WIN32
+    pid = (unsigned long)GetCurrentProcessId();
+#else
+    pid = (unsigned long)getpid();
+#endif
+    std::string pid_path = token_path + "_" + std::to_string(pid);
+#ifdef _WIN32
+    DeleteFileA(pid_path.c_str());
+#else
+    unlink(pid_path.c_str());
+#endif
+
+    // If mcp_token contains this session's token, remove it as well
+    std::string current_token = read_token_file();
+    if (!current_token.empty()) {
+        std::ifstream ifs(token_path.c_str());
+        if (ifs.is_open()) {
+            std::string tok;
+            ifs >> tok;
+            ifs.close();
+            if (tok == current_token) {
+#ifdef _WIN32
+                DeleteFileA(token_path.c_str());
+#else
+                unlink(token_path.c_str());
+#endif
+            }
+        }
+    }
+}
+
 std::string read_token_file() {
     std::string path = get_token_file_path();
     std::ifstream ifs(path.c_str());

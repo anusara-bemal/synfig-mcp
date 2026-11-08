@@ -19,13 +19,29 @@ jobs:
             libxml++2.6-dev libsigc++-2.0-dev libglibmm-2.4-dev libgtkmm-3.0-dev \
             libmlt++-dev libmlt-dev libfftw3-dev libavcodec-dev libavformat-dev \
             libswscale-dev libmagick++-dev libopenexr-dev libboost-all-dev \
-            libltdl-dev libharfbuzz-dev libmng-dev nlohmann-json3-dev
+            libltdl-dev libharfbuzz-dev libmng-dev nlohmann-json3-dev xvfb
 
       - name: Fetch and build Synfig Studio
         run: |
           bash bridge/scripts/fetch_synfig.sh
           bash bridge/scripts/apply_patches.sh
           bash bridge/scripts/build_linux.sh
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "./server[dev]"
+
+      - name: Run Real Studio Tests under xvfb
+        run: |
+          export SYNFIG_STUDIO_PATH="${GITHUB_WORKSPACE}/build_synfig/build_linux/install/bin/synfigstudio"
+          export SYNFIG_MCP_ENABLE=1
+          xvfb-run -a pytest server/tests/e2e/test_live_mutate.py -m real_studio -v --durations=10
 
       - name: Package Linux Artifacts
         run: |

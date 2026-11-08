@@ -18,6 +18,24 @@ std::string generate_session_token();
 std::string get_token_file_path();
 
 /**
+ * Retrieve path to MCP configuration toggle file:
+ * - Windows: %USERPROFILE%\.synfig\mcp_enabled
+ * - POSIX:   $HOME/.synfig/mcp_enabled
+ */
+std::string get_config_file_path();
+
+/**
+ * Remove stale token files from previous crashed instances.
+ * Checks whether the process ID in mcp_token_<pid> is still active.
+ */
+void clean_stale_tokens();
+
+/**
+ * Remove session token files (both per-PID and default mcp_token if matching) on shutdown.
+ */
+void remove_session_token_files();
+
+/**
  * Write token to the token file with restricted permissions (0600 on POSIX).
  * Ensures the parent directory exists.
  */
