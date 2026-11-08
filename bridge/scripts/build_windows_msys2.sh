@@ -16,6 +16,8 @@ echo "Build:  ${BUILD_DIR}"
 
 # 1. Ensure dependencies are installed
 PACKAGES=(
+    git
+    curl
     autoconf
     automake-wrapper
     intltool
