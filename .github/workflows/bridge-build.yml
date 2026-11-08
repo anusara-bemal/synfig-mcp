@@ -20,7 +20,8 @@ jobs:
             libxml++2.6-dev libsigc++-2.0-dev libglibmm-2.4-dev libgtkmm-3.0-dev \
             libmlt++-dev libmlt-dev libfftw3-dev libavcodec-dev libavformat-dev \
             libswscale-dev libmagick++-dev libopenexr-dev libboost-all-dev \
-            libltdl-dev libharfbuzz-dev libmng-dev nlohmann-json3-dev xvfb
+            libltdl-dev libharfbuzz-dev libmng-dev nlohmann-json3-dev xvfb \
+            dbus dbus-x11 libgl1-mesa-dri
 
       - name: Fetch and build Synfig Studio
         run: |
@@ -51,7 +52,8 @@ jobs:
           export LIBGL_ALWAYS_SOFTWARE=1
           # A session bus is required for Gtk::Application single-instance
           # forwarding, which one of the bridge tests exercises.
-          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x1024x24"             pytest server/tests/e2e/test_live_mutate.py -m real_studio -v --durations=20
+          dbus-run-session -- xvfb-run -a -s "-screen 0 1280x1024x24" \
+            pytest server/tests/e2e/test_live_mutate.py -m real_studio -v --durations=20
 
       - name: Package Linux Artifacts
         run: |
