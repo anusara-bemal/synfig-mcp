@@ -124,9 +124,11 @@ Doctor status: OK. synfig-mcp is ready for operation.
 
 ---
 
-## 6. Windows Troubleshooting
+## 7. Install Guide Verification Status
 
-Refer to [`docs/troubleshooting.md`](file:///docs/troubleshooting.md) for detailed diagnostics, including:
-- Disabling inherited ACE permissions on NTFS files.
-- Avoiding GTK modal dialog deadlocks on `doc.close`.
-- Resolving MSYS2 `/etc/profile` printer query aborts.
+- **Host Environment (Windows 11 AMD64, Python 3.14, MSYS2 UCRT64)**: **VERIFIED**.
+  * Native Studio compilation via `bridge/scripts/build_windows_msys2.sh` verified.
+  * Live E2E test suite against real `synfigstudio.exe` (`poe live`): 13/13 tests pass.
+  * Windows token file ACL restriction (`icacls` / `SetNamedSecurityInfoW` owner-only ACE without inheritance): verified.
+- **Clean Windows Profile / Sterile VM without Pre-installed Toolchain**: **UNVERIFIED**.
+  * Reason: Standalone sandbox testing was executed on local dev host and GitHub Actions Windows runners (`windows-latest`). An isolated offline Windows VM deployment with zero development prerequisites has not yet been manually audited. Follow Section 3 Option A for standard binary deployment.

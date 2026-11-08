@@ -15,6 +15,7 @@
 | **Phase P7a** | Core Animation Write Path & ValueNodes | **DONE** | `anim.waypoint_set`, `anim.waypoint_remove`, `anim.animate_param` (bulk waypoints in 1 undo step), `anim.interpolation_set`, `doc.set_time_range`, `param.convert`, `param.export`, `param.unexport`. Verified against live Studio with undo and timeline interpolation. |
 | **Phase P7b** | Render / Preview Pipeline & ADR | **DONE** | High-performance frame/sequence/video rendering, contact sheet generation, progress notifications, cancellation, disk cache keyed by state+params. ADR recorded in `docs/decisions/ADR-0004-render-pipeline.md`. |
 | **Phase P8** | Packaging, Distribution & Diagnostics | **DONE** | CI artifact packaging (`bridge-build.yml`), GPL-3.0 notice/offer, `synfig-mcp doctor` CLI, Streamable HTTP transport with bearer auth & host filtering, headless Dockerfile, `server.json`, PyPI build dry-run (`uv build`), Windows installation & troubleshooting guides. |
+| **Phase P9** | Documentation, Verification & Release Readiness | **DONE** | Auto-generated 47-tool reference (`docs/tools.md`), upstream rebase & maintenance guide (`docs/upstream-rebase.md`), demo walkthrough & Claude Desktop guide (`docs/demo-guide.md`), architecture diagrams, clean Windows verification status documented, multi-platform matrix CI green (Linux, Windows, macOS on Python 3.12 & 3.13), wheel/sdist release artifacts validated. |
 
 ---
 
