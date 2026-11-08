@@ -20,7 +20,7 @@ cp -r "${ROOT_DIR}/bridge/src/mcp_bridge/"* "${SRC_DIR}/synfig-studio/src/gui/mc
 
 # Inject build commit SHA and version
 COMMIT_SHA="${SYNFIG_MCP_COMMIT_SHA:-$(git -C "${ROOT_DIR}" rev-parse HEAD 2>/dev/null || echo "dev")}"
-VERSION="${SYNFIG_MCP_VERSION:-0.7.0-rc3}"
+VERSION="${SYNFIG_MCP_VERSION:-0.8.0-rc1}"
 sed -i "s/#define BUILD_COMMIT_SHA .*/#define BUILD_COMMIT_SHA \"${COMMIT_SHA}\"/" "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge/bridge_init.cpp"
 sed -i "s/#define BUILD_VERSION .*/#define BUILD_VERSION \"${VERSION}\"/" "${SRC_DIR}/synfig-studio/src/gui/mcp_bridge/bridge_init.cpp"
 

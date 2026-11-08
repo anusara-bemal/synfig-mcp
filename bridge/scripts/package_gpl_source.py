@@ -17,12 +17,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DIST_DIR = REPO_ROOT / "dist"
 SYNFIG_SRC = REPO_ROOT / "build_synfig" / "synfig_src"
-OUTPUT_TAR = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0-rc3.tar.gz"
+VERSION = os.environ.get("SYNFIG_MCP_VERSION", "v0.8.0-rc1")
+if not VERSION.startswith("v"):
+    VERSION = f"v{VERSION}"
+OUTPUT_TAR = DIST_DIR / f"synfig-mcp-gpl-source-{VERSION}.tar.gz"
 
 
 def main() -> None:
     DIST_DIR.mkdir(parents=True, exist_ok=True)
-    temp_bundle_dir = DIST_DIR / "synfig-mcp-gpl-source-v0.7.0-rc3"
+    temp_bundle_dir = DIST_DIR / f"synfig-mcp-gpl-source-{VERSION}"
     if temp_bundle_dir.exists():
         shutil.rmtree(temp_bundle_dir)
     temp_bundle_dir.mkdir(parents=True)
@@ -66,7 +69,7 @@ def main() -> None:
     # 4. Create tar.gz archive
     print(f"[gpl_package] Writing tarball {OUTPUT_TAR}...")
     with tarfile.open(OUTPUT_TAR, "w:gz") as tar:
-        tar.add(temp_bundle_dir, arcname="synfig-mcp-gpl-source-v0.7.0-rc3")
+        tar.add(temp_bundle_dir, arcname=f"synfig-mcp-gpl-source-{VERSION}")
 
     shutil.rmtree(temp_bundle_dir)
     size_mb = OUTPUT_TAR.stat().st_size / (1024 * 1024)

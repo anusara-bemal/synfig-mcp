@@ -5,6 +5,24 @@ All notable changes to `synfig-mcp` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0-rc1] - 2026-11-09
+
+### Added
+- **Declarative Scene Construction (`scene_build`)**: Atomic single-undo-step construction of complex multi-layer scenes, hierarchies, waypoints, keyframes, and render targets via compact JSON specs. Includes `scene_export_spec` and `scene_summary`.
+- **Tool Profiles & Token Budget Architecture**: Configurable tool profiles (`core`, `anim`, `fx`, `rig`, `assets`, `review`, `all`) via `SYNFIG_MCP_PROFILE`. Default `core` profile token footprint reduced by 82.8% to 2,658 cl100k tokens, enforced by CI gate.
+- **Visual Review Loop ("Render -> Critique -> Fix")**: Closed-loop visual verification tools (`review_frame`, `review_sequence`, `review_compare`) pairing client vision models with objective mathematical analytics: pure PIL/numpy SSIM, safe-area margin checks, boundary clipping, crushed black and blown highlight luminance clipping, dominant palette extraction, WCAG 2.3.1 photosensitivity strobe detection, per-frame motion deltas, and visual difference heatmaps.
+- **Anime Effects Recipe Library**: 14 parameterized visual effect stacks composed exclusively from Synfig native layers: `speed_lines`, `radial_blur_burst`, `impact_frame`, `slash_arc`, `energy_aura`, `vignette`, `film_grain`, `chromatic_aberration`, `camera_shake`, `halftone_screentone`, `cel_shade_rim`, `color_grade_stack`, `limited_animation_timing`, and `transition_whip_pan`.
+- **Generic Aesthetic Style Presets**: 5 generic style presets with neutral descriptive identifiers: `shonen_action`, `dark_fantasy`, `supernatural_noir`, `cyber_mecha`, and `retro_anime`.
+- **Cut-Out Characters & Storyboard Pipeline**: Cut-out character rigging from parts (`character_rig_from_parts`), standard pose presets (`idle`, `walk`, `run`, `punch`, `jump`), looped motion cycles (`character_motion_apply`), and screenplay-to-animatic shot lists (`storyboard_from_script`). Includes 100% original geometry example in `examples/cutout_character_animatic/`.
+- **Hardened Licensed Asset Pipeline**: Open media search and download adapter (Openverse API) with strict licensing policy enforcement (`cc0`, `pdm`, opt-in `by`/`by-sa`, blocking `nd`/`nc`, adult filter), DNS-resolved SSRF protection (blocking loopback, private ranges, link-local, and cloud metadata `169.254.169.254`), hardened SVG DOM sanitizer, raster magic-byte validation, and automated attribution tracking (`ATTRIBUTION.md`).
+- **Introspection & Feature Coverage Matrix**: Automated coverage generator and regression CI gate tracking 55 native layer types, 455 parameters, 69 valuenodes, and 13 render targets (`docs/COVERAGE.md`).
+- **Comprehensive Documentation**: Complete guides for project scope & IP policy (`docs/scope.md`), system architecture (`docs/architecture.md`), MCP tools API reference (`docs/api.md`), effects recipes & styles (`docs/recipes.md`), and licensed asset pipeline (`docs/assets.md`).
+- **Performance Benchmarks**: Sub-6ms latency benchmarks across all 10 core mutating and inspection operations (`scripts/benchmark_latency.py`).
+
+### Changed
+- **Server Version**: Bumped to `0.8.0rc1` (`v0.8.0-rc1`).
+- **Doctor Command**: Added checks for asset pipeline directory and tool profile token budget compliance.
+
 ## [0.7.0-rc3] - 2026-11-08
 
 ### Added

@@ -1772,7 +1772,7 @@ wheels = [
 
 [[package]]
 name = "synfig-mcp"
-version = "0.7.0rc3"
+version = "0.8.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
