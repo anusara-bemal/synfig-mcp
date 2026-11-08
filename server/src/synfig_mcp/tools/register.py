@@ -80,6 +80,13 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "layer_raise": {"fx", "all"},
     "layer_lower": {"fx", "all"},
     "layer_reorder": {"fx", "all"},
+    # Effects Recipes & Style Presets (Phase A3)
+    "recipe_list": {"fx", "all"},
+    "recipe_info": {"fx", "all"},
+    "recipe_apply": {"fx", "all"},
+    "style_list": {"fx", "all"},
+    "style_get": {"fx", "all"},
+    "style_apply": {"fx", "all"},
     # Parameters & ValueNodes
     "param_get": {"fx", "anim", "all"},
     "param_set": {"fx", "anim", "all"},
@@ -486,6 +493,96 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             file_path=file_path,
             canvas_path=canvas_path,
         )
+
+    # -----------------------------------------------------------------------
+    # Effects Recipes & Style Presets (Phase A3)
+    # -----------------------------------------------------------------------
+
+    @tool_for("recipe_list", annotations=READ_ONLY)
+    async def recipe_list() -> dict[str, Any]:
+        """List all parameterized anime effects recipes (speed lines, vignette, grain, blur, etc.).
+        Returns: List of recipe descriptors with category, description, and required native layers.
+        Gotcha: Check parameter schema using recipe_info before calling recipe_apply.
+        """
+        from synfig_mcp.recipes.registry import list_recipes
+
+        return wrap_untrusted({"recipes": list_recipes()})
+
+    @tool_for("recipe_info", annotations=READ_ONLY)
+    async def recipe_info(name: str) -> dict[str, Any]:
+        """Get parameter specification, defaults, and usage notes for a named recipe.
+        Returns: RecipeManifest containing parameters, types, defaults, and notes.
+        Gotcha: Recipe names are case-insensitive snake_case.
+        """
+        from synfig_mcp.recipes.registry import get_recipe_manifest
+
+        manifest = get_recipe_manifest(name)
+        if not manifest:
+            return {"error": f"Recipe '{name}' not found."}
+        return wrap_untrusted(manifest.model_dump())
+
+    @tool_for("recipe_apply", annotations=MUTATING)
+    async def recipe_apply(
+        doc_id: str = "doc_0",
+        name: str = "vignette",
+        params: dict[str, Any] | None = None,
+        target_layer_or_group: str | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Apply a parameterized visual effect recipe atomically as a single undo step.
+        Returns: Diff object with created layers and applied parameter values.
+        Gotcha: Use dry_run=true to preview generated layer tree before mutating document.
+        """
+        from synfig_mcp.recipes.engine import RecipeEngine
+
+        engine = RecipeEngine(backend=backend)
+        res = await engine.apply_recipe(
+            doc_id=doc_id,
+            name=name,
+            params=params,
+            target_layer_or_group=target_layer_or_group,
+            dry_run=dry_run,
+        )
+        return wrap_untrusted(res)
+
+    @tool_for("style_list", annotations=READ_ONLY)
+    async def style_list() -> dict[str, Any]:
+        """List all generic anime style presets (shonen_action, dark_fantasy, supernatural_noir, etc.).
+        Returns: List of style descriptors with palette, contrast, grain, line weight, and recipes.
+        Gotcha: Adheres to strict IP policy (generic aesthetic traits only, no franchise names).
+        """
+        from synfig_mcp.recipes.styles import list_style_presets
+
+        return wrap_untrusted({"styles": list_style_presets()})
+
+    @tool_for("style_get", annotations=READ_ONLY)
+    async def style_get(name: str) -> dict[str, Any]:
+        """Get detailed configuration of a generic style preset.
+        Returns: Complete StylePreset dictionary with palette, grain, contrast, and default recipe stack.
+        Gotcha: Style names are generic (e.g. 'shonen_action', 'dark_fantasy').
+        """
+        from synfig_mcp.recipes.styles import get_style_preset
+
+        preset = get_style_preset(name)
+        if not preset:
+            return {"error": f"Style '{name}' not found."}
+        return wrap_untrusted(preset.model_dump())
+
+    @tool_for("style_apply", annotations=MUTATING)
+    async def style_apply(
+        doc_id: str = "doc_0",
+        name: str = "shonen_action",
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Apply a complete anime aesthetic style stack (grading, grain, vignette, recipes) atomically.
+        Returns: Summary of applied recipes and color parameters.
+        Gotcha: Applies all recipes in the style's default stack as atomic scene operations.
+        """
+        from synfig_mcp.recipes.engine import RecipeEngine
+
+        engine = RecipeEngine(backend=backend)
+        res = await engine.apply_style(doc_id=doc_id, style_name=name, dry_run=dry_run)
+        return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
     # Layer Parameters
