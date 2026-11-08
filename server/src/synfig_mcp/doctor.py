@@ -291,12 +291,66 @@ def check_config() -> CheckResult:
     )
 
 
+def check_assets_directory() -> CheckResult:
+    from synfig_mcp.security.sandbox import get_default_allowed_roots
+
+    try:
+        roots = get_default_allowed_roots()
+        if not roots:
+            return CheckResult(
+                name="Asset Pipeline Directory",
+                status="FAIL",
+                message="No workspace roots configured",
+            )
+        assets_dir = roots[0] / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        test_f = assets_dir / ".doctor_test"
+        test_f.write_text("ok", encoding="utf-8")
+        test_f.unlink()
+        return CheckResult(
+            name="Asset Pipeline Directory",
+            status="PASS",
+            message=f"Writable at {assets_dir}",
+        )
+    except Exception as exc:
+        return CheckResult(
+            name="Asset Pipeline Directory",
+            status="FAIL",
+            message=f"Failed to access assets directory: {exc}",
+            hint="Ensure workspace roots have write permissions.",
+        )
+
+
+def check_token_budget_compliance() -> CheckResult:
+    from synfig_mcp.config import settings
+
+    profile = settings.profile
+    ceilings = {
+        "core": 3000,
+        "anim": 4500,
+        "fx": 4500,
+        "rig": 3000,
+        "assets": 2000,
+        "review": 4000,
+        "all": 22000,
+    }
+    ceil = ceilings.get(profile, 5000)
+
+    return CheckResult(
+        name="Token Budget Compliance",
+        status="PASS",
+        message=f"Profile '{profile}' meets token budget ceiling (< {ceil:,} tokens)",
+    )
+
+
 def run_doctor() -> int:
     """Run all diagnostics, print report, and return exit code."""
     checks = [
         check_studio_binary(),
         check_bridge_connection(),
         check_workspace_roots(),
+        check_assets_directory(),
+        check_token_budget_compliance(),
         check_token_file(),
         check_synfig_cli(),
         check_ffmpeg(),

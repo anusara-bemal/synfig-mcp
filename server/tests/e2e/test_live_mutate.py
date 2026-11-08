@@ -52,23 +52,47 @@ SAMPLE_SIF = REPO_ROOT / "server" / "tests" / "fixtures" / "sample_project.sif"
 TEST_PORT = 19992
 
 
+def studio_env(**overrides: str) -> dict[str, str]:
+    """Build an environment able to launch the *installed* Studio binary.
+
+    Installed Linux builds have no RPATH, so the bundled ``lib`` directory must
+    be added to ``LD_LIBRARY_PATH``. Windows resolves DLLs next to the
+    executable. Any direct ``subprocess`` launch in this module must use this
+    helper so the binary can actually start on clean CI runners.
+    """
+    env = os.environ.copy()
+    if not BIN_PATH.name.endswith(".exe"):
+        root = BIN_PATH.parent.parent
+        lib_dir = str(root / "lib")
+        existing_ld = env.get("LD_LIBRARY_PATH", "")
+        env["LD_LIBRARY_PATH"] = f"{lib_dir}:{existing_ld}" if existing_ld else lib_dir
+        env["SYNFIG_MODULE_DIR"] = str(root / "lib" / "synfig" / "modules")
+        env.setdefault("SYNFIG_DATA_DIR", str(root / "share"))
+    env["MSYS2_ARG_CONV_EXCL"] = "*"
+    env.update(overrides)
+    return env
+
+
+def _studio_log_tail(log_path: Path, limit: int = 6000) -> str:
+    """Return the tail of a Studio log file for failure diagnostics."""
+    try:
+        return log_path.read_text(encoding="utf-8", errors="replace")[-limit:]
+    except Exception:
+        return "<log unavailable>"
+
+
 @pytest_asyncio.fixture
 async def live_studio(tmp_path: Path) -> AsyncIterator[BridgeClient]:
     """Launches real synfigstudio.exe, connects over TCP with token authentication, and yields the client."""
     if not BIN_PATH.exists():
         pytest.skip("Patched Synfig Studio binary not found")
 
-    env = os.environ.copy()
-    env["SYNFIG_MCP_ENABLE"] = "1"
-    env["SYNFIG_MCP_PORT"] = str(TEST_PORT)
-    env["MSYS2_ARG_CONV_EXCL"] = "*"
-    env["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
-    env["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
-    if not BIN_PATH.name.endswith(".exe"):
-        lib_dir = str(BIN_PATH.parent.parent / "lib")
-        existing_ld = env.get("LD_LIBRARY_PATH", "")
-        env["LD_LIBRARY_PATH"] = f"{lib_dir}:{existing_ld}" if existing_ld else lib_dir
-        env["SYNFIG_MODULE_DIR"] = str(BIN_PATH.parent.parent / "lib" / "synfig" / "modules")
+    env = studio_env(
+        SYNFIG_MCP_ENABLE="1",
+        SYNFIG_MCP_PORT=str(TEST_PORT),
+        SYNFIG_DISABLE_AUTO_RECOVERY="1",
+        SYNFIG_DISABLE_AUTO_SAVE="1",
+    )
 
     token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
     if token_dir.is_dir():
@@ -103,7 +127,10 @@ async def live_studio(tmp_path: Path) -> AsyncIterator[BridgeClient]:
                 break
             await asyncio.sleep(0.5)
 
-        assert token, "Session token was not created by Synfig Studio"
+        assert token, (
+            "Session token was not created by Synfig Studio. "
+            f"Binary: {BIN_PATH}\n--- Studio log ---\n{_studio_log_tail(log_path)}"
+        )
 
         client = BridgeClient(host="127.0.0.1", port=TEST_PORT, token=token, default_timeout=10.0)
         connected = False
@@ -115,7 +142,10 @@ async def live_studio(tmp_path: Path) -> AsyncIterator[BridgeClient]:
             except Exception:
                 await asyncio.sleep(0.5)
 
-        assert connected, "Failed to connect to live bridge"
+        assert connected, (
+            f"Failed to connect to live bridge on port {TEST_PORT}\n"
+            f"--- Studio log ---\n{_studio_log_tail(log_path)}"
+        )
 
         # Wait for Studio document initialization
         for _ in range(20):
@@ -1196,17 +1226,23 @@ async def test_bridge_direct_path_safety_rejection(
     # Case 3: Symlink / junction escape -> rejected (code 1203)
     # -------------------------------------------------------------
     junction_dir = inside_dir / "external_junction"
-    target_outside = Path("C:/Windows/System32")
-    # Create NTFS directory junction pointing outside workspace
-    subprocess.run(
-        ["cmd.exe", "/c", "mklink", "/J", str(junction_dir), str(target_outside)],
-        capture_output=True,
-    )
+    if os.name == "nt":
+        target_outside = Path("C:/Windows/System32")
+        # Create NTFS directory junction pointing outside workspace
+        subprocess.run(
+            ["cmd.exe", "/c", "mklink", "/J", str(junction_dir), str(target_outside)],
+            capture_output=True,
+        )
+        escaped_open_path = junction_dir / "drivers" / "etc" / "hosts.sif"
+    else:
+        target_outside = Path("/etc")
+        with contextlib.suppress(OSError):
+            os.symlink(str(target_outside), str(junction_dir), target_is_directory=True)
+        escaped_open_path = junction_dir / "hosts.sif"
+
     if junction_dir.exists():
         with pytest.raises(SecurityError) as exc_junc_open:
-            await live_studio.call(
-                "doc.open", {"file_path": str(junction_dir / "drivers" / "etc" / "hosts.sif")}
-            )
+            await live_studio.call("doc.open", {"file_path": str(escaped_open_path)})
         assert exc_junc_open.value.code == 1203
         assert "outside configured workspace roots" in str(exc_junc_open.value).lower()
 
@@ -1542,11 +1578,20 @@ async def test_bridge_multi_instance_ports_and_disable() -> None:
     token_dir = Path(os.environ.get("USERPROFILE", os.environ.get("HOME", ""))) / ".synfig"
     token_dir.mkdir(parents=True, exist_ok=True)
 
+    # Make sure the persisted opt-in flag cannot re-enable the bridge for the
+    # explicit-disable case below.
+    cfg_file = token_dir / "mcp_enabled"
+    if cfg_file.is_file():
+        cfg_file.unlink()
+
     # 1. Test SYNFIG_MCP_DISABLE
-    env_disabled = os.environ.copy()
-    env_disabled["SYNFIG_MCP_DISABLE"] = "1"
-    env_disabled["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
-    env_disabled["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+    env_disabled = studio_env(
+        SYNFIG_MCP_DISABLE="1",
+        SYNFIG_DISABLE_AUTO_RECOVERY="1",
+        SYNFIG_DISABLE_AUTO_SAVE="1",
+    )
+    # CI exports SYNFIG_MCP_ENABLE=1; explicit disable must win for this case.
+    env_disabled.pop("SYNFIG_MCP_ENABLE", None)
 
     proc_disabled = subprocess.Popen(
         [str(BIN_PATH)],
@@ -1577,12 +1622,13 @@ async def test_bridge_multi_instance_ports_and_disable() -> None:
     blocking_sock.bind(("127.0.0.1", 19998))
     blocking_sock.listen(1)
 
-    env_instance = os.environ.copy()
-    env_instance["SYNFIG_MCP_ENABLE"] = "1"
+    env_instance = studio_env(
+        SYNFIG_MCP_ENABLE="1",
+        SYNFIG_DISABLE_AUTO_RECOVERY="1",
+        SYNFIG_DISABLE_AUTO_SAVE="1",
+    )
     env_instance.pop("SYNFIG_MCP_PORT", None)  # Ensure default probing 19998 -> 19999
     env_instance.pop("SYNFIG_MCP_DISABLE", None)
-    env_instance["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
-    env_instance["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
 
     proc1 = subprocess.Popen([str(BIN_PATH)], env=env_instance)
     try:
@@ -1662,11 +1708,12 @@ async def test_bridge_opt_in_default_and_stale_token_cleanup() -> None:
     assert stale_token.is_file()
 
     # 2. Test OFF by default: Launch Studio with SYNFIG_MCP_ENABLE omitted and ~/.synfig/mcp_enabled absent
-    env_default = os.environ.copy()
+    env_default = studio_env(
+        SYNFIG_DISABLE_AUTO_RECOVERY="1",
+        SYNFIG_DISABLE_AUTO_SAVE="1",
+    )
     env_default.pop("SYNFIG_MCP_ENABLE", None)
     env_default.pop("SYNFIG_MCP_PORT", None)
-    env_default["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
-    env_default["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
 
     cfg_file = token_dir / "mcp_enabled"
     if cfg_file.is_file():
@@ -1691,10 +1738,11 @@ async def test_bridge_opt_in_default_and_stale_token_cleanup() -> None:
             proc_default.kill()
 
     # 3. Test ON with SYNFIG_MCP_ENABLE=1: Stale token cleaned, active token created and removed on stop
-    env_on = os.environ.copy()
-    env_on["SYNFIG_MCP_ENABLE"] = "1"
-    env_on["SYNFIG_DISABLE_AUTO_RECOVERY"] = "1"
-    env_on["SYNFIG_DISABLE_AUTO_SAVE"] = "1"
+    env_on = studio_env(
+        SYNFIG_MCP_ENABLE="1",
+        SYNFIG_DISABLE_AUTO_RECOVERY="1",
+        SYNFIG_DISABLE_AUTO_SAVE="1",
+    )
 
     proc_on = subprocess.Popen([str(BIN_PATH)], env=env_on)
     try:
