@@ -32,6 +32,9 @@ async def mcp_server(request: pytest.FixtureRequest) -> AsyncIterator[tuple[str,
 
             async def fake_render(doc_id: str, output_path: str, **_kwargs: Any) -> bool:
                 del doc_id
+                import asyncio
+
+                await asyncio.sleep(0.01)
                 p = Path(output_path)
                 p.parent.mkdir(parents=True, exist_ok=True)
                 valid_png = (
