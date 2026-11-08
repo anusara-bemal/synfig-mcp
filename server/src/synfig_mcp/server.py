@@ -13,6 +13,7 @@ from mcp.server.mcpserver import MCPServer
 
 from synfig_mcp.backend.base import BackendBase
 from synfig_mcp.backend.select import get_backend
+from synfig_mcp.config import ProfileType
 from synfig_mcp.logging import configure_logging, get_logger
 from synfig_mcp.tools import register_all_tools
 
@@ -20,11 +21,14 @@ configure_logging()
 logger = get_logger("synfig_mcp.server")
 
 
-def create_server(backend: BackendBase | None = None) -> MCPServer:
-    """Create and configure the MCPServer instance with all tools registered."""
+def create_server(
+    backend: BackendBase | None = None,
+    profile: ProfileType | None = None,
+) -> MCPServer:
+    """Create and configure the MCPServer instance with tools filtered by profile."""
     active_backend = backend or get_backend()
     mcp_app = MCPServer("synfig-mcp")
-    register_all_tools(mcp_app, active_backend)
+    register_all_tools(mcp_app, active_backend, profile=profile)
     return mcp_app
 
 
@@ -43,6 +47,11 @@ def main(args: list[str] | None = None) -> None:
 
     # synfig-mcp doctor
     subparsers.add_parser("doctor", help="Run system diagnostics and verify dependencies")
+
+    # synfig-mcp usage-report
+    subparsers.add_parser(
+        "usage-report", help="Display token budget baseline and profile consumption metrics"
+    )
 
     # server options
     parser.add_argument(
@@ -86,6 +95,17 @@ def main(args: list[str] | None = None) -> None:
         from synfig_mcp.doctor import run_doctor
 
         sys.exit(run_doctor())
+
+    if parsed.command == "usage-report":
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent.parent.parent
+        budget_doc = repo_root / "docs" / "TOKEN_BUDGET.md"
+        if budget_doc.exists():
+            print(budget_doc.read_text(encoding="utf-8"))
+        else:
+            print("Token budget documentation not found at docs/TOKEN_BUDGET.md")
+        sys.exit(0)
 
     if parsed.transport == "streamable-http":
         from synfig_mcp.http_transport import run_http_server

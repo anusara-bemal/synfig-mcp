@@ -647,6 +647,41 @@ class FakeBridgeServer:
                 },
             }
 
+        if method == "scene.build":
+            doc_id = params.get("doc_id", "doc_0")
+            layers_spec = params.get("layers", [])
+            groups_spec = params.get("groups", [])
+            created: list[str] = []
+            doc_layers = self._fake_docs.setdefault(doc_id, {}).setdefault("layers", [])
+            for lyr in layers_spec:
+                l_id = lyr.get("id", "Layer")
+                created.append(l_id)
+                doc_layers.append(
+                    {
+                        "id": l_id,
+                        "name": l_id,
+                        "type": lyr.get("type", "circle"),
+                        "depth": lyr.get("depth", 0),
+                        "params": lyr.get("params", {}),
+                    }
+                )
+            for g in groups_spec:
+                g_id = g.get("id", "Group")
+                created.append(g_id)
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": doc_id,
+                    "diff": {
+                        "action": "scene.build",
+                        "created": created,
+                        "modified": [],
+                        "deleted": [],
+                    },
+                },
+            }
+
         # Default fallback
         return {
             "jsonrpc": "2.0",

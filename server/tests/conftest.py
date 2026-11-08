@@ -1,5 +1,9 @@
 """Pytest fixtures and configuration."""
 
+import os
+
+os.environ.setdefault("SYNFIG_MCP_PROFILE", "all")
+
 import pytest
 
 from synfig_mcp.backend.headless import HeadlessBackend

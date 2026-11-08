@@ -873,3 +873,195 @@ class HeadlessBackend(BackendBase):
             end_time=end_time,
         )
         return bool(ok)
+
+    # -----------------------------------------------------------------------
+    # Declarative Scene Operations (Phase A1)
+    # -----------------------------------------------------------------------
+
+    async def scene_build(
+        self,
+        spec: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Apply a declarative scene build spec atomically as a single undo step."""
+        from synfig_mcp.schema.scene_spec import SceneBuildSpec
+
+        try:
+            parsed_spec = SceneBuildSpec.model_validate(spec)
+        except Exception as err:
+            return {
+                "success": False,
+                "error": f"Invalid SceneBuildSpec: {err}",
+                "valid": False,
+            }
+        doc_id = parsed_spec.doc_id
+
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        created_layers: list[str] = []
+        modified_layers: list[str] = []
+
+        if dry_run:
+            for l_spec in parsed_spec.layers:
+                created_layers.append(l_spec.id)
+            for g_spec in parsed_spec.groups:
+                created_layers.append(g_spec.id)
+            return {
+                "doc_id": doc_id,
+                "dry_run": True,
+                "valid": True,
+                "diff": {
+                    "action": "scene.build",
+                    "created": created_layers,
+                    "modified": modified_layers,
+                    "deleted": [],
+                },
+            }
+
+        self._save_undo_state(doc_id)
+        doc = self._documents[doc_id]
+
+        if (
+            parsed_spec.fps is not None
+            or parsed_spec.width is not None
+            or parsed_spec.height is not None
+        ):
+            await self.doc_set_properties(
+                doc_id=doc_id,
+                width=parsed_spec.width,
+                height=parsed_spec.height,
+                fps=parsed_spec.fps,
+            )
+
+        if parsed_spec.start_time is not None or parsed_spec.end_time is not None:
+            await self.doc_set_time_range(
+                doc_id=doc_id,
+                start_time=parsed_spec.start_time or 0.0,
+                end_time=parsed_spec.end_time or 5.0,
+            )
+
+        for l_spec in parsed_spec.layers:
+            layer = doc.add_layer(
+                layer_type=l_spec.type,
+                canvas_path=parsed_spec.canvas_path,
+                desc=l_spec.id,
+                params=l_spec.params,
+                depth=l_spec.depth,
+            )
+            created_layers.append(layer.desc)
+
+            for wp in l_spec.waypoints:
+                interp = wp.interpolation or "clamped"
+                layer.set_waypoint(
+                    name=wp.param,
+                    time=wp.time,
+                    value=wp.value,
+                    interpolation=interp,
+                    interpolation_in=interp,
+                    interpolation_out=interp,
+                )
+
+        for g_spec in parsed_spec.groups:
+            if g_spec.layer_ids:
+                grp = doc.group_layers(
+                    layer_ids=g_spec.layer_ids,
+                    group_desc=g_spec.id,
+                    canvas_path=parsed_spec.canvas_path,
+                )
+                if g_spec.params:
+                    for p_name, p_val in g_spec.params.items():
+                        grp.set_param(p_name, p_val)
+                created_layers.append(grp.desc)
+
+        return {
+            "doc_id": doc_id,
+            "diff": {
+                "action": "scene.build",
+                "created": created_layers,
+                "modified": modified_layers,
+                "deleted": [],
+            },
+        }
+
+    async def scene_export_spec(
+        self,
+        doc_id: str,
+        scope: str = "canvas",
+        fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Export current scene state into a declarative SceneBuildSpec dictionary."""
+        del scope
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        doc = self._documents[doc_id]
+        exported_layers: list[dict[str, Any]] = []
+
+        include_params = fields is None or "params" in fields
+        include_waypoints = fields is None or "waypoints" in fields
+
+        for layer in doc.get_layers():
+            layer_dict: dict[str, Any] = {
+                "id": layer.desc,
+                "type": layer.type,
+                "depth": layer.depth,
+            }
+            params_dict = layer.get_params()
+            if include_params:
+                layer_dict["params"] = {
+                    k: v.to_dict() if hasattr(v, "to_dict") else getattr(v, "value", str(v))
+                    for k, v in params_dict.items()
+                }
+            if include_waypoints:
+                wps = []
+                for p_name, val in params_dict.items():
+                    if hasattr(val, "waypoints"):
+                        for wp in val.waypoints:
+                            wps.append(
+                                {
+                                    "param": p_name,
+                                    "time": getattr(wp, "time", 0.0),
+                                    "value": getattr(wp, "value", {}),
+                                    "interpolation": getattr(wp, "interpolation", "clamped"),
+                                }
+                            )
+                if wps:
+                    layer_dict["waypoints"] = wps
+            exported_layers.append(layer_dict)
+
+        return {
+            "doc_id": doc_id,
+            "fps": doc.fps,
+            "width": doc.width,
+            "height": doc.height,
+            "start_time": doc.start_time,
+            "end_time": doc.end_time,
+            "layers": exported_layers,
+            "groups": [],
+        }
+
+    async def scene_summary(
+        self,
+        doc_id: str,
+        budget_tokens: int = 500,
+    ) -> dict[str, Any]:
+        """Generate a token-bounded structural summary of the document."""
+        del budget_tokens
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        doc = self._documents[doc_id]
+        layers = doc.get_layers()
+        layer_names = [f"{lyr.type}('{lyr.desc}')" for lyr in layers]
+
+        summary: dict[str, Any] = {
+            "doc_id": doc_id,
+            "canvas": f"{doc.width}x{doc.height} @ {doc.fps}fps",
+            "time_range": f"{doc.start_time}s to {doc.end_time}s",
+            "layer_count": len(layers),
+            "layers": layer_names[:20] if len(layer_names) > 20 else layer_names,
+        }
+        if len(layer_names) > 20:
+            summary["truncated_layers_count"] = len(layer_names) - 20
+        return summary

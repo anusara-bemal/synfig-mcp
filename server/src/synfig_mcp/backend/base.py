@@ -407,3 +407,35 @@ class BackendBase(ABC):
     ) -> bool:
         """Render a grid contact sheet of timeline key moments/frames into a single image."""
         ...
+
+    # -----------------------------------------------------------------------
+    # Declarative Scene Operations (Phase A1)
+    # -----------------------------------------------------------------------
+
+    @abstractmethod
+    async def scene_build(
+        self,
+        spec: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Apply a declarative scene build spec atomically as a single undo step."""
+        ...
+
+    @abstractmethod
+    async def scene_export_spec(
+        self,
+        doc_id: str,
+        scope: str = "canvas",
+        fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Export current scene state into a declarative SceneBuildSpec dictionary."""
+        ...
+
+    @abstractmethod
+    async def scene_summary(
+        self,
+        doc_id: str,
+        budget_tokens: int = 500,
+    ) -> dict[str, Any]:
+        """Generate a token-bounded structural summary of the document."""
+        ...

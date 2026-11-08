@@ -38,6 +38,16 @@ def get_default_workspace_roots() -> list[Path]:
     return [default_dir.resolve()]
 
 
+ProfileType = Literal["core", "anim", "fx", "rig", "assets", "review", "all"]
+
+
+def get_default_profile() -> ProfileType:
+    p = os.environ.get("SYNFIG_MCP_PROFILE", "core").lower()
+    if p in ("core", "anim", "fx", "rig", "assets", "review", "all"):
+        return p  # type: ignore[return-value]
+    return "core"
+
+
 def get_default_backend_mode() -> Literal["auto", "live", "headless"]:
     mode = os.environ.get("SYNFIG_MCP_BACKEND", "auto").lower()
     if mode in ("live", "headless", "auto"):
@@ -72,6 +82,10 @@ def get_default_token_path() -> Path:
 class Settings(BaseModel):
     """Runtime configuration for synfig-mcp."""
 
+    profile: ProfileType = Field(
+        default_factory=get_default_profile,
+        description="Tool profile to expose: 'core' (default, <3k tokens), 'anim', 'fx', 'rig', 'assets', 'review', or 'all'.",
+    )
     backend_mode: Literal["auto", "live", "headless"] = Field(
         default_factory=get_default_backend_mode,
         description="Backend selection mode: 'live' (Studio), 'headless' (CLI/sif), or 'auto'.",

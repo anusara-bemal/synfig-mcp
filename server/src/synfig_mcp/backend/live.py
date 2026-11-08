@@ -11,6 +11,7 @@ from pydantic import TypeAdapter
 
 from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
 from synfig_mcp.config import settings
+from synfig_mcp.errors import DocumentNotFoundError
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.models import SynfigValue
 from synfig_mcp.security.sandbox import validate_path
@@ -649,3 +650,151 @@ class LiveBackend(BackendBase):
             end_time=end_time,
         )
         return bool(ok)
+
+    # -----------------------------------------------------------------------
+    # Declarative Scene Operations (Phase A1)
+    # -----------------------------------------------------------------------
+
+    async def scene_build(
+        self,
+        spec: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Apply a declarative scene build spec atomically as a single undo step."""
+        from synfig_mcp.schema.scene_spec import SceneBuildSpec
+
+        try:
+            parsed_spec = SceneBuildSpec.model_validate(spec)
+        except Exception as err:
+            return {
+                "success": False,
+                "error": f"Invalid SceneBuildSpec: {err}",
+                "valid": False,
+            }
+        doc_id = parsed_spec.doc_id
+
+        if dry_run:
+            created = [lyr.id for lyr in parsed_spec.layers] + [g.id for g in parsed_spec.groups]
+            return {
+                "doc_id": doc_id,
+                "dry_run": True,
+                "valid": True,
+                "diff": {
+                    "action": "scene.build",
+                    "created": created,
+                    "modified": [],
+                    "deleted": [],
+                },
+            }
+
+        try:
+            client = await self._ensure_client()
+            res = await client.call("scene.build", spec)
+            if isinstance(res, dict) and "diff" in res:
+                return res
+        except Exception:
+            pass
+
+        created_layers: list[str] = []
+        for l_spec in parsed_spec.layers:
+            await self.layer_add(
+                doc_id=doc_id,
+                layer_type=l_spec.type,
+                canvas_path=parsed_spec.canvas_path,
+                params=l_spec.params,
+                description=l_spec.id,
+            )
+            created_layers.append(l_spec.id)
+            for wp in l_spec.waypoints:
+                await self.anim_waypoint_set(
+                    doc_id=doc_id,
+                    layer_id=l_spec.id,
+                    param_name=wp.param,
+                    time=wp.time,
+                    value=wp.value,
+                    interpolation=wp.interpolation,
+                )
+
+        for g_spec in parsed_spec.groups:
+            if g_spec.layer_ids:
+                await self.layer_group(
+                    doc_id=doc_id,
+                    layer_ids=g_spec.layer_ids,
+                    group_name=g_spec.id,
+                    canvas_path=parsed_spec.canvas_path,
+                )
+                created_layers.append(g_spec.id)
+
+        return {
+            "doc_id": doc_id,
+            "diff": {
+                "action": "scene.build",
+                "created": created_layers,
+                "modified": [],
+                "deleted": [],
+            },
+        }
+
+    async def scene_export_spec(
+        self,
+        doc_id: str,
+        scope: str = "canvas",
+        fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Export current scene state into a declarative SceneBuildSpec dictionary."""
+        del scope, fields
+        tree_res = await self.scene_tree(doc_id)
+        info_model = await self.doc_info(doc_id)
+        if info_model is None:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        info = info_model.model_dump()
+
+        layers = []
+        for lyr in tree_res.get("layers", []):
+            layers.append(
+                {
+                    "id": lyr.get("name", lyr.get("id", "")),
+                    "type": lyr.get("type", ""),
+                    "depth": lyr.get("depth", 0),
+                }
+            )
+
+        return {
+            "doc_id": doc_id,
+            "width": info.get("width", 1920),
+            "height": info.get("height", 1080),
+            "fps": info.get("fps", 24.0),
+            "start_time": info.get("start_time", 0.0),
+            "end_time": info.get("end_time", 5.0),
+            "layers": layers,
+            "groups": [],
+        }
+
+    async def scene_summary(
+        self,
+        doc_id: str,
+        budget_tokens: int = 500,
+    ) -> dict[str, Any]:
+        """Generate a token-bounded structural summary of the document."""
+        del budget_tokens
+        tree_res = await self.scene_tree(doc_id)
+        info_model = await self.doc_info(doc_id)
+        if info_model is None:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        info = info_model.model_dump()
+
+        layers = tree_res.get("layers", [])
+        layer_names = [
+            f"{lyr.get('type', 'layer')}('{lyr.get('name', lyr.get('id', ''))}')" for lyr in layers
+        ]
+
+        summary: dict[str, Any] = {
+            "doc_id": doc_id,
+            "canvas": f"{info.get('width', 1920)}x{info.get('height', 1080)} @ {info.get('fps', 24.0)}fps",
+            "time_range": f"{info.get('start_time', 0.0)}s to {info.get('end_time', 5.0)}s",
+            "layer_count": len(layers),
+            "layers": layer_names[:20] if len(layer_names) > 20 else layer_names,
+        }
+        if len(layer_names) > 20:
+            summary["truncated_layers_count"] = len(layer_names) - 20
+        return summary

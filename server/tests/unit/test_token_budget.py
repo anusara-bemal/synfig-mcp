@@ -34,16 +34,16 @@ def test_token_budget_artifact_exists() -> None:
     """TOKEN_BUDGET.md must exist and contain verified baseline numbers."""
     assert TOKEN_BUDGET_MD.exists(), "docs/TOKEN_BUDGET.md is missing"
     content = TOKEN_BUDGET_MD.read_text(encoding="utf-8")
-    assert "15,498 tokens" in content
     assert "cl100k_base" in content
     assert "Contact Sheet Efficiency" in content
+    assert "core" in content
 
 
 @pytest.mark.asyncio
-async def test_tools_list_token_ceiling() -> None:
-    """Assert tools/list does not silently balloon without profile gating."""
+async def test_tools_list_core_profile_budget() -> None:
+    """Default 'core' profile must stay strictly below 3,000 tokens."""
     backend = HeadlessBackend()
-    app = create_server(backend=backend)
+    app = create_server(backend=backend, profile="core")
     async with Client(app) as client:
         tools_res = await client.list_tools()
 
@@ -51,8 +51,24 @@ async def test_tools_list_token_ceiling() -> None:
     dumped = json.dumps(tools_raw)
     tokens = count_tokens(dumped)
 
-    # Current baseline: 15,498 tokens for 52 tools.
-    # Ceiling allows reasonable variation but fails if bloated beyond 18k without profiles.
+    # Core budget ceiling enforced by CI
+    assert tokens <= 3000, f"core profile exceeded 3,000 token budget: {tokens} tokens"
+    assert len(tools_res.tools) <= 15, f"core profile tool count bloated: {len(tools_res.tools)}"
+
+
+@pytest.mark.asyncio
+async def test_tools_list_token_ceiling() -> None:
+    """Assert tools/list does not silently balloon without profile gating."""
+    backend = HeadlessBackend()
+    app = create_server(backend=backend, profile="all")
+    async with Client(app) as client:
+        tools_res = await client.list_tools()
+
+    tools_raw = [t.model_dump() for t in tools_res.tools]
+    dumped = json.dumps(tools_raw)
+    tokens = count_tokens(dumped)
+
+    # Full studio ceiling
     assert tokens <= 18000, f"tools/list token bloat detected: {tokens} > 18000"
 
 
@@ -60,7 +76,7 @@ async def test_tools_list_token_ceiling() -> None:
 async def test_common_tool_call_response_ceilings() -> None:
     """Typical scalar mutations and inspect calls must stay strictly under 500 tokens."""
     backend = HeadlessBackend()
-    app = create_server(backend=backend)
+    app = create_server(backend=backend, profile="all")
 
     async with Client(app) as client:
         # health_check

@@ -6,25 +6,23 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Current Total Tools**: 52 tools exposed simultaneously in a single default profile.
-- **Current Raw JSON Size**: 55,967 bytes (75,011 formatted).
-- **Current Baseline Token Cost**: **15,498 tokens** (`cl100k_base`) / **15,506 tokens** (`o200k_base`).
+- **Default Profile (`core`)**: 12 tools, 9,835 bytes, **2,658 tokens** (`cl100k_base`).
+- **Full Studio Profile (`all`)**: 56 tools, 49,697 bytes, **13,700 tokens** (`cl100k_base`).
 
-> [!WARNING]
-> Without tool profiles, an LLM agent consumes **15,498 tokens** on its very first turn just loading the tool definitions,
-> before executing a single animation command. Phase A1 introduces profiles to cap the default tool definition payload under **3,000 tokens**.
+> [!NOTE]
+> `core` profile reduces initial system prompt payload from **13,700 tokens** to **2,658 tokens** (an **82.8% reduction**), well under the 3,000 token ceiling enforced by CI.
 
-### Projected Phase A1 Profile Allocations
+### Profile Allocations & Measured Counts
 
-| Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Target Token Ceiling (`cl100k`) | Target Description |
-|---|---|---|---|
-| `core` (default) | ~12 | **< 3,000 tokens** | Health, doc lifecycle, layer CRUD, time, status |
-| `anim` | ~10 | **< 2,500 tokens** | Waypoints, keyframes, time ranges, timetrack |
-| `fx` | ~8 | **< 2,000 tokens** | Recipe library, filters, composites, grading |
-| `rig` | ~8 | **< 2,000 tokens** | Cut-out skeletons, bone binding, parts assembly |
-| `assets` | ~6 | **< 1,500 tokens** | Openverse/Wikimedia search, download, attribution |
-| `review` | ~6 | **< 1,500 tokens** | Frame critique, SSIM diff, strobe/safe-area check |
-| `all` | 52 | 15,498 tokens | Complete unconstrained studio suite |
+| Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
+|---|---|---|---|---|
+| `core` | 12 | **2,658** | 2,665 | ✅ Pass (< 3000) |
+| `anim` | 18 | **4,330** | 4,335 | ✅ Pass (< 4500) |
+| `fx` | 17 | **4,042** | 4,048 | ✅ Pass (< 4500) |
+| `rig` | 12 | **2,528** | 2,533 | ✅ Pass (< 3000) |
+| `assets` | 7 | **1,420** | 1,426 | ✅ Pass (< 2000) |
+| `review` | 14 | **3,647** | 3,655 | ✅ Pass (< 4000) |
+| `all` | 56 | **13,700** | 13,715 | ✅ Pass (< 16000) |
 
 ---
 
@@ -80,21 +78,21 @@ Vision model consumption per single preview or contact-sheet image:
 
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
-| `render_sequence` | 1,905 | **551** | 550 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `doc_set_properties` | 1,557 | **465** | 465 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_video` | 1,507 | **446** | 446 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `layer_add` | 1,491 | **440** | 440 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_contact_sheet` | 1,542 | **440** | 440 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_waypoint_set` | 1,519 | **425** | 422 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_start` | 1,462 | **418** | 419 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_frame` | 1,341 | **386** | 386 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_animate_param` | 1,371 | **385** | 387 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `doc_set_time_range` | 1,235 | **358** | 359 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `param_set` | 1,213 | **357** | 356 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `param_get` | 1,214 | **354** | 353 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `param_convert` | 1,250 | **347** | 350 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_interpolation_set` | 1,246 | **332** | 332 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `layer_reorder` | 1,156 | **327** | 327 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_sequence` | 1,520 | **442** | 442 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `doc_set_properties` | 1,356 | **402** | 402 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_start` | 1,327 | **387** | 387 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_contact_sheet` | 1,308 | **377** | 377 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_video` | 1,274 | **374** | 374 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `anim_waypoint_set` | 1,193 | **333** | 331 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `layer_add` | 1,171 | **329** | 329 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_frame` | 1,117 | **322** | 322 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `doc_set_time_range` | 1,031 | **295** | 296 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `param_get` | 988 | **292** | 291 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `param_set` | 969 | **283** | 283 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `param_convert` | 990 | **281** | 283 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `anim_keyframe_add` | 1,008 | **276** | 276 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `anim_animate_param` | 1,013 | **274** | 275 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `layer_reorder` | 947 | **271** | 271 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 

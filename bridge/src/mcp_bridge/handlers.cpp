@@ -996,6 +996,63 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    if (method == "scene.build") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        return run_on_main_thread([&, doc_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            if (!ci) {
+                r["error"] = {{"code", -32000}, {"message", "Canvas interface not found"}};
+                return r;
+            }
+
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: scene.build");
+            std::vector<std::string> created_ids;
+
+            if (params.contains("layers") && params["layers"].is_array()) {
+                for (auto& l_spec : params["layers"]) {
+                    std::string l_type = l_spec.value("type", "circle");
+                    std::string l_id = l_spec.value("id", "");
+                    int depth = l_spec.value("depth", 0);
+
+                    synfig::Layer::Handle layer = ci->add_layer_to(l_type, inst->get_canvas(), depth);
+                    if (layer) {
+                        if (!l_id.empty()) {
+                            layer->set_description(l_id);
+                        }
+                        created_ids.push_back(layer->get_description().empty() ? layer->get_guid().get_string() : layer->get_description());
+
+                        if (l_spec.contains("params") && l_spec["params"].is_object()) {
+                            for (auto& item : l_spec["params"].items()) {
+                                synfig::ValueBase val = json_to_valuebase(item.value());
+                                if (val.is_valid()) {
+                                    ci->change_value(synfigapp::ValueDesc(layer, item.key()), val);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"diff", make_diff("scene.build", created_ids, {}, {})}
+            };
+            return r;
+        });
+    }
+
     if (method == "layer.remove" || method == "layer.delete") {
         std::string doc_id = params.value("doc_id", "doc_0");
         std::string layer_id = params.value("layer_id", "");
