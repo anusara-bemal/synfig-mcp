@@ -1,22 +1,67 @@
 {
-  "$schema": "https://json.schemastore.org/mcp-server.json",
-  "name": "synfig-mcp",
-  "description": "Live Model Context Protocol control of Synfig Studio with headless fallback",
-  "version": "0.6.0",
-  "homepage": "https://github.com/synfig/synfig-mcp",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.anusara-bemal/synfig-mcp",
+  "title": "Synfig MCP",
+  "description": "MCP server for Synfig Studio with live canvas automation and headless rendering.",
+  "version": "0.8.0-rc2",
+  "websiteUrl": "https://github.com/anusara-bemal/synfig-mcp",
   "repository": {
-    "type": "git",
-    "url": "https://github.com/synfig/synfig-mcp.git"
+    "url": "https://github.com/anusara-bemal/synfig-mcp",
+    "source": "github"
   },
-  "license": "MIT",
   "packages": [
     {
-      "registry": "pypi",
-      "package": "synfig-mcp"
+      "registryType": "oci",
+      "identifier": "ghcr.io/anusara-bemal/synfig-mcp:0.8.0-rc2",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--mount",
+          "value": "type=bind,src={workspace_path},dst=/workspace",
+          "description": "Mount a host workspace into the container",
+          "isRequired": true,
+          "variables": {
+            "workspace_path": {
+              "description": "Absolute path to the project directory",
+              "format": "filepath",
+              "isRequired": true
+            }
+          }
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "SYNFIG_MCP_WORKSPACE_ROOTS",
+          "description": "Sandboxed workspace roots inside the container",
+          "default": "/workspace",
+          "isRequired": false
+        },
+        {
+          "name": "SYNFIG_MCP_PROFILE",
+          "description": "Tool profile to expose",
+          "default": "core",
+          "choices": [
+            "core",
+            "anim",
+            "fx",
+            "rig",
+            "assets",
+            "review",
+            "all"
+          ],
+          "isRequired": false
+        }
+      ]
     }
   ],
-  "transport": {
-    "type": "stdio",
-    "command": "synfig-mcp"
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "github-actions",
+      "repository": "anusara-bemal/synfig-mcp",
+      "license": "MIT"
+    }
   }
 }

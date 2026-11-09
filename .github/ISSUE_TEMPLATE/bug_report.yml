@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible problem with the server, Studio bundle, or docs.
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include enough detail to reproduce it.
+        For security issues, use the private process in SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version / tag
+      description: Output of `synfig-mcp doctor` includes the installed version.
+      placeholder: v0.8.0-rc2
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux (Ubuntu/Debian)
+        - Linux (other)
+        - macOS
+        - Docker
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Backend mode
+      options:
+        - auto
+        - live (patched Synfig Studio)
+        - headless (synfig CLI)
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: Claude Desktop / Claude Code / Cursor / VS Code / other
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Exact commands, tool calls, or UI actions.
+      placeholder: |
+        1. Run ...
+        2. Call tool ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Paste stderr logs. Never include your bridge token.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor output
+      description: Paste `synfig-mcp doctor` output (redact paths if needed).
+      render: shell

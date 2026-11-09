@@ -5,6 +5,25 @@ All notable changes to `synfig-mcp` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0-rc2] - 2026-11-09
+
+### Fixed
+- **Linux bridge build**: `auth.cpp` now includes the POSIX headers (`<dirent.h>`, `<signal.h>`, `<cerrno>`) required by stale-token cleanup. The previous `v0.8.0-rc1` source failed to compile on Linux.
+- **Visual review failures**: review tools now raise a typed `RenderError` with an actionable message when the renderer produces no image, instead of failing later with `FileNotFoundError`.
+- **Hermetic review tests**: contract tests use a fake CLI renderer, so they no longer depend on a locally installed `synfig` binary and pass on every CI platform.
+
+### Added
+- **Release automation**: tag releases now generate a complete release body with changelog, install instructions, artifact table, and SHA-256 checksums.
+- **GHCR container publishing**: every `v*` tag publishes `ghcr.io/anusara-bemal/synfig-mcp` with semver tags.
+- **Strict documentation CI**: MkDocs Material builds the full docs tree on pushes and pull requests.
+- **Repository hygiene**: Dependabot updates, issue forms, pull request template, code of conduct, editor config, and corrected MCP registry metadata.
+- **User-facing README**: badges, platform requirements, quick start, client configuration for Claude Desktop/Claude Code/Cursor/VS Code, Docker usage, configuration reference, security model, and troubleshooting.
+
+### Changed
+- **Version**: bumped to `0.8.0-rc2` across the Python package, bridge build stamp, release tooling, and registry manifest.
+- **CI hardening**: locked dependency syncs, explicit workflow permissions, concurrency groups, and job timeouts.
+- **Metadata**: `server.json` now targets the official MCP registry schema with the correct owner, version, repository, and OCI package.
+
 ## [0.8.0-rc1] - 2026-11-09
 
 ### Added

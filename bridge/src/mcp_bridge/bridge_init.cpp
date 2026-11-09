@@ -16,7 +16,7 @@
 #endif
 
 #ifndef BUILD_VERSION
-#define BUILD_VERSION "0.8.0-rc1"
+#define BUILD_VERSION "0.8.0-rc2"
 #endif
 
 namespace mcp_bridge {

@@ -1,89 +1,90 @@
 # synfig-mcp
 
-> **Live Model Context Protocol (MCP) control of Synfig Studio (native C++ bridge + headless fallback)**
+[![Server CI](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml)
+[![PyPI](https://img.shields.io/badge/pypi-synfig--mcp-blue.svg)](https://pypi.org/project/synfig-mcp/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/anusara-bemal/synfig-mcp/blob/v1.0.0/LICENSE)
 
-`synfig-mcp` connects Claude Desktop, Claude Code, Cursor, VS Code, and any MCP-compliant client directly into [Synfig Studio](https://www.synfig.org/). Edits appear on the canvas in real time, are undoable via standard `Ctrl+Z`, and blend safely with manual artist workflows.
+**Model Context Protocol server for Synfig Studio — live canvas automation with a headless fallback.**
 
----
+This package provides the Python MCP server. It can drive a running patched Synfig Studio over an authenticated local bridge, or operate entirely headless using the `synfig` CLI.
 
-## Architecture: Dual Backend
+Full documentation, screenshots, client setup, and prebuilt Studio bundles: **[github.com/anusara-bemal/synfig-mcp](https://github.com/anusara-bemal/synfig-mcp)**.
 
-```mermaid
-flowchart LR
-    LLM[MCP Client / LLM] <-->|stdio or Streamable HTTP| Server[synfig-mcp Server]
-    subgraph PY["Server (Python >=3.12)"]
-        Server --> BI[Backend Interface]
-        BI --> LB[LiveBackend<br/>Protocol Client]
-        BI --> HB[HeadlessBackend<br/>SIF Engine + CLI]
-        REG[Schema Registry]
-        Server --> REG
-    end
-    LB <-->|JSON-RPC 2.0 over TCP<br/>127.0.0.1:19998 + Token| Bridge[mcp_bridge Socket]
-    subgraph ST["Patched Synfig Studio (C++)"]
-        Bridge -->|Glib::Dispatcher| MainThread[GTKmm Main Thread]
-        MainThread --> ActionSystem[synfigapp Action System<br/>PassiveGrouper]
-        ActionSystem --> Canvas[Live Canvas + Redraw + Undo]
-    end
-    HB --> SIF[(.sif .sifz .sfg)]
-    HB --> CLI[[synfig CLI]]
-```
-
-1. **LiveBackend (Primary)**: Drives an open, running Synfig Studio using an in-tree C++ bridge. Operations are marshalled to the GTK main loop thread via `Glib::Dispatcher` and executed as undoable `synfigapp::Action`s.
-2. **HeadlessBackend (Secondary)**: Pure-Python lossless XML engine (`lxml`) + the `synfig` CLI. Designed for headless servers, CI pipelines, and environments without the patched Studio binary.
-
----
-
-## Honest Limits & Known Boundaries
-
-- **Live Mode Requirement**: Live interactive editing requires running a patched Synfig Studio binary with `mcp_bridge` enabled.
-- **Thread Safety**: Synfig's core and GTKmm GUI are not thread-safe; all mutations are strictly serialized onto the GTK main thread.
-- **Sandbox Boundary**: Headless file operations are sandboxed to explicitly configured workspace directories to prevent unauthorized filesystem access.
-- **Stock Plugins**: Synfig Studio's stock plugin architecture is file-based only (save $\to$ exit $\to$ script $\to$ reload) and cannot support live pairing; the in-tree bridge is necessary.
-
----
-
-## Quickstart
-
-### 1. Installation
+## Install
 
 ```bash
-uv pip install synfig-mcp
+uv pip install "synfig-mcp @ https://github.com/anusara-bemal/synfig-mcp/releases/download/v0.8.0-rc2/synfig_mcp-0.8.0rc2-py3-none-any.whl"
 ```
 
-### 2. Configure MCP Client (e.g. Claude Desktop)
+Or from source:
 
-Add to your `claude_desktop_config.json`:
+```bash
+uv pip install "git+https://github.com/anusara-bemal/synfig-mcp.git#subdirectory=server"
+```
+
+## Use
+
+```bash
+synfig-mcp doctor
+synfig-mcp
+```
+
+Example MCP client configuration:
 
 ```json
 {
   "mcpServers": {
     "synfig": {
-      "command": "uvx",
-      "args": ["synfig-mcp"]
+      "command": "synfig-mcp",
+      "env": {
+        "SYNFIG_MCP_PROFILE": "core",
+        "SYNFIG_MCP_BACKEND": "auto"
+      }
     }
   }
 }
 ```
 
-### 3. Verify Health
+## Operating modes
 
-In your client, invoke `health_check`. It will report whether the Live Studio Bridge or Headless Backend is currently active.
+| Mode | Backend | Use case |
+|---|---|---|
+| `auto` | Live if reachable, otherwise headless | Desktop |
+| `live` | Patched Synfig Studio | Interactive editing with undo/redo |
+| `headless` | SIF engine + `synfig` CLI | Servers, CI, containers |
 
----
+## Tool profiles
 
-## Development & Testing
+`SYNFIG_MCP_PROFILE` selects the exposed tools:
 
-We use [poethepoet](https://github.com/nat-n/poethepoet) for cross-platform task automation:
+| Profile | Tools | Approx. tokens |
+|---|---:|---:|
+| `core` (default) | 12 | ~2,658 |
+| `anim` | 14 | ~3,800 |
+| `fx` | 21 | ~4,200 |
+| `rig` | 12 | ~2,800 |
+| `assets` | 10 | ~1,900 |
+| `review` | 15 | ~3,900 |
+| `all` | 56 | ~18,500 |
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `SYNFIG_MCP_PROFILE` | `core` | Tool profile |
+| `SYNFIG_MCP_BACKEND` | `auto` | `auto`, `live`, or `headless` |
+| `SYNFIG_MCP_HOST` / `SYNFIG_MCP_PORT` | `127.0.0.1` / `19998` | Live bridge endpoint |
+| `SYNFIG_MCP_TOKEN_PATH` | `~/.synfig/mcp_token` | Bridge token |
+| `SYNFIG_MCP_WORKSPACE_ROOTS` | `~/Documents/SynfigMCP` | Sandbox roots |
+
+## Development
 
 ```bash
 cd server
-poe check     # Runs ruff format-check, ruff lint, mypy --strict, and pytest
+uv sync --locked --all-extras
+uv run poe check
 ```
 
----
+## License
 
-## Licensing
-
-- `server/` (Python package): Licensed under the **MIT License**.
-- `bridge/` (C++ in-tree patches): Statically linked with Synfig Studio and licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
-- See [docs/decisions/ADR-0003-licensing.md](docs/decisions/ADR-0003-licensing.md) for full architectural licensing rationale.
+The Python server is MIT licensed. The native bridge and patched Studio binaries are GPL-3.0-or-later. See [LICENSE](https://github.com/anusara-bemal/synfig-mcp/blob/v1.0.0/LICENSE) and [docs/gpl-compliance.md](https://github.com/anusara-bemal/synfig-mcp/blob/v1.0.0/docs/gpl-compliance.md).

@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a new tool, workflow, or integration.
+title: "[feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the animation workflow you want to support, not only the implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to accomplish, and what blocks you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Tool names, inputs/outputs, or UI behavior you have in mind.
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Suggested profile
+      options:
+        - core
+        - anim
+        - fx
+        - rig
+        - assets
+        - review
+        - all
+        - new profile
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This must work in headless mode
+        - label: This requires live Synfig Studio
+        - label: This needs an external network service

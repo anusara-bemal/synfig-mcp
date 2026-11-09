@@ -21,7 +21,7 @@ import pytest
     reason="Requires SYNFIG_TEST_SHIPPED_RELEASE=1 to download and verify release binaries",
 )
 def test_shipped_binary_reports_tag_commit(tmp_path: Path) -> None:
-    tag = os.environ.get("SYNFIG_RELEASE_TAG", "v0.8.0-rc1")
+    tag = os.environ.get("SYNFIG_RELEASE_TAG", "v0.8.0-rc2")
     expected_sha = os.environ.get("SYNFIG_EXPECTED_COMMIT_SHA")
 
     if not expected_sha:

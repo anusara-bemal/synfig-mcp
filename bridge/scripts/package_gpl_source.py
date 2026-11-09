@@ -17,7 +17,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DIST_DIR = REPO_ROOT / "dist"
 SYNFIG_SRC = REPO_ROOT / "build_synfig" / "synfig_src"
-VERSION = os.environ.get("SYNFIG_MCP_VERSION", "v0.8.0-rc1")
+VERSION = os.environ.get("SYNFIG_MCP_VERSION", "v0.8.0-rc2")
 if not VERSION.startswith("v"):
     VERSION = f"v{VERSION}"
 OUTPUT_TAR = DIST_DIR / f"synfig-mcp-gpl-source-{VERSION}.tar.gz"

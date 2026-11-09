@@ -6,10 +6,22 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main, v*]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bridge-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SYNFIG_MCP_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '0.8.0-rc2' }}
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -71,9 +83,12 @@ jobs:
         with:
           name: synfigstudio-linux-mcp
           path: synfigstudio-linux-mcp-*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
 
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -110,10 +125,13 @@ jobs:
         with:
           name: synfigstudio-windows-ucrt64-mcp
           path: synfigstudio-windows-ucrt64-mcp-*.zip
+          if-no-files-found: error
+          retention-days: 14
 
   smoke-test-linux:
     needs: build-linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -156,6 +174,7 @@ jobs:
   smoke-test-windows:
     needs: build-windows
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -192,7 +211,8 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [smoke-test-linux, smoke-test-windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -210,20 +230,106 @@ jobs:
         with:
           path: artifacts
 
-      - name: Build GPL Source Bundle & Python Distributions
+      - name: Fetch pinned Synfig source for GPL bundle
+        run: bash bridge/scripts/fetch_synfig.sh
+
+      - name: Build GPL Source Bundle, Python Distributions & Checksums
         run: |
-          pip install uv
+          python -m pip install --upgrade pip uv
           mkdir -p dist
           python bridge/scripts/package_gpl_source.py
           uv build --directory server --out-dir dist
           find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} dist/ \;
-          sha256sum dist/* > dist/SHA256SUMS.txt
+          (cd dist && sha256sum * > SHA256SUMS.txt)
           cat dist/SHA256SUMS.txt
 
-      - name: Create GitHub Pre-Release
+      - name: Render Release Notes
+        run: |
+          python scripts/render_release_notes.py "$GITHUB_REF_NAME" dist > release_notes.md
+          test -s release_notes.md
+          test -s dist/SHA256SUMS.txt
+          ls -lh dist release_notes.md
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          prerelease: true
-          files: |
-            dist/*
-          body_path: docs/gpl-compliance.md
+          name: synfig-mcp ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: release_notes.md
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          fail_on_unmatched_files: true
+          files: dist/*
+
+  publish-container:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.title=synfig-mcp
+            org.opencontainers.image.description=Model Context Protocol server for Synfig Studio
+            org.opencontainers.image.licenses=MIT
+
+      - name: Build and push container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-pypi:
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_TO_PYPI == 'true'
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/synfig-mcp
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip uv
+          uv build --directory server --out-dir dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

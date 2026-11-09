@@ -49,7 +49,7 @@ Phase G0 evaluates the feasibility of building Synfig Studio on Windows (MSYS2 U
    ```
 
 ### 3.3 Live Test Execution & Output
-The patched `synfigstudio.exe` was started, followed by executing the client trigger script [`bridge/tests/test_g0_socket_trigger.py`](../../bridge/tests/test_g0_socket_trigger.py):
+The patched `synfigstudio.exe` was started, followed by executing the client trigger script [`bridge/tests/test_g0_socket_trigger.py`](https://github.com/anusara-bemal/synfig-mcp/blob/v1.0.0/bridge/tests/test_g0_socket_trigger.py):
 
 ```
 Client: Connecting to Synfig Studio G0 hook at 127.0.0.1:19998...

@@ -13,7 +13,7 @@ In full compliance with Section 6 of the GPL-3.0 ("Conveying Non-Source Forms"),
 - **Patch Directory**: `bridge/patches/` contains the full git-compatible patches applied to upstream.
 - **Bridge Source**: `bridge/src/mcp_bridge/` contains the full C++ source code of the embedded MCP bridge.
 - **Build Scripts**: `bridge/scripts/` provides automated, reproducible build scripts for Windows (MSYS2 UCRT64) and Linux.
-- **Source Bundle Archive**: Every GitHub release attaches `synfig-mcp-gpl-source-v0.7.0.tar.gz` containing the exact commit tree, applied patches, and build definitions.
+- **Source Bundle Archive**: Every GitHub release attaches `synfig-mcp-gpl-source-v0.8.0-rc2.tar.gz` containing the exact commit tree, applied patches, and build definitions.
 
 ---
 
@@ -55,7 +55,7 @@ ffmpeg version 8.1.1 Copyright (c) 2000-2026 the FFmpeg developers
 
 ## 3. Bundled Third-Party Dependencies and Licenses
 
-The Windows distribution packages libraries from MSYS2 UCRT64. Full package details and licensing can be inspected in [`THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md). A summary of core dependencies and their licenses:
+The Windows distribution packages libraries from MSYS2 UCRT64. Full package details and licensing can be inspected in [`THIRD_PARTY_LICENSES.md`](https://github.com/anusara-bemal/synfig-mcp/blob/v1.0.0/bridge/THIRD_PARTY_LICENSES.md). A summary of core dependencies and their licenses:
 
 | Component / Library | Upstream License | Distribution Compatibility |
 | :--- | :--- | :--- |
@@ -79,7 +79,7 @@ To rebuild the exact binary artifact from source:
 
 1. Clone or download the source bundle:
    ```bash
-   tar -xzf synfig-mcp-gpl-source-v0.7.0.tar.gz
+   tar -xzf synfig-mcp-gpl-source-v0.8.0-rc2.tar.gz
    cd synfig-mcp-gpl-source
    ```
 2. In an MSYS2 UCRT64 shell:

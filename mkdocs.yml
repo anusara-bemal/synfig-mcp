@@ -1,0 +1,93 @@
+site_name: Synfig MCP
+site_description: Model Context Protocol server for Synfig Studio with live canvas automation and headless rendering.
+site_url: https://anusara-bemal.github.io/synfig-mcp/
+repo_url: https://github.com/anusara-bemal/synfig-mcp
+repo_name: anusara-bemal/synfig-mcp
+edit_uri: edit/v1.0.0/docs/
+copyright: Copyright &copy; 2026 synfig-mcp contributors
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install on Windows: install-windows.md
+      - Build on Windows: build-windows.md
+      - Build on Linux: build-linux.md
+      - Demo guide: demo-guide.md
+  - User guide:
+      - Tools API: api.md
+      - Full tool reference: tools.md
+      - Effects and styles: recipes.md
+      - Asset pipeline: assets.md
+      - Feature coverage: COVERAGE.md
+      - Token budget: TOKEN_BUDGET.md
+  - Architecture:
+      - Overview: architecture.md
+      - Protocol: protocol.md
+      - Security: security.md
+      - Scope and IP policy: scope.md
+      - Decisions:
+          - Native bridge: decisions/ADR-0001-native-bridge.md
+          - Dual backend: decisions/ADR-0002-dual-backend.md
+          - Licensing: decisions/ADR-0003-licensing.md
+          - Render pipeline: decisions/ADR-0004-render-pipeline.md
+  - Operations:
+      - Troubleshooting: troubleshooting.md
+      - GPL compliance: gpl-compliance.md
+      - Upstream rebase: upstream-rebase.md
+  - Project:
+      - Roadmap: ROADMAP.md
+      - Repository audit: REPO_AUDIT.md
+      - Cairo spike: SPIKE_CAIRO_SCREENSHOT.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+
+strict: true
