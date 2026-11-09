@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
+from synfig_mcp.backend.detect import is_studio_running
 from synfig_mcp.cli.runner import CliRunner
 from synfig_mcp.errors import DocumentNotFoundError, SynfigError
 from synfig_mcp.protocol.models import SynfigValue
@@ -40,17 +41,27 @@ class HeadlessBackend(BackendBase):
     async def health_check(self) -> HealthStatus:
         """Check backend readiness and CLI availability."""
         version = await self.runner.get_version()
+        studio_open = is_studio_running()
+        details: dict[str, Any] = {
+            "engine": "lxml_sif_dom",
+            "cli_available": self.runner.is_available,
+            "cli_path": str(self.runner.binary_path) if self.runner.binary_path else None,
+            "open_documents": len(self._documents),
+            "studio_process_detected": studio_open,
+        }
+        if studio_open:
+            details["warning"] = (
+                "Synfig Studio is running, but the server is using the headless backend. "
+                "Documents created here are off-screen and will not appear in Studio. "
+                "Use SYNFIG_MCP_BACKEND=auto or live with the patched build's Tools -> MCP "
+                "Bridge enabled to edit the open canvas."
+            )
         return HealthStatus(
             backend="headless",
             connected=True,
             version=version,
-            studio_running=False,
-            details={
-                "engine": "lxml_sif_dom",
-                "cli_available": self.runner.is_available,
-                "cli_path": str(self.runner.binary_path) if self.runner.binary_path else None,
-                "open_documents": len(self._documents),
-            },
+            studio_running=studio_open,
+            details=details,
         )
 
     # -----------------------------------------------------------------------

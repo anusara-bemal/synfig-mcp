@@ -65,7 +65,7 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "health_check": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "synfig_help": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     # Document Management
-    "doc_list": {"all"},
+    "doc_list": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "doc_new": {"core", "all"},
     "doc_open": {"core", "all"},
     "doc_save": {"core", "all"},
@@ -167,7 +167,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             )
         elif isinstance(exc, SecuritySandboxError):
             hint = " Add the target directory to SYNFIG_MCP_WORKSPACE_ROOTS."
-        elif isinstance(exc, BridgeConnectionError):
+        elif isinstance(exc, BridgeConnectionError) and "MCP Bridge" not in exc.message:
             hint = (
                 " Start the patched Synfig Studio and enable Tools -> MCP Bridge, "
                 "or switch to SYNFIG_MCP_BACKEND=headless."
@@ -221,7 +221,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     async def health_check() -> dict[str, Any]:
         """Check server readiness, active backend ('live' Synfig Studio vs 'headless' pure-Python SIF engine), and connection status.
         Returns: JSON object with 'backend' ('live' or 'headless'), 'connected' (bool), 'studio_running' (bool), and 'details'.
-        Gotcha: Assuming Studio is running without checking 'connected' or 'studio_running'.
+        Gotcha: In 'auto' mode a blank canvas usually means Studio is open without its MCP bridge. Check 'details.warning' and use the patched Studio build.
         """
         status = await backend.health_check()
         return status.model_dump()
@@ -267,7 +267,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     async def doc_new(width: int = 1920, height: int = 1080, fps: float = 24.0) -> dict[str, Any]:
         """Create a new blank Synfig animation document with specified resolution and framerate.
         Returns: The created DocumentInfo object with generated 'id', 'name', dimensions, and fps.
-        Gotcha: Supplying non-positive dimensions or frame rate.
+        Gotcha: In live mode this opens a visible Studio document; in headless mode it is off-screen. Call doc_list() first to reuse an open document.
         """
         doc = await backend.doc_new(width=width, height=height, fps=fps)
         return doc.model_dump()

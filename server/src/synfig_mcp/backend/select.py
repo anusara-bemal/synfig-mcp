@@ -5,6 +5,7 @@ Backend selection and auto-detection logic.
 import socket
 
 from synfig_mcp.backend.base import BackendBase
+from synfig_mcp.backend.detect import is_studio_running
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
 from synfig_mcp.config import settings
@@ -27,7 +28,12 @@ def get_backend(mode: str | None = None) -> BackendBase:
     Select active backend based on mode and availability.
     - 'live': forces LiveBackend
     - 'headless': forces HeadlessBackend
-    - 'auto': probes live bridge; falls back to headless if unreachable
+    - 'auto': probes the live bridge; uses headless only when no Studio process is running
+
+    In auto mode an open Studio window is never silently replaced by an
+    invisible headless document. If Studio is detected but its bridge is
+    unreachable, the live backend is kept so operations fail with guidance
+    instead of reporting success on a document the user cannot see.
     """
     target_mode = mode or settings.backend_mode
 
@@ -50,5 +56,15 @@ def get_backend(mode: str | None = None) -> BackendBase:
         )
         return LiveBackend()
 
-    logger.info("Live bridge unreachable, falling back to HeadlessBackend")
+    if is_studio_running():
+        logger.warning(
+            "Synfig Studio is running but the MCP bridge is unreachable; "
+            "keeping LiveBackend so operations fail loudly instead of creating "
+            "invisible headless documents",
+            host=settings.bridge_host,
+            port=settings.bridge_port,
+        )
+        return LiveBackend(studio_detected=True)
+
+    logger.info("Live bridge unreachable and no Studio process detected, using HeadlessBackend")
     return HeadlessBackend()

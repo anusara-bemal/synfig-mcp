@@ -17,12 +17,30 @@ def backend() -> HeadlessBackend:
 
 
 @pytest.mark.asyncio
-async def test_headless_health_check(backend: HeadlessBackend) -> None:
+async def test_headless_health_check(
+    backend: HeadlessBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("synfig_mcp.backend.headless.is_studio_running", lambda *_, **__: False)
     health = await backend.health_check()
     assert health.backend == "headless"
     assert health.connected is True
     assert health.studio_running is False
     assert health.details["engine"] == "lxml_sif_dom"
+    assert health.details["studio_process_detected"] is False
+    assert "warning" not in health.details
+
+
+@pytest.mark.asyncio
+async def test_headless_health_warns_when_studio_is_open(
+    backend: HeadlessBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("synfig_mcp.backend.headless.is_studio_running", lambda *_, **__: True)
+    health = await backend.health_check()
+    assert health.backend == "headless"
+    assert health.studio_running is True
+    assert health.details["studio_process_detected"] is True
+    assert "off-screen" in health.details["warning"]
+    assert "MCP Bridge" in health.details["warning"]
 
 
 @pytest.mark.asyncio

@@ -10,8 +10,9 @@ from typing import Any, cast
 from pydantic import TypeAdapter
 
 from synfig_mcp.backend.base import BackendBase, DocumentInfo, HealthStatus
+from synfig_mcp.backend.detect import is_studio_running
 from synfig_mcp.config import settings
-from synfig_mcp.errors import DocumentNotFoundError
+from synfig_mcp.errors import BridgeConnectionError, DocumentNotFoundError
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.models import SynfigValue
 from synfig_mcp.security.sandbox import validate_path
@@ -28,11 +29,13 @@ class LiveBackend(BackendBase):
         port: int | None = None,
         token: str | None = None,
         client: BridgeClient | None = None,
+        studio_detected: bool = False,
     ) -> None:
         self.host = host or settings.bridge_host
         self.port = port or settings.bridge_port
         self.token = token
         self._client = client
+        self.studio_detected = studio_detected
         self._pipeline: Any = None
 
     @property
@@ -46,11 +49,30 @@ class LiveBackend(BackendBase):
             return settings.bridge_token_path.read_text(encoding="utf-8").strip()
         return ""
 
+    def bridge_unavailable_message(self) -> str:
+        """Explain why live control is unavailable, with the next action."""
+        if self.studio_detected or is_studio_running():
+            return (
+                "Synfig Studio is running, but its MCP bridge is not reachable on "
+                f"{self.host}:{self.port}. Live control requires the patched Studio build "
+                "from the synfig-mcp releases with Tools -> MCP Bridge enabled "
+                "(or SYNFIG_MCP_ENABLE=1). A stock Synfig installation has no bridge. "
+                "Set SYNFIG_MCP_BACKEND=headless only for off-screen work."
+            )
+        return (
+            f"No Synfig Studio MCP bridge is reachable on {self.host}:{self.port} "
+            "and no Studio process was detected. Start the patched Studio with the "
+            "bridge enabled, or set SYNFIG_MCP_BACKEND=headless for off-screen work."
+        )
+
     async def _ensure_client(self) -> BridgeClient:
         if self._client is None or not self._client.is_connected:
             token = self._get_token()
             self._client = BridgeClient(host=self.host, port=self.port, token=token)
-            await self._client.connect(timeout=settings.bridge_connect_timeout_seconds)
+            try:
+                await self._client.connect(timeout=settings.bridge_connect_timeout_seconds)
+            except Exception as exc:
+                raise BridgeConnectionError(self.bridge_unavailable_message()) from exc
         return self._client
 
     async def health_check(self) -> HealthStatus:
@@ -68,11 +90,25 @@ class LiveBackend(BackendBase):
                 },
             )
         except Exception as e:
+            detected = self.studio_detected or is_studio_running()
+            details: dict[str, Any] = {
+                "host": self.host,
+                "port": self.port,
+                "bridge_reachable": False,
+                "studio_process_detected": detected,
+                "error": str(e),
+            }
+            if detected:
+                details["warning"] = (
+                    "Synfig Studio is open but the MCP bridge is not connected. Edits "
+                    "cannot reach the canvas until the patched build's Tools -> MCP "
+                    "Bridge is enabled."
+                )
             return HealthStatus(
                 backend="live",
                 connected=False,
-                studio_running=False,
-                details={"host": self.host, "port": self.port, "error": str(e)},
+                studio_running=detected,
+                details=details,
             )
 
     async def doc_list(self) -> list[DocumentInfo]:
