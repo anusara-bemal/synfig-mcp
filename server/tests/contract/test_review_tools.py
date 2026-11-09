@@ -10,18 +10,40 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from mcp.client import Client
 from mcp.server.mcpserver import MCPServer
 from mcp.types import TextContent, TextResourceContents
+from PIL import Image
 
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
+from synfig_mcp.cli.runner import CliRunner
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.fake_bridge import FakeBridgeServer
 from synfig_mcp.server import create_server
+
+
+class _FakeRenderCliRunner(CliRunner):
+    """Hermetic CLI stub that renders a deterministic PNG without invoking Synfig."""
+
+    async def render_frame(
+        self,
+        sif_path: Path,
+        output_path: Path,
+        time: float | str = 0.0,
+        width: int | None = None,
+        height: int | None = None,
+        target: str = "png",
+        antialias: int = 2,
+    ) -> bool:
+        del sif_path, time, target, antialias
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (width or 160, height or 120), (80, 120, 200)).save(output_path)
+        return True
 
 
 @pytest_asyncio.fixture(params=["headless", "live_fake"])
@@ -29,7 +51,7 @@ async def mcp_server(request: pytest.FixtureRequest) -> AsyncIterator[tuple[str,
     """Yields backend mode string ('headless' or 'live_fake') and configured MCPServer."""
     mode: str = request.param
     if mode == "headless":
-        backend = HeadlessBackend()
+        backend = HeadlessBackend(runner=_FakeRenderCliRunner())
         app = create_server(backend=backend, profile="all")
         yield (mode, app)
     else:

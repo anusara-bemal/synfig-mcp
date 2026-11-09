@@ -21,6 +21,9 @@
 #define MKDIR(dir) _mkdir(dir)
 #else
 #include <unistd.h>
+#include <dirent.h>
+#include <signal.h>
+#include <cerrno>
 #define MKDIR(dir) mkdir(dir, 0700)
 #endif
 

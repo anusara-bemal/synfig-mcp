@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 
 from synfig_mcp.backend.base import BackendBase
+from synfig_mcp.errors import RenderError
 from synfig_mcp.review.metrics import (
     check_empty_or_uniform,
     check_safe_areas,
@@ -40,6 +41,29 @@ class ReviewService:
     def __init__(self, backend: BackendBase) -> None:
         self.backend = backend
 
+    async def _render_frame_png(
+        self,
+        doc_id: str,
+        output_path: Path,
+        time: float,
+        width: int,
+        height: int,
+    ) -> None:
+        """Render one frame and fail with a clear error when no image is produced."""
+        rendered = await self.backend.render_frame(
+            doc_id=doc_id,
+            output_path=str(output_path),
+            width=width,
+            height=height,
+            time=time,
+        )
+        if not rendered or not output_path.is_file() or output_path.stat().st_size == 0:
+            raise RenderError(
+                "Frame render produced no output. Ensure the synfig CLI is installed "
+                "and available on PATH, or connect to a running Synfig Studio.",
+                details={"doc_id": doc_id, "time": time, "output_path": str(output_path)},
+            )
+
     async def review_frame(
         self,
         doc_id: str = "doc_0",
@@ -54,13 +78,7 @@ class ReviewService:
         """
         with tempfile.TemporaryDirectory() as td:
             out_png = Path(td) / "review_frame.png"
-            await self.backend.render_frame(
-                doc_id=doc_id,
-                output_path=str(out_png),
-                width=width,
-                height=height,
-                time=time,
-            )
+            await self._render_frame_png(doc_id, out_png, time, width, height)
             pil_img = Image.open(out_png).convert("RGBA")
             arr = np.array(pil_img)
 
@@ -122,13 +140,7 @@ class ReviewService:
         with tempfile.TemporaryDirectory() as td:
             for idx, t in enumerate(times):
                 out_png = Path(td) / f"frame_{idx:03d}.png"
-                await self.backend.render_frame(
-                    doc_id=doc_id,
-                    output_path=str(out_png),
-                    width=width,
-                    height=height,
-                    time=t,
-                )
+                await self._render_frame_png(doc_id, out_png, t, width, height)
                 f_pil = Image.open(out_png).convert("RGB")
                 frames_pil.append(f_pil)
                 frames_np.append(np.array(f_pil))
@@ -186,12 +198,8 @@ class ReviewService:
             out_a = Path(td) / "frame_a.png"
             out_b = Path(td) / "frame_b.png"
 
-            await self.backend.render_frame(
-                doc_id=doc_id_a, output_path=str(out_a), width=width, height=height, time=time_a
-            )
-            await self.backend.render_frame(
-                doc_id=doc_id_b, output_path=str(out_b), width=width, height=height, time=time_b
-            )
+            await self._render_frame_png(doc_id_a, out_a, time_a, width, height)
+            await self._render_frame_png(doc_id_b, out_b, time_b, width, height)
 
             img_a = Image.open(out_a).convert("RGB")
             img_b = Image.open(out_b).convert("RGB")
