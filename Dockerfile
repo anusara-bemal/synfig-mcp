@@ -2,7 +2,7 @@
 # Includes the synfig CLI for out-of-process renders and pure-Python SIF DOM manipulation.
 # No X11 or GUI dependencies required.
 
-FROM python:3.12-slim-bookworm AS base
+FROM python:3.15-slim-bookworm AS base
 
 ARG VERSION=0.8.0-rc2
 
