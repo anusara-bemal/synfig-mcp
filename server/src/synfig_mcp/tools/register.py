@@ -267,7 +267,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     async def doc_new(width: int = 1920, height: int = 1080, fps: float = 24.0) -> dict[str, Any]:
         """Create a new blank Synfig animation document with specified resolution and framerate.
         Returns: The created DocumentInfo object with generated 'id', 'name', dimensions, and fps.
-        Gotcha: In live mode this opens a visible Studio document; in headless mode it is off-screen. Call doc_list() first to reuse an open document.
+        Gotcha: ONLY call when the user explicitly asked for a new document. Otherwise reuse the currently open document (doc_list) and pass its doc_id.
         """
         doc = await backend.doc_new(width=width, height=height, fps=fps)
         return doc.model_dump()
@@ -276,7 +276,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     async def doc_open(file_path: str) -> dict[str, Any]:
         """Open an existing Synfig animation project (.sif, .sifz, or .sfg container).
         Returns: DocumentInfo representing the loaded project.
-        Gotcha: Providing a non-existent or relative file path outside the allowed workspace.
+        Gotcha: ONLY call when the user explicitly asked to open this file. Never use it to 'start fresh'; implement in the currently open document instead.
         """
         doc = await backend.doc_open(file_path=file_path)
         return doc.model_dump()
@@ -369,7 +369,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     ) -> dict[str, Any]:
         """Apply a declarative scene build spec (layers, params, waypoints, groups) atomically as one undo step.
         Returns: Compact diff {action: 'scene.build', created: [...], modified: [...]}.
-        Gotcha: Use dry_run=true to validate schema without mutating the canvas.
+        Gotcha: spec.doc_id defaults to the currently selected document; never call doc_new/doc_open first - implement in the open document.
         """
         res = await backend.scene_build(spec=spec, dry_run=dry_run)
         return wrap_untrusted(res)
@@ -394,7 +394,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     ) -> dict[str, Any]:
         """Get a token-bounded structural summary of canvas size, framerate, duration, and layer hierarchy.
         Returns: Compact document metadata summary strictly bounded under budget_tokens.
-        Gotcha: Preferred over scene_tree on complex documents to minimize context consumption.
+        Gotcha: Defaults to the currently selected document; call this first to confirm the target before building.
         """
         res = await backend.scene_summary(doc_id=doc_id, budget_tokens=budget_tokens)
         return wrap_untrusted(res)

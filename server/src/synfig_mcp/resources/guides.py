@@ -6,6 +6,12 @@ Accessible via MCP resources (synfig://guide/{topic}) and the synfig_help tool.
 GUIDE_TOPICS: dict[str, str] = {
     "overview": """# Synfig MCP Overview & Best Practices
 
+## Current document rule (like Blender's active scene)
+- Always work in the **currently open/selected document** by default. Every tool's `doc_id` defaults to `doc_0`, which the bridge resolves to the Studio window you have selected.
+- Never call `doc_new` or `doc_open` unless the user explicitly asked for a new file or a specific file to open. Creating a document silently discards the document the user is looking at.
+- Before building, confirm the target with `doc_list` and `scene_summary`; pass the returned `doc_id` explicitly on every subsequent call.
+- If no document is open (or `doc_list` is empty), tell the user instead of creating one unasked.
+
 ## Studio-Grade Workflow
 1. Use declarative `scene_build` for assembling layers, parameters, and keyframes in a single atomic call instead of sequential round trips.
 2. Verify visual results using `render_frame` (or `review_frame`) at low resolution (320x240) for fast iteration.
