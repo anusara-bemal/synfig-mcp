@@ -5,12 +5,20 @@ Exposes typed, categorized tools over BackendBase with ToolAnnotations and LLM-o
 
 import contextlib
 from collections.abc import Callable
+from functools import wraps
 from typing import Any, TypeVar, cast
 
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from synfig_mcp.backend.base import BackendBase
+from synfig_mcp.errors import (
+    BridgeConnectionError,
+    DocumentNotFoundError,
+    SecuritySandboxError,
+    SynfigError,
+)
 from synfig_mcp.render.jobs import job_manager
 from synfig_mcp.render.pipeline import CancellationToken
 from synfig_mcp.schema.probe import seed_builtin_schemas
@@ -149,11 +157,41 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     active_profile = (profile or settings.profile).lower()
 
+    def diagnostic(exc: SynfigError) -> str:
+        """Return an actionable message for common tool failures."""
+        hint = ""
+        if isinstance(exc, DocumentNotFoundError):
+            hint = (
+                " Run doc_list() to see open documents; use doc_new() or doc_open() "
+                "to create or load one."
+            )
+        elif isinstance(exc, SecuritySandboxError):
+            hint = " Add the target directory to SYNFIG_MCP_WORKSPACE_ROOTS."
+        elif isinstance(exc, BridgeConnectionError):
+            hint = (
+                " Start the patched Synfig Studio and enable Tools -> MCP Bridge, "
+                "or switch to SYNFIG_MCP_BACKEND=headless."
+            )
+        return f"{exc.message}{hint}"
+
     def tool_for(name: str, annotations: ToolAnnotations | None = None) -> Callable[[F], F]:
         def decorator(fn: F) -> F:
             allowed = TOOL_PROFILES.get(name, {"all"})
             if active_profile == "all" or active_profile in allowed:
-                mcp.tool(name=name, annotations=annotations)(fn)
+
+                @wraps(fn)
+                async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    try:
+                        return await fn(*args, **kwargs)
+                    except SynfigError as exc:
+                        # The MCP SDK turns uncaught exceptions into a generic
+                        # "Error executing tool <name>" crash, hiding the cause.
+                        # Raise its anticipated-error type so the model receives
+                        # the actionable diagnostic instead of a dead end.
+                        raise ToolError(diagnostic(exc)) from exc
+
+                mcp.tool(name=name, annotations=annotations)(wrapper)
+                return cast(F, wrapper)
             return fn
 
         return decorator
