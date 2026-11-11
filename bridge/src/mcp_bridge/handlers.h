@@ -2,6 +2,7 @@
 #define MCP_BRIDGE_HANDLERS_H
 
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 
 namespace mcp_bridge {

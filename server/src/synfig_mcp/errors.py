@@ -84,6 +84,19 @@ class ValidationError(SynfigError):
     message = "Validation failed for action parameters"
 
 
+class UnsupportedValueTypeError(ValidationError):
+    """A value could not be represented in the Synfig document format.
+
+    Raised by the SIF writer when a parameter carries a value type that has no
+    upstream-compatible XML representation.  Failing here is deliberate: a
+    lossy fallback (stringifying the value) produces a document that Synfig
+    loads as a corrupt canvas, which is strictly worse than a typed error.
+    """
+
+    code = 1204
+    message = "Unsupported value type for Synfig document serialisation"
+
+
 class SecuritySandboxError(SynfigError):
     """File access outside of configured workspace sandbox."""
 

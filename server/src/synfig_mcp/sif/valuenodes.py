@@ -15,11 +15,21 @@ generated document with the real ``synfig`` binary.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 
 from lxml import etree
 
-from synfig_mcp.errors import SynfigError
+from synfig_mcp.errors import SynfigError, UnsupportedValueTypeError
+from synfig_mcp.sif.numerics import (
+    bool_element,
+    color_element,
+    format_time,
+    integer_element,
+    real_element,
+    string_element,
+    vector_element,
+)
 
 # ---------------------------------------------------------------------------
 # Interpolation
@@ -85,56 +95,37 @@ def value_type_of(element: etree._Element) -> str:
 
 
 def _real(value: float) -> etree._Element:
-    elem = etree.Element("real")
-    elem.set("value", f"{float(value):.10f}")
-    return elem
+    return real_element(value)
 
 
 def _integer(value: int) -> etree._Element:
-    elem = etree.Element("integer")
-    elem.set("value", str(int(value)))
-    return elem
+    return integer_element(value)
 
 
 def _bool(value: bool) -> etree._Element:
-    elem = etree.Element("bool")
-    elem.set("value", "true" if value else "false")
-    return elem
+    return bool_element(value)
 
 
 def _string(value: str) -> etree._Element:
-    elem = etree.Element("string")
-    elem.text = str(value)
-    return elem
+    return string_element(value)
 
 
 def _angle(degrees: float) -> etree._Element:
-    elem = etree.Element("angle")
-    elem.set("value", f"{float(degrees):.6f}")
-    return elem
+    return real_element(degrees, tag="angle")
 
 
 def _time(seconds: float) -> etree._Element:
     elem = etree.Element("time")
-    elem.set("value", f"{float(seconds):.4f}s")
+    elem.set("value", format_time(seconds))
     return elem
 
 
 def _vector(x: float, y: float) -> etree._Element:
-    elem = etree.Element("vector")
-    x_el = etree.SubElement(elem, "x")
-    x_el.text = f"{float(x):.10f}"
-    y_el = etree.SubElement(elem, "y")
-    y_el.text = f"{float(y):.10f}"
-    return elem
+    return vector_element(x, y)
 
 
 def _color(r: float, g: float, b: float, a: float) -> etree._Element:
-    elem = etree.Element("color")
-    for channel, value in (("r", r), ("g", g), ("b", b), ("a", a)):
-        ch = etree.SubElement(elem, channel)
-        ch.text = f"{float(value):.6f}"
-    return elem
+    return color_element(r, g, b, a)
 
 
 def _default_value(type_name: str, value: float | int | bool) -> etree._Element:
@@ -447,10 +438,11 @@ VALUENODE_SPECS: dict[str, ValueNodeSpec] = {
 }
 
 #: Composite ValueNodes use a different link layout per value type.
-#: The Synfig engine only accepts composite for these value types
-#: (``ValueNode_Composite::check_type``); numeric parameters use the
-#: ``add``/``subtract``/``scale`` nodes instead.  Vector and color composites
-#: are built from the *components* of the source value (real numbers).
+#: The Synfig engine only accepts composite for the structured types listed by
+#: ``ValueNode_Composite::check_type`` (``valuenodes/valuenode_composite.cpp``);
+#: numeric parameters use ``add``/``subtract``/``scale`` instead.  Vector and
+#: colour composites are built from the *components* of the source value (real
+#: numbers), the others from component value elements.
 COMPOSITE_LINK_SPECS: dict[str, tuple[LinkSpec, ...]] = {
     "vector": (
         LinkSpec("x", _REAL, True, "x"),
@@ -461,6 +453,42 @@ COMPOSITE_LINK_SPECS: dict[str, tuple[LinkSpec, ...]] = {
         LinkSpec("green", _REAL, True, "g"),
         LinkSpec("blue", _REAL, True, "b"),
         LinkSpec("alpha", _REAL, True, "a"),
+    ),
+    "segment": (
+        LinkSpec("p1", _VECTOR, True, "p1"),
+        LinkSpec("t1", _VECTOR, True, "t1"),
+        LinkSpec("p2", _VECTOR, True, "p2"),
+        LinkSpec("t2", _VECTOR, True, "t2"),
+    ),
+    "bline_point": (
+        LinkSpec("point", _VECTOR, True, "vertex"),
+        LinkSpec("width", _REAL, True, "width"),
+        LinkSpec("origin", _REAL, True, "origin"),
+        LinkSpec("split", _BOOL, True, "split"),
+        LinkSpec("split_radius", _BOOL, True, "split_radius"),
+        LinkSpec("split_angle", _BOOL, True, "split_angle"),
+        LinkSpec("t1", _VECTOR, True, "t1"),
+        LinkSpec("t2", _VECTOR, True, "t2"),
+    ),
+    "width_point": (
+        LinkSpec("position", _REAL, True, "position"),
+        LinkSpec("width", _REAL, True, "width"),
+        LinkSpec("side_before", _INTEGER, True, "side_before"),
+        LinkSpec("side_after", _INTEGER, True, "side_after"),
+        LinkSpec("lower_bound", _REAL, True, "lower_bound", default=0.0),
+        LinkSpec("upper_bound", _REAL, True, "upper_bound", default=1.0),
+    ),
+    "dash_item": (
+        LinkSpec("offset", _REAL, True, "offset"),
+        LinkSpec("length", _REAL, True, "length"),
+        LinkSpec("side_before", _INTEGER, True, "side_before"),
+        LinkSpec("side_after", _INTEGER, True, "side_after"),
+    ),
+    "transformation": (
+        LinkSpec("offset", _VECTOR, True, "offset"),
+        LinkSpec("angle", _ANGLE, True, "angle"),
+        LinkSpec("skew_angle", _ANGLE, True, "skew_angle"),
+        LinkSpec("scale", _VECTOR, True, "scale"),
     ),
 }
 
@@ -492,22 +520,29 @@ def build_valuenode_element(
     if name == "composite":
         specs = COMPOSITE_LINK_SPECS.get(value_type)
         if specs is None:
-            raise SynfigError(
+            raise UnsupportedValueTypeError(
                 f"The Composite ValueNode does not accept '{value_type}' parameters in "
                 f"Synfig. Use 'add', 'subtract' or 'scale' for numeric parameters "
-                f"(composite supports: {', '.join(sorted(COMPOSITE_LINK_SPECS))})."
+                f"(composite supports: {', '.join(sorted(COMPOSITE_LINK_SPECS))}).",
+                details={"valuenode": name, "value_type": value_type},
             )
     else:
         node_spec = VALUENODE_SPECS.get(name)
         if node_spec is None:
-            raise SynfigError(
+            raise UnsupportedValueTypeError(
                 f"Unsupported ValueNode conversion type '{valuenode_type}'. "
-                f"Supported types: {', '.join(supported_conversions())}."
+                f"Supported types: {', '.join(supported_conversions())}.",
+                details={"valuenode": valuenode_type},
             )
         if not node_spec.supports(value_type):
-            raise SynfigError(
+            raise UnsupportedValueTypeError(
                 f"The '{name}' ValueNode does not accept '{value_type}' parameters in "
-                f"Synfig (accepted: {', '.join(sorted(node_spec.value_types))})."
+                f"Synfig (accepted: {', '.join(sorted(node_spec.value_types))}).",
+                details={
+                    "valuenode": name,
+                    "value_type": value_type,
+                    "accepted": sorted(node_spec.value_types),
+                },
             )
         specs = node_spec.links
 
@@ -535,17 +570,52 @@ def _seed_element(source: etree._Element, spec: LinkSpec, link_type: str) -> etr
     """Build the seed value for one link of a converted ValueNode."""
     if spec.component is not None:
         component = source.find(spec.component)
-        if component is not None and component.text:
-            return _real(float(component.text))
-        return _real(0.0)
+        if component is not None and isinstance(component.tag, str):
+            return _component_element(component, link_type)
+        if spec.default is not None:
+            return _default_value(link_type, spec.default)
+        return _default_for(link_type, link_type)
     source_tag = etree.QName(str(source.tag)).localname if isinstance(source.tag, str) else ""
     if source_tag == "animated":
         # An animated parameter keeps its animation when it is converted: the
         # <animated> element is a valid value node on its own.
         if source.get("type") == link_type:
-            return etree.fromstring(etree.tostring(source))
+            return deepcopy(source)
         return _default_for(link_type, link_type)
     if value_type_of(source) == link_type:
-        clone = etree.fromstring(etree.tostring(source))
-        return clone
+        return deepcopy(source)
+    return _default_for(link_type, link_type)
+
+
+def _component_element(component: etree._Element, link_type: str) -> etree._Element:
+    """Seed a composite link from a component of the source value element.
+
+    Components are either nested value elements (``<vertex><vector>…</vector>
+    </vertex>``) or bare numbers (``<x>1.0</x>``).  The correct element is
+    produced for both shapes; a component that does not match the link type
+    falls back to the neutral default instead of emitting a mistyped link.
+    """
+    nested = next((child for child in component if isinstance(child.tag, str)), None)
+    if nested is not None:
+        if value_type_of(nested) == link_type:
+            return deepcopy(nested)
+        if link_type == "bline_point_list" and value_type_of(nested) == "bline":
+            return deepcopy(nested)
+        return _default_for(link_type, link_type)
+
+    text = (component.text or "").strip()
+    if not text:
+        return _default_for(link_type, link_type)
+    if link_type == "integer":
+        return _integer(int(float(text)))
+    if link_type == "bool":
+        return _bool(text.lower() in ("true", "1"))
+    if link_type == "string":
+        return _string(component.text or "")
+    if link_type == "angle":
+        return _angle(float(text))
+    if link_type == "time":
+        return _time(float(text))
+    if link_type == "real":
+        return _real(float(text))
     return _default_for(link_type, link_type)

@@ -22,6 +22,7 @@ from synfig_mcp.errors import (
 from synfig_mcp.render.jobs import job_manager
 from synfig_mcp.render.pipeline import CancellationToken
 from synfig_mcp.schema.probe import get_synfig_registry
+from synfig_mcp.schema.registry import LayerTypeInfo, layer_info_from_bridge
 
 # Schema registry for the introspection tools.  The registry is populated from
 # the installed Synfig binary on first use (see ``get_synfig_registry``).
@@ -1540,14 +1541,41 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     # Schema & Registry Introspection
     # -----------------------------------------------------------------------
 
+    async def _layer_catalogue() -> list[LayerTypeInfo]:
+        """Return the active backend's layer catalogue as schema models.
+
+        The live backend answers from ``synfig::Layer::book()`` (the exact
+        factory registry of the running Studio build), the headless backend
+        from its introspected CLI registry.  A bridge failure falls back to the
+        introspected registry so the introspection tools keep working while
+        Studio is not reachable.
+        """
+        try:
+            entries = await backend.schema_list_layers()
+        except SynfigError:
+            entries = []
+        catalogue = [
+            layer_info_from_bridge(entry)
+            for entry in entries
+            if isinstance(entry, dict) and entry.get("name")
+        ]
+        if catalogue:
+            return catalogue
+        registry = await get_synfig_registry()
+        return [
+            info
+            for name in registry.list_layers()
+            if (info := registry.get_layer(name)) is not None
+        ]
+
     @tool_for("schema_list_layers", annotations=READ_ONLY)
     async def schema_list_layers() -> list[str]:
         """List all layer types supported by the installed Synfig build (e.g. 'circle', 'rectangle', 'star', 'text', 'blur', 'outline').
         Returns: Alphabetical list of supported layer type strings.
         Gotcha: The list is introspected from the Synfig binary, so it reflects the exact build installed on this machine.
         """
-        registry = await get_synfig_registry()
-        return registry.list_layers()
+        catalogue = await _layer_catalogue()
+        return sorted({info.name for info in catalogue})
 
     @tool_for("schema_get_layer", annotations=READ_ONLY)
     async def schema_get_layer(layer_type: str) -> dict[str, Any]:
@@ -1555,12 +1583,17 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Returns: LayerTypeInfo object containing 'name', 'version', 'description', and 'params' dictionary.
         Gotcha: Looking for a parameter that belongs to a different layer type.
         """
-        registry = await get_synfig_registry()
-        info = registry.get_layer(layer_type)
+        catalogue = await _layer_catalogue()
+        info = next((entry for entry in catalogue if entry.name == layer_type), None)
         if info is None:
-            for candidate in registry.list_layers():
-                if candidate.lower() == layer_type.lower():
-                    info = registry.get_layer(candidate)
+            info = next(
+                (entry for entry in catalogue if entry.name.lower() == layer_type.lower()),
+                None,
+            )
+        if info is None:
+            for entry in catalogue:
+                if entry.localized_name.lower() == layer_type.lower():
+                    info = entry
                     break
         return info.model_dump() if info else {"error": f"Layer type '{layer_type}' not found"}
 

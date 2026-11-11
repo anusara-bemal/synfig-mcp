@@ -779,6 +779,221 @@ class FakeBridgeServer:
                 },
             }
 
+        if method == "schema.list_layers":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "count": 6,
+                    "layers": [
+                        {
+                            "name": "circle",
+                            "local_name": "Circle",
+                            "category": "Geometry",
+                            "version": "0.1",
+                            "params": {
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "radius": {
+                                    "type": "real",
+                                    "local_name": "Radius",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "origin": {
+                                    "type": "vector",
+                                    "local_name": "Origin",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "rectangle",
+                            "local_name": "Rectangle",
+                            "category": "Geometry",
+                            "version": "0.1",
+                            "params": {
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "point1": {
+                                    "type": "vector",
+                                    "local_name": "Point 1",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "point2": {
+                                    "type": "vector",
+                                    "local_name": "Point 2",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "star",
+                            "local_name": "Star",
+                            "category": "Geometry",
+                            "version": "0.1",
+                            "params": {
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "radius1": {
+                                    "type": "real",
+                                    "local_name": "Radius 1",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "radius2": {
+                                    "type": "real",
+                                    "local_name": "Radius 2",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "points": {
+                                    "type": "integer",
+                                    "local_name": "Points",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "text",
+                            "local_name": "Text",
+                            "category": "Typography",
+                            "version": "0.1",
+                            "params": {
+                                "text": {
+                                    "type": "string",
+                                    "local_name": "Text",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "solid_color",
+                            "local_name": "Solid Color",
+                            "category": "Geometry",
+                            "version": "0.1",
+                            "params": {
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "outline",
+                            "local_name": "Outline",
+                            "category": "Geometry",
+                            "version": "0.1",
+                            "params": {
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "width": {
+                                    "type": "real",
+                                    "local_name": "Width",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "bline": {
+                                    "type": "bline_point_list",
+                                    "local_name": "Spline",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "region",
+                            "local_name": "Region",
+                            "category": "Geometry",
+                            "version": "0.1",
+                            "params": {
+                                "color": {
+                                    "type": "color",
+                                    "local_name": "Color",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "bline": {
+                                    "type": "bline_point_list",
+                                    "local_name": "Spline",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "blur",
+                            "local_name": "Blur",
+                            "category": "Blurs",
+                            "version": "0.1",
+                            "params": {
+                                "size": {
+                                    "type": "vector",
+                                    "local_name": "Size",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "type": {
+                                    "type": "integer",
+                                    "local_name": "Type",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                            },
+                        },
+                        {
+                            "name": "PasteCanvas",
+                            "local_name": "Group",
+                            "category": "Composite",
+                            "version": "0.1",
+                            "params": {
+                                "origin": {
+                                    "type": "vector",
+                                    "local_name": "Origin",
+                                    "writable": True,
+                                    "animatable": True,
+                                },
+                                "canvas": {
+                                    "type": "canvas",
+                                    "local_name": "Canvas",
+                                    "writable": True,
+                                    "animatable": False,
+                                },
+                            },
+                        },
+                    ],
+                },
+            }
+
         if method == "param.list":
             return {
                 "jsonrpc": "2.0",

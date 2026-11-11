@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <vector>
+#include <list>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -29,6 +30,7 @@
 #include <synfigapp/value_desc.h>
 #include <synfig/canvas.h>
 #include <synfig/layer.h>
+#include <synfig/paramdesc.h>
 #include <synfig/layers/layer_pastecanvas.h>
 #include <synfig/renddesc.h>
 #include <synfig/keyframe.h>
@@ -82,6 +84,66 @@ static nlohmann::json make_diff(const std::string& action,
     d["modified"] = modified;
     d["deleted"] = deleted;
     return d;
+}
+
+//! Build an error response immediately, without dispatching to the GUI thread.
+/*!
+ * Every handler that needs a layer, a parameter or a value node must reject
+ * empty identifiers *before* it queues work on the main thread.  Dispatching
+ * a request with an empty identifier used to enqueue a task that could never
+ * resolve, so the caller waited for its transport timeout instead of getting a
+ * deterministic 2002 error.  This helper produces the JSON-RPC error payload
+ * directly on the socket thread.
+ *
+ * The payload carries both the JSON-RPC ``error`` object (for protocol
+ * clients) and the flat ``status``/``code``/``message`` members (for tooling
+ * that reads the response body without unwrapping ``error``).
+ */
+static std::string safe_extract_string(const nlohmann::json& obj, const std::string& key, const std::string& fallback = "") {
+    if (!obj.is_object() || !obj.contains(key) || obj[key].is_null()) {
+        return fallback;
+    }
+    if (obj[key].is_string()) {
+        return obj[key].get<std::string>();
+    }
+    return fallback;
+}
+
+static nlohmann::json make_input_error(const nlohmann::json& req,
+                                       int code,
+                                       const std::string& message) {
+    nlohmann::json r;
+    r["jsonrpc"] = "2.0";
+    if (req.contains("id")) {
+        r["id"] = req["id"];
+    }
+    r["status"] = "error";
+    r["code"] = code;
+    r["message"] = message;
+    r["error"] = {{"code", code}, {"message", message}};
+    return r;
+}
+
+//! Validate the identifiers every layer-scoped request depends on.
+/*!
+ * Returns an empty JSON object when the request may proceed, or a fully
+ * formed error response when it must be rejected.  Callers use the
+ * ``is_null()`` check so a legitimate empty result is never confused with an
+ * error.
+ */
+static bool reject_empty_identifiers(const nlohmann::json& req,
+                                     const std::string& layer_id,
+                                     const std::string& param_name,
+                                     nlohmann::json& out) {
+    if (layer_id.empty()) {
+        out = make_input_error(req, 2002, "Layer ID cannot be empty or null.");
+        return true;
+    }
+    if (param_name.empty()) {
+        out = make_input_error(req, 2003, "Parameter name cannot be empty or null.");
+        return true;
+    }
+    return false;
 }
 
 #ifndef MCP_BRIDGE_STANDALONE
@@ -198,6 +260,16 @@ static nlohmann::json build_layer_tree(synfig::Canvas::Handle canvas) {
     }
     return layers;
 }
+#endif
+
+#ifdef MCP_BRIDGE_STANDALONE
+const char* get_build_version() {
+    return "0.8.0";
+}
+const char* get_build_commit_sha() {
+    return "dev";
+}
+#endif
 
 static std::vector<std::string> s_workspace_roots;
 
@@ -474,7 +546,6 @@ static bool is_safe_bridge_path(const std::string& path, const std::vector<std::
 
     return true;
 }
-#endif
 
 nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authenticated) {
     nlohmann::json res;
@@ -1335,8 +1406,11 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     }
 
     if (method == "layer.remove" || method == "layer.delete") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string layer_id = params.value("layer_id", "");
+        std::string doc_id = safe_extract_string(params, "doc_id", "doc_0");
+        std::string layer_id = safe_extract_string(params, "layer_id", "");
+        if (layer_id.empty()) {
+            return make_input_error(req, 2002, "Layer ID cannot be empty or null.");
+        }
         return run_on_main_thread([&, doc_id, layer_id]() -> nlohmann::json {
             nlohmann::json r;
             r["jsonrpc"] = "2.0";
@@ -1701,8 +1775,8 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     }
 
     if (method == "rig.bone_add") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string layer_id = params.value("layer_id", params.value("skeleton_layer", ""));
+        std::string doc_id = safe_extract_string(params, "doc_id", "doc_0");
+        std::string layer_id = safe_extract_string(params, "layer_id", safe_extract_string(params, "skeleton_layer", ""));
         double bone_time = params.value("time", 0.0);
         double origin_x = params.value("origin_x", 0.0);
         double origin_y = params.value("origin_y", 0.0);
@@ -1710,6 +1784,12 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         double bone_width = params.value("width", 1.0);
         double tip_width = params.value("tipwidth", 1.0);
         int parent_index = params.value("parent_index", -1);
+
+        if (layer_id.empty()) {
+            return make_input_error(req, 2002, "Layer ID cannot be empty or null.");
+        }
+            return make_input_error(req, 2002, "Layer ID cannot be empty or null.");
+        }
 
         return run_on_main_thread([&, doc_id, layer_id, bone_time, origin_x, origin_y, bone_angle,
                                    bone_width, tip_width, parent_index]() -> nlohmann::json {
@@ -1845,10 +1925,91 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     }
 
     // --- 5. PARAMETER METHODS ---
+    if (method == "schema.list_layers") {
+        // Truthful introspection: enumerate the live Synfig layer factory
+        // registry instead of a hardcoded list.  Each entry instantiates the
+        // factory once to read its real parameter vocabulary and defaults.
+        nlohmann::json r;
+        r["jsonrpc"] = "2.0";
+        if (req.contains("id")) {
+            r["id"] = req["id"];
+        }
+
+        nlohmann::json layers = nlohmann::json::array();
+        const synfig::Layer::Book& book = synfig::Layer::book();
+        for (synfig::Layer::Book::const_iterator it = book.begin(); it != book.end(); ++it) {
+            const synfig::Layer::BookEntry& entry = it->second;
+
+            nlohmann::json item;
+            item["name"] = entry.name.c_str();
+            item["local_name"] = entry.local_name.c_str();
+            item["category"] = entry.category.c_str();
+            item["version"] = entry.version.c_str();
+
+            nlohmann::json params_json = nlohmann::json::object();
+            try {
+                synfig::Layer::Handle instance(entry.factory());
+                if (instance) {
+                    const synfig::Layer::Vocab& vocab = instance->get_param_vocab();
+                    for (synfig::Layer::Vocab::const_iterator p = vocab.begin(); p != vocab.end(); ++p) {
+                        nlohmann::json pj;
+                        synfig::ValueBase def = instance->get_param(p->get_name());
+                        pj["type"] = def.is_valid() ? def.type_name().c_str() : "unknown";
+                        pj["local_name"] = p->get_local_name().c_str();
+                        pj["description"] = p->get_description().c_str();
+                        pj["hint"] = p->get_hint().c_str();
+                        pj["origin"] = p->get_origin().c_str();
+                        pj["critical"] = p->get_critical();
+                        pj["hidden"] = p->get_hidden();
+                        // Synfig has no runtime read-only flag on ParamDesc
+                        // (read_only() is a stub upstream); hidden parameters
+                        // are the only ones the GUI never exposes for writing.
+                        pj["writable"] = !p->get_hidden();
+                        pj["animatable"] = !p->get_static();
+                        pj["enum"] = nlohmann::json::array();
+                        const std::list<synfig::ParamDesc::EnumData>& enums = p->get_enum_list();
+                        for (std::list<synfig::ParamDesc::EnumData>::const_iterator e = enums.begin();
+                             e != enums.end(); ++e) {
+                            nlohmann::json ev;
+                            ev["value"] = e->value;
+                            ev["name"] = e->name.c_str();
+                            ev["local_name"] = e->local_name.c_str();
+                            pj["enum"].push_back(ev);
+                        }
+                        if (def.is_valid()) {
+                            pj["default"] = valuebase_to_json(def);
+                        }
+                        params_json[p->get_name().c_str()] = pj;
+                    }
+                }
+            } catch (...) {
+                item["params"] = params_json;
+                item["error"] = "factory instantiation failed";
+                layers.push_back(item);
+                continue;
+            }
+
+            item["params"] = params_json;
+            item["param_count"] = params_json.size();
+            layers.push_back(item);
+        }
+
+        r["result"] = {
+            {"count", layers.size()},
+            {"layers", layers}
+        };
+        return r;
+    }
+
     if (method == "param.get") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string layer_id = params.value("layer_id", "");
-        std::string param_name = params.value("param_name", "");
+        std::string doc_id = safe_extract_string(params, "doc_id", "doc_0");
+        std::string layer_id = safe_extract_string(params, "layer_id", "");
+        std::string param_name = safe_extract_string(params, "param_name", "");
+
+        nlohmann::json early;
+        if (reject_empty_identifiers(req, layer_id, param_name, early)) {
+            return early;
+        }
 
         return run_on_main_thread([&, doc_id, layer_id, param_name]() -> nlohmann::json {
             nlohmann::json r;
@@ -1890,10 +2051,15 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     }
 
     if (method == "param.set") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string layer_id = params.value("layer_id", "");
-        std::string param_name = params.value("param_name", "");
-        nlohmann::json val_json = params.value("value", nlohmann::json::object());
+        std::string doc_id = safe_extract_string(params, "doc_id", "doc_0");
+        std::string layer_id = safe_extract_string(params, "layer_id", "");
+        std::string param_name = safe_extract_string(params, "param_name", "");
+        nlohmann::json val_json = params.contains("value") && !params["value"].is_null() ? params["value"] : nlohmann::json::object();
+
+        nlohmann::json early;
+        if (reject_empty_identifiers(req, layer_id, param_name, early)) {
+            return early;
+        }
 
         return run_on_main_thread([&, doc_id, layer_id, param_name, val_json]() -> nlohmann::json {
             nlohmann::json r;
@@ -2104,10 +2270,18 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
     }
 
     if (method == "param.link") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string layer_id = params.value("layer_id", "");
-        std::string param_name = params.value("param_name", "");
-        std::string link_id = params.value("link_id", params.value("name", ""));
+        std::string doc_id = safe_extract_string(params, "doc_id", "doc_0");
+        std::string layer_id = safe_extract_string(params, "layer_id", "");
+        std::string param_name = safe_extract_string(params, "param_name", "");
+        std::string link_id = safe_extract_string(params, "link_id", safe_extract_string(params, "name", ""));
+
+        nlohmann::json early;
+        if (reject_empty_identifiers(req, layer_id, param_name, early)) {
+            return early;
+        }
+        if (link_id.empty()) {
+            return make_input_error(req, 2004, "Value node ID cannot be empty or null.");
+        }
 
         return run_on_main_thread([&, doc_id, layer_id, param_name, link_id]() -> nlohmann::json {
             nlohmann::json r;

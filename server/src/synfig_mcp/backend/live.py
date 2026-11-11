@@ -224,6 +224,18 @@ class LiveBackend(BackendBase):
         )
         return tree
 
+    async def schema_list_layers(self) -> list[dict[str, Any]]:
+        """Enumerate the live Synfig layer factory registry.
+
+        The bridge answers with one entry per ``synfig::Layer::book()`` type,
+        including the real parameter vocabulary (value type, hint, enum values,
+        default and write state) of the running build.
+        """
+        client = await self._ensure_client()
+        res = await client.call("schema.list_layers")
+        layers = res.get("layers", [])
+        return [dict(entry) for entry in layers if isinstance(entry, dict)]
+
     async def layer_add(
         self,
         doc_id: str,
@@ -884,49 +896,25 @@ class LiveBackend(BackendBase):
                 },
             }
 
-        try:
-            client = await self._ensure_client()
-            res = await client.call("scene.build", spec)
-            if isinstance(res, dict) and "diff" in res:
-                return res
-        except Exception:
-            pass
-
-        created_layers: list[str] = []
-        for l_spec in parsed_spec.layers:
-            await self.layer_add(
-                doc_id=doc_id,
-                layer_type=l_spec.type,
-                canvas_path=parsed_spec.canvas_path,
-                params=l_spec.params,
-                description=l_spec.id,
-            )
-            created_layers.append(l_spec.id)
-            for wp in l_spec.waypoints:
-                await self.anim_waypoint_set(
-                    doc_id=doc_id,
-                    layer_id=l_spec.id,
-                    param_name=wp.param,
-                    time=wp.time,
-                    value=wp.value,
-                    interpolation=wp.interpolation,
-                )
-
-        for g_spec in parsed_spec.groups:
-            if g_spec.layer_ids:
-                await self.layer_group(
-                    doc_id=doc_id,
-                    layer_ids=g_spec.layer_ids,
-                    group_name=g_spec.id,
-                    canvas_path=parsed_spec.canvas_path,
-                )
-                created_layers.append(g_spec.id)
-
+        client = await self._ensure_client()
+        res = await client.call("scene.build", spec)
+        if isinstance(res, dict) and "diff" in res:
+            return res
         return {
             "doc_id": doc_id,
-            "diff": {
+            "diff": res.get(
+                "diff",
+                {
+                    "action": "scene.build",
+                    "created": [],
+                    "modified": [],
+                    "deleted": [],
+                },
+            )
+            if isinstance(res, dict)
+            else {
                 "action": "scene.build",
-                "created": created_layers,
+                "created": [],
                 "modified": [],
                 "deleted": [],
             },

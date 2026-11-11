@@ -164,6 +164,10 @@ class AutoBackend(BackendBase):
         """Delegate to the active backend."""
         return await self._current().scene_tree(doc_id=doc_id, canvas_path=canvas_path)
 
+    async def schema_list_layers(self) -> list[dict[str, Any]]:
+        """Delegate to the active backend (live factory probe when Studio is up)."""
+        return await self._current().schema_list_layers()
+
     async def layer_add(
         self,
         doc_id: str,

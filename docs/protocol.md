@@ -113,6 +113,7 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `doc.close` | `doc_id`, `force?` | `studio::Instance::close()` (dirty documents are refused instead of opening a modal dialog) | Verified |
 | `scene.tree` | `doc_id` | `canvas->rbegin()..rend()` recursive layer traversal | Verified |
 | `scene.build` | `doc_id`, `layers[]`, `groups?` | `canvas_interface->add_layer_to()` + `Action::ValueDescSet` (waypoints) + `Action::LayerEncapsulate` (groups), all inside one `PassiveGrouper` | Verified |
+| `schema.list_layers` | none | `synfig::Layer::book()` runtime factory probe | Verified |
 | `canvas.list` | `doc_id` | `canvas->children()`, `canvas->get_root()` | Verified |
 | `canvas.create` | `doc_id`, `id` | `Action::CanvasAdd::create()` | Verified |
 | `canvas.rename` | `doc_id`, `canvas_id`, `name` | `Canvas::set_name()` | Verified |

@@ -134,6 +134,18 @@ class BackendBase(ABC):
         """Get hierarchical layer tree for the document."""
         ...
 
+    @abstractmethod
+    async def schema_list_layers(self) -> list[dict[str, Any]]:
+        """Return the layer factory catalogue of this backend.
+
+        Each entry is a mapping with ``name``, ``local_name``, ``category``,
+        ``version`` and a ``params`` map.  A live backend answers from the
+        Synfig layer registry (``synfig::Layer::book()``), so the result always
+        reflects the exact build the artist is running; a headless backend
+        answers from its introspected schema registry.
+        """
+        ...
+
     # -----------------------------------------------------------------------
     # Layer Operations
     # -----------------------------------------------------------------------
