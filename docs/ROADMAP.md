@@ -45,6 +45,7 @@ by a test that fails without the fix.
 | 15 | Value node linking | A parameter could not follow an exported value node | `param_link` implemented with the native `LayerParamConnect` action | `test_live_param_link_connects_a_parameter_to_an_exported_value_node` |
 | 16 | Value node accuracy | `param_convert` advertised three ValueNode names Synfig does not have (`cosine`, `time_loop`, `stepwise`) | Names, links and accepted value types taken from upstream; every conversion verified against the engine | `test_every_supported_conversion_is_accepted_by_synfig` |
 | 17 | Render target accuracy | All 13 output modules were claimed as supported | 6 write a single frame, 4 are sequence encoders, 1 is a converter, 2 write nothing - classified and verified | `test_render_targets.py` |
+| 18 | Wire format | The bridge answered gradients as `value` while the documented format and the model use `cpoints`, so every gradient parameter was unreadable in Studio | Bridge follows the documented format and accepts gradients on write | `test_live_gradient_parameters_round_trip` |
 
 ### Remaining gaps (documented, not implemented in this pass)
 

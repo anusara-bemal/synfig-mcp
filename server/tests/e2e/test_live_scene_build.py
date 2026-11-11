@@ -131,6 +131,55 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_gradient_parameters_round_trip(live_studio: BridgeClient) -> None:
+    """Gradient parameters must be readable and writable through the bridge.
+
+    The bridge used to answer with ``{"type": "gradient", "value": [...]}`` while
+    the documented wire format and the Python model use ``cpoints``, which made
+    every gradient parameter unreadable for MCP clients.
+    """
+    layer = await live_studio.call(
+        "layer.add",
+        {"doc_id": "doc_0", "layer_type": "linear_gradient", "description": "gradient"},
+    )
+    layer_id = layer["layer_id"]
+
+    value = await live_studio.call(
+        "param.get",
+        {"doc_id": "doc_0", "layer_id": layer_id, "param_name": "gradient"},
+    )
+    gradient = value.get("value", {}) if isinstance(value, dict) else {}
+    assert "cpoints" in gradient, f"gradient does not use the documented format: {gradient}"
+    assert gradient["cpoints"], "the gradient has no color stops"
+
+    await live_studio.call(
+        "param.set",
+        {
+            "doc_id": "doc_0",
+            "layer_id": layer_id,
+            "param_name": "gradient",
+            "value": {
+                "type": "gradient",
+                "cpoints": [
+                    {"pos": 0.0, "color": {"r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0}},
+                    {"pos": 1.0, "color": {"r": 0.0, "g": 0.0, "b": 1.0, "a": 1.0}},
+                ],
+            },
+        },
+    )
+
+    updated = await live_studio.call(
+        "param.get",
+        {"doc_id": "doc_0", "layer_id": layer_id, "param_name": "gradient"},
+    )
+    stops = updated.get("value", {}).get("cpoints", []) if isinstance(updated, dict) else []
+    assert stops, "the gradient lost its color stops"
+    first = stops[0].get("color", {})
+    assert abs(float(first.get("r", 0.0)) - 1.0) < 0.01, f"the gradient was not written: {stops}"
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_param_link_connects_a_parameter_to_an_exported_value_node(
     live_studio: BridgeClient,
 ) -> None:

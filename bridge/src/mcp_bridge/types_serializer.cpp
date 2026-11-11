@@ -73,7 +73,9 @@ nlohmann::json valuebase_to_json(const synfig::ValueBase& val) {
             stops.push_back(stop_obj);
         }
         j["type"] = "gradient";
-        j["value"] = stops;
+        // The documented wire format (docs/protocol.md) uses "cpoints"; the
+        // Python SynfigValue model expects the same key.
+        j["cpoints"] = stops;
     } else if (type_name == "bline_point") {
         synfig::BLinePoint bp = val.get(synfig::BLinePoint());
         j["type"] = "bline_point";
@@ -150,6 +152,33 @@ synfig::ValueBase json_to_valuebase(const nlohmann::json& j) {
     } else if (type_name == "time" && val.is_object()) {
         double sec = val.value("seconds", 0.0);
         return synfig::ValueBase(synfig::Time(sec));
+    } else if (type_name == "gradient") {
+        // Accept the documented "cpoints" spelling as well as the older
+        // "value" array so both directions of the wire format work.
+        const nlohmann::json* stops = nullptr;
+        if (j.contains("cpoints") && j["cpoints"].is_array()) {
+            stops = &j["cpoints"];
+        } else if (val.is_array()) {
+            stops = &val;
+        }
+        if (!stops) {
+            return synfig::ValueBase();
+        }
+        synfig::Gradient gradient;
+        for (nlohmann::json::const_iterator it = stops->begin(); it != stops->end(); ++it) {
+            if (!it->is_object()) continue;
+            double pos = it->value("pos", 0.0);
+            const nlohmann::json& c = it->contains("color") ? (*it)["color"] : nlohmann::json::object();
+            float r = c.value("r", 0.0f);
+            float g = c.value("g", 0.0f);
+            float b = c.value("b", 0.0f);
+            float a = c.value("a", 1.0f);
+            gradient.push_back(synfig::Gradient::CPoint(
+                static_cast<synfig::Real>(pos),
+                synfig::Color(r, g, b, a)));
+        }
+        gradient.sort();
+        return synfig::ValueBase(gradient);
     }
 
     return synfig::ValueBase();
