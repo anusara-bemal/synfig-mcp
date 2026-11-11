@@ -4,14 +4,27 @@ CLI introspection probe for discovering layer types, parameters, valuenodes, and
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from typing import TYPE_CHECKING
 
 from synfig_mcp.schema.cache import SchemaCache
+from synfig_mcp.schema.param_types import load_param_types
 from synfig_mcp.schema.registry import LayerParamInfo, LayerTypeInfo, SchemaRegistry
 
 if TYPE_CHECKING:
     from synfig_mcp.cli.runner import CliRunner
+
+#: Cache key of the introspected registry on disk.
+#: The suffix is bumped whenever the cached payload layout changes.
+REGISTRY_CACHE_KEY = "synfig_cli_registry_v2"
+
+#: Maximum age of a cached introspection before it is refreshed.
+REGISTRY_CACHE_MAX_AGE = 7 * 24 * 3600
+
+#: Module level singletons shared by the schema tools.
+_shared_registry: SchemaRegistry | None = None
+_shared_lock: asyncio.Lock | None = None
 
 
 def seed_builtin_schemas(registry: SchemaRegistry) -> None:
@@ -173,6 +186,17 @@ def seed_builtin_schemas(registry: SchemaRegistry) -> None:
     )
 
 
+def _apply_param_types(info: LayerTypeInfo, types: dict[str, str]) -> None:
+    """Attach the introspected value types to the parameters of a layer type."""
+    from synfig_mcp.schema.param_types import is_editable_param
+
+    for name, param in info.params.items():
+        value_type = types.get(name)
+        if value_type:
+            param.type = value_type
+            param.editable = is_editable_param(name, value_type)
+
+
 async def probe_synfig_cli(
     runner: CliRunner,
     registry: SchemaRegistry,
@@ -181,7 +205,7 @@ async def probe_synfig_cli(
     deep_probe_layers: bool = False,
 ) -> None:
     """Introspect Synfig CLI binary to populate SchemaRegistry, with caching and fallback."""
-    cache_key = "synfig_cli_registry"
+    cache_key = REGISTRY_CACHE_KEY
 
     # Attempt cache load
     if use_cache and cache:
@@ -198,10 +222,12 @@ async def probe_synfig_cli(
 
     # Introspect layers
     layers = await runner.get_layers()
+    param_types = load_param_types()
     for layer_name in layers:
         if deep_probe_layers:
             info = await runner.get_layer_info(layer_name)
             if info:
+                _apply_param_types(info, param_types.get(layer_name, {}))
                 registry.register_layer(info)
             else:
                 registry.register_layer(LayerTypeInfo(name=layer_name))
@@ -225,3 +251,53 @@ async def probe_synfig_cli(
     if cache:
         with contextlib.suppress(Exception):
             cache.save(cache_key, registry.export_dict())
+
+
+async def get_synfig_registry(
+    *,
+    runner: CliRunner | None = None,
+    cache: SchemaCache | None = None,
+    force_refresh: bool = False,
+) -> SchemaRegistry:
+    """
+    Return a registry that reflects the *installed* Synfig binary.
+
+    The registry is introspected once and cached on disk, so the schema tools
+    report the real layer types, parameters, targets, renderers and value nodes
+    of the Synfig build on this machine instead of a static fallback list.
+    """
+    global _shared_registry, _shared_lock
+
+    if _shared_lock is None:
+        _shared_lock = asyncio.Lock()
+
+    if _shared_registry is not None and not force_refresh:
+        return _shared_registry
+
+    async with _shared_lock:
+        if _shared_registry is not None and not force_refresh:
+            return _shared_registry
+
+        from synfig_mcp.cli.runner import CliRunner as _CliRunner
+
+        active_runner = runner or _CliRunner()
+        active_cache = cache or SchemaCache()
+        registry = SchemaRegistry()
+
+        if not force_refresh and active_cache.is_fresh(REGISTRY_CACHE_KEY, REGISTRY_CACHE_MAX_AGE):
+            cached = active_cache.load(REGISTRY_CACHE_KEY)
+            if cached:
+                registry.import_dict(cached)
+                _shared_registry = registry
+                return registry
+
+        seed_builtin_schemas(registry)
+        await probe_synfig_cli(
+            active_runner,
+            registry,
+            cache=active_cache,
+            use_cache=False,
+            deep_probe_layers=True,
+        )
+        _shared_registry = registry
+        return registry

@@ -5,6 +5,34 @@ All notable changes to `synfig-mcp` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Corrupt headless documents (critical)**: `param_export` wrote `<defs><valuenode id=…>`, a shape the Synfig engine rejects ("Unknown ID referenced in parameter", "Unexpected element <valuenode>"), so every exported document failed to load. Exported value nodes are now written as `<defs><real id="…"/></defs>` and the `<defs>` section is placed *before* the layers that reference it, exactly as Synfig does.
+- **Corrupt headless documents (critical)**: `param_convert` wrote `<linear>` elements without the mandatory `type` attribute, producing documents the engine refused to load ("Missing attribute \"type\" in <linear>"). Conversions now emit the real linkable ValueNode layout (`linear`, `add`, `subtract`, `scale`, `absolute`, `duplicate`, `step`, `range`, `sine`, `cosine`, `time_loop`, `timed_swap`, `composite`) and reject unsupported combinations with an actionable error.
+- **Invalid waypoint interpolation**: `anim_waypoint_set` accepted `"tcb"` (documented as valid) and any other string, producing documents Synfig rejects ("Bad value \"tcb\" in <before>"). Interpolations are now validated against the engine's own set (`linear`, `constant`, `halt`, `clamped`, `auto`, `manual`); `tcb` is accepted as a legacy alias of `auto`.
+- **Silent value corruption**: `param_set` stringified unsupported values into the parameter (a Python `repr` inside `<string>`), which Synfig then rejected while the tool reported success. Unsupported values now raise a typed error.
+- **Live `scene_build` data loss**: the C++ bridge ignored the `groups` and `waypoints` sections of a scene specification, so live builds silently produced a different document than headless builds. Both are now applied inside the same undo step.
+- **Invalid parameter values were ignored**: `layer.add` and `scene.build` skipped parameters whose value could not be parsed instead of reporting the problem. They now fail with a typed error.
+- **Video rendering could lie**: `render_video` silently wrote GIF bytes into a file named `.mp4` when ffmpeg was unavailable. It now locates ffmpeg (PATH, Synfig bundle, MSYS2) and fails with an actionable message instead of producing a mislabelled file.
+- **Wrong layer versions**: layers were written with a hardcoded `version="0.1"`, which made Synfig warn about outdated layers. The real version from `synfig --layer-info` is used now.
+- **Unknown layer types were accepted**: the headless backend created layers with arbitrary type names, producing broken documents. It now rejects them with the list of valid types.
+
+### Added
+- **Synfig validity gate**: `server/tests/contract/test_sif_synfig_validity.py` performs every mutation, saves the document and requires the *real* `synfig` binary to load and render it without a single error. `synfig_mcp.validation` provides the same check programmatically.
+- **Live parity gate**: `server/tests/e2e/test_live_scene_build.py` verifies waypoints, groups, single-step undo and engine-loadability of documents saved through the bridge.
+- **Truthful introspection**: the schema tools are now backed by the installed Synfig binary. `schema_list_layers` reports all 55 layer types (was 6), `schema_get_layer` reports the real parameters, versions and value types, `schema_list_targets` reports all 13 targets (was 7), `schema_list_renderers` reports all 8 renderers with correct names (was 3, mangled) and `schema_list_valuenodes` reports all 69 value nodes (was 14).
+- **Parameter type table**: `server/src/synfig_mcp/schema/param_types.json` holds the value type of all 454 introspected parameters, produced by `scripts/introspect_param_types.py` from the patched Studio, and validated against the binary in CI.
+- **Spline authoring**: `param_set` can now write `bline` spline points as a valid `<bline>` element.
+- **Parameter value coercion**: plain JSON values are coerced into the type the parameter expects (`[x, y]` becomes a vector, a number becomes an angle/time/integer when required).
+- **Documentation freshness gate**: `server/tests/unit/test_tool_docs.py` fails when `docs/tools.md` does not match the registered tool surface.
+
+### Changed
+- **All tools enabled by default**: the default profile is now `all` (73 tools) so a freshly installed server exposes the complete Synfig feature set. `SYNFIG_MCP_PROFILE=core|anim|fx|rig|assets|review` remains available for token-constrained clients.
+- **Truthful coverage matrix**: `docs/COVERAGE.md` is generated from measured capability instead of hardcoded claims. It now reports 55/55 layer types, 440/455 writable parameters, 13/13 render targets and - instead of the previously claimed 100% - the 11 value nodes the MCP can actually create.
+- **Regenerated tool reference**: `docs/tools.md` documents all 73 tools (was 47) and is generated from the live registry.
+- **Corrected documentation**: README, `docs/api.md` and `docs/TOKEN_BUDGET.md` state the real tool counts, token budgets and the new default profile.
+
 ## [0.8.0-rc2] - 2026-11-09
 
 ### Fixed

@@ -23,7 +23,7 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 |---|---|
 | **Live editing** | Drives a running, patched Synfig Studio through an authenticated local bridge. Every mutation is an undoable Studio action. |
 | **Headless fallback** | Works without a GUI through a lossless `.sif` / `.sifz` / `.sfg` engine and the `synfig` CLI. Ideal for CI, containers, and render farms. |
-| **Small context footprint** | Tool profiles keep definitions between ~1.9k and ~18.5k tokens instead of loading all 56 tools at once. |
+| **Small context footprint** | Tool profiles keep definitions between ~3.0k and ~18.2k tokens; the complete 73-tool surface ships enabled by default and can be narrowed per client. |
 | **Visual feedback loop** | Renders frames and returns base64 previews plus objective metrics: SSIM, palette, safe areas, clipping, strobe/photosensitivity, diff heatmaps. |
 | **Hardened by default** | Token-authenticated bridge, loopback-only binding, sandboxed file access, SSRF-resistant asset downloads, and SVG sanitization. |
 | **Reproducible releases** | Cross-platform Studio bundles, a GPL source bundle, Python wheel/sdist, SHA-256 checksums, and a signed-in-CI GHCR container. |
@@ -141,7 +141,7 @@ Edit `claude_desktop_config.json`:
     "synfig": {
       "command": "synfig-mcp",
       "env": {
-        "SYNFIG_MCP_PROFILE": "core",
+        "SYNFIG_MCP_PROFILE": "all",
         "SYNFIG_MCP_BACKEND": "auto"
       }
     }
@@ -183,7 +183,7 @@ Add to `.vscode/mcp.json`:
       "type": "stdio",
       "command": "synfig-mcp",
       "env": {
-        "SYNFIG_MCP_PROFILE": "core"
+        "SYNFIG_MCP_PROFILE": "all"
       }
     }
   }
@@ -199,7 +199,7 @@ Add to `.vscode/mcp.json`:
       "command": "/absolute/path/to/synfig-mcp",
       "args": [],
       "env": {
-        "SYNFIG_MCP_PROFILE": "core",
+        "SYNFIG_MCP_PROFILE": "all",
         "SYNFIG_MCP_BACKEND": "auto",
         "SYNFIG_MCP_WORKSPACE_ROOTS": "/home/me/Documents/SynfigMCP"
       }
@@ -228,17 +228,17 @@ Headless mode never needs a GUI. It is fully lossless for SIF documents and dele
 
 ## Tool profiles
 
-Set `SYNFIG_MCP_PROFILE` to expose only the tools a workflow needs.
+All 73 tools are exposed by default. Set `SYNFIG_MCP_PROFILE` to expose only the tools a workflow needs.
 
 | Profile | Tools | Approx. tokens (cl100k) | Focus |
 |---|---:|---:|---|
-| `core` (default) | 12 | ~2,658 | Scene build/export, inspection, undo/redo, single-frame render |
-| `anim` | 14 | ~3,800 | Keyframes, timeline, waypoints, interpolation |
-| `fx` | 21 | ~4,200 | Layer hierarchy, effects recipes, style presets |
-| `rig` | 12 | ~2,800 | Cut-out rigging, poses, motion cycles, storyboards |
-| `assets` | 10 | ~1,900 | Licensed asset search, hardened downloads, attribution |
-| `review` | 15 | ~3,900 | Frame/sequence/compare review, objective metrics, jobs |
-| `all` | 56 | ~18,500 | Full low-level surface |
+| `all` (default) | 73 | ~18,200 | Complete Synfig surface: documents, layers, parameters, animation, FX, rigging, review, assets |
+| `core` | 13 | ~2,970 | Scene build/export, inspection, undo/redo, single-frame render |
+| `anim` | 19 | ~4,600 | Keyframes, timeline, waypoints, interpolation |
+| `fx` | 24 | ~5,600 | Layer hierarchy, effects recipes, style presets |
+| `rig` | 17 | ~3,800 | Cut-out rigging, poses, motion cycles, storyboards |
+| `assets` | 12 | ~2,700 | Licensed asset search, hardened downloads, attribution |
+| `review` | 18 | ~4,900 | Frame/sequence/compare review, objective metrics, jobs |
 
 Examples:
 
@@ -255,7 +255,7 @@ See the [full tool reference](docs/api.md) and the generated [coverage matrix](d
 
 | Environment variable | Default | Description |
 |---|---|---|
-| `SYNFIG_MCP_PROFILE` | `core` | Tool profile: `core`, `anim`, `fx`, `rig`, `assets`, `review`, `all` |
+| `SYNFIG_MCP_PROFILE` | `all` | Tool profile: `all` (complete surface), `core`, `anim`, `fx`, `rig`, `assets`, `review` |
 | `SYNFIG_MCP_BACKEND` | `auto` | `auto`, `live`, or `headless` |
 | `SYNFIG_MCP_HOST` | `127.0.0.1` | Bridge host probed by live mode |
 | `SYNFIG_MCP_PORT` | `19998` | Bridge TCP port |

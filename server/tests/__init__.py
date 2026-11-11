@@ -1,0 +1,1 @@
+"""Synfig MCP test suite."""

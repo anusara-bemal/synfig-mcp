@@ -15,6 +15,43 @@ class CliRunner:
 
     def __init__(self, binary_path: Path | None = None) -> None:
         self.binary_path = binary_path or self._discover_binary()
+        self._layer_catalog: dict[str, LayerTypeInfo] | None = None
+        self._layer_names: list[str] | None = None
+
+    async def get_layer_catalog(self) -> dict[str, LayerTypeInfo]:
+        """Return (and cache) the full layer catalog of the Synfig binary.
+
+        Each entry carries the layer version and the list of parameters the
+        engine knows about, which the writer needs to emit valid documents.
+        """
+        if self._layer_catalog is not None:
+            return self._layer_catalog
+
+        catalog: dict[str, LayerTypeInfo] = {}
+        for name in await self.get_layers():
+            info = await self.get_layer_info(name)
+            catalog[name] = info or LayerTypeInfo(name=name)
+        self._layer_catalog = catalog
+        return catalog
+
+    async def get_layer_version(self, layer_name: str) -> str | None:
+        """Return the version string of a layer type (e.g. ``0.2``)."""
+        catalog = await self.get_layer_catalog()
+        info = catalog.get(layer_name)
+        return info.version if info else None
+
+    async def is_valid_layer_type(self, layer_name: str) -> bool:
+        """Check whether the Synfig binary knows the given layer type."""
+        if not self.is_available:
+            # Without a binary we cannot validate; assume the type is valid so
+            # offline usage keeps working.
+            return True
+        catalog = await self.get_layer_catalog()
+        if layer_name in catalog:
+            return True
+        # Studio uses a few aliases for the same layer (e.g. "group" ->
+        # "PasteCanvas").
+        return layer_name.lower() in {name.lower() for name in catalog}
 
     def _discover_binary(self) -> Path | None:
         """Find the synfig CLI binary from config, PATH, or local build trees."""
@@ -74,6 +111,9 @@ class CliRunner:
                 for line in out_str.splitlines():
                     clean = line.strip()
                     if clean and not clean.startswith("synfig(") and not clean.startswith("mlt_"):
+                        # The CLI prints "synfig 1.5.5"; keep the bare version.
+                        if clean.lower().startswith("synfig "):
+                            clean = clean[len("synfig ") :].strip()
                         return clean
             return out_str or None
         except Exception:
@@ -183,7 +223,13 @@ class CliRunner:
             return []
 
     async def get_renderers(self) -> list[str]:
-        """List available render engines via synfig -q --renderers."""
+        """List available render engines via synfig -q --renderers.
+
+        The CLI prints ``<name> - <description>`` lines, e.g.
+        ``software-draft - Cobra Draft (software)``.  Only the separator
+        ``" - "`` marks the end of the name, so names such as
+        ``software-low2`` keep their suffix.
+        """
         if not self.is_available or self.binary_path is None:
             return []
 
@@ -200,8 +246,8 @@ class CliRunner:
             for line in stdout.decode("utf-8", errors="replace").splitlines():
                 r = line.strip()
                 if r and not r.startswith("synfig(") and not r.startswith("mlt_"):
-                    name = r.split("-", 1)[0].strip() if "-" in r else r
-                    renderers.append(name)
+                    name = r.split(" - ", 1)[0].strip()
+                    renderers.append(name or r)
             return renderers
         except Exception:
             return []

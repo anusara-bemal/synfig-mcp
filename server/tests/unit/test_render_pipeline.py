@@ -43,6 +43,44 @@ def get_mockable_backend() -> HeadlessBackend:
 
 
 @pytest.mark.asyncio
+async def test_render_video_without_ffmpeg_fails_loudly(
+    tmp_path: Path, tmp_cache: RenderCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing ffmpeg must not silently produce a GIF inside an .mp4 file."""
+    backend = get_mockable_backend()
+    doc = await backend.doc_new(width=160, height=120, fps=10.0)
+    await backend.doc_set_time_range(doc.id, start_time=0.0, end_time=0.2, fps=10.0)
+
+    pipeline = RenderPipeline(backend, cache=tmp_cache)
+    monkeypatch.setattr(pipeline, "_find_ffmpeg", lambda: None)
+
+    output = tmp_path / "movie.mp4"
+    with pytest.raises(SynfigError) as exc_info:
+        await pipeline.render_video(doc_id=doc.id, output_path=str(output))
+
+    assert "ffmpeg" in str(exc_info.value).lower()
+    assert not output.exists(), "a video file was created without ffmpeg"
+
+
+@pytest.mark.asyncio
+async def test_render_video_gif_does_not_require_ffmpeg(
+    tmp_path: Path, tmp_cache: RenderCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Animated GIF output keeps working without ffmpeg."""
+    backend = get_mockable_backend()
+    doc = await backend.doc_new(width=160, height=120, fps=10.0)
+    await backend.doc_set_time_range(doc.id, start_time=0.0, end_time=0.2, fps=10.0)
+
+    pipeline = RenderPipeline(backend, cache=tmp_cache)
+    monkeypatch.setattr(pipeline, "_find_ffmpeg", lambda: None)
+
+    output = tmp_path / "movie.gif"
+    assert await pipeline.render_video(doc_id=doc.id, output_path=str(output)) is True
+    assert output.is_file()
+    assert output.read_bytes()[:3] == b"GIF"
+
+
+@pytest.mark.asyncio
 async def test_render_progress_notifications(tmp_path: Path, tmp_cache: RenderCache) -> None:
     """Assert progress callback is called with accurate frame counts and percentage."""
     backend = get_mockable_backend()

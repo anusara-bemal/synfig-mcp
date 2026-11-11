@@ -48,7 +48,7 @@ async def test_client_crud_methods(connected_client: BridgeClient) -> None:
         {"doc_id": "doc_0", "layer_type": "circle", "depth": 0},
     )
     assert layer_res["layer_id"] == "circle_001"
-    assert layer_res["diff"]["action"] == "layer_add"
+    assert layer_res["diff"]["action"] == "layer.add"
 
     # 3. param.set
     param_res = await connected_client.call(

@@ -16,6 +16,7 @@ from typing import Any
 
 from lxml import etree
 
+from synfig_mcp.errors import SynfigError
 from synfig_mcp.protocol.models import (
     AngleValue,
     BLinePoint,
@@ -32,6 +33,11 @@ from synfig_mcp.protocol.models import (
     TimeValue,
     ValueNodeLinkValue,
     VectorValue,
+)
+from synfig_mcp.sif.valuenodes import (
+    build_valuenode_element,
+    normalize_interpolation,
+    value_type_of,
 )
 
 
@@ -87,6 +93,75 @@ def format_synfig_time(seconds: float, fps: float = 24.0) -> str:
     if s == 0:
         return f"{f}f"
     return f"{s}s {f}f"
+
+
+def _param_value_type(param: etree._Element) -> str | None:
+    """Determine the value type of a ``<param>`` element."""
+    for child in param:
+        tag = etree.QName(str(child.tag)).localname if isinstance(child.tag, str) else ""
+        if tag == "animated":
+            return child.get("type")
+        return value_type_of(child)
+    return None
+
+
+def _coerce_value(value: Any, current_type: str | None) -> Any:
+    """Coerce loosely typed values into the type the parameter expects.
+
+    The MCP accepts plain JSON scalars, so ``[0.0, 0.0]`` may be used where a
+    vector is expected and ``2.0`` where a real/angle/time is expected.  The
+    current value of the parameter decides the concrete type, which keeps the
+    written document consistent with the parameter it belongs to.
+
+    The nested spelling ``{"type": "vector", "value": {"x": 0, "y": 0}}`` is
+    accepted as well and flattened, because it is the form used by several
+    Synfig examples and by older versions of the MCP guides.
+    """
+    if isinstance(value, dict):
+        inner = value.get("value")
+        if isinstance(inner, dict):
+            return {"type": value.get("type"), **inner}
+        return value
+
+    if isinstance(value, (list, tuple)):
+        if (
+            len(value) == 2
+            and all(isinstance(v, (int, float)) for v in value)
+            and current_type in (None, "vector", "unknown")
+        ):
+            return VectorValue(x=float(value[0]), y=float(value[1]))
+        raise SynfigError(
+            f"Cannot convert the sequence {value!r} into a Synfig parameter value. "
+            "Use a typed value such as {'type': 'vector', 'x': 0.0, 'y': 0.0}."
+        )
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if current_type == "angle":
+            return AngleValue(degrees=float(value))
+        if current_type == "time":
+            return TimeValue(seconds=float(value))
+        if current_type == "integer":
+            return IntegerValue(value=int(value))
+        return value
+    return value
+
+
+def _read_real_child(element: etree._Element | None, default: float) -> float:
+    """Read a ``<real value="..."/>`` child element."""
+    if element is None:
+        return default
+    real_el = element.find("real")
+    if real_el is None:
+        return default
+    value = real_el.get("value")
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
 
 
 def xml_to_synfig_value(elem: etree._Element) -> SynfigValue | None:
@@ -177,9 +252,9 @@ def xml_to_synfig_value(elem: etree._Element) -> SynfigValue | None:
                         t2x = float(te.findtext("x", "0.0"))
                         t2y = float(te.findtext("y", "0.0"))
                 w_el = bp.find("width")
-                w = float(w_el.findtext("real", "1.0")) if w_el is not None else 1.0
+                w = _read_real_child(w_el, 1.0)
                 o_el = bp.find("origin")
-                o = float(o_el.findtext("real", "0.5")) if o_el is not None else 0.5
+                o = _read_real_child(o_el, 0.5)
                 points.append(
                     BLinePoint(
                         vertex=(vx, vy),
@@ -204,6 +279,48 @@ def xml_to_synfig_value(elem: etree._Element) -> SynfigValue | None:
                 return val
 
     return None
+
+
+def _gradient_to_xml(cpoints: list[Any]) -> etree._Element:
+    """Serialise a gradient into the Synfig ``<gradient>`` element."""
+    elem = etree.Element("gradient")
+    for cpoint in cpoints:
+        data = cpoint.model_dump() if hasattr(cpoint, "model_dump") else dict(cpoint)
+        color = data.get("color") or {}
+        if hasattr(color, "model_dump"):
+            color = color.model_dump()
+        c_el = etree.SubElement(elem, "color")
+        c_el.set("pos", f"{float(data.get('pos', 0.0)):.6f}")
+        for channel in ("r", "g", "b", "a"):
+            ch_el = etree.SubElement(c_el, channel)
+            default = 1.0 if channel == "a" else 0.0
+            ch_el.text = f"{float(color.get(channel, default)):.6f}"
+    return elem
+
+
+def _bline_to_xml(points: list[Any]) -> etree._Element:
+    """Serialise spline points into the Synfig ``<bline>`` element."""
+    elem = etree.Element("bline")
+    elem.set("type", "bline_point")
+    for point in points:
+        data = point.model_dump() if hasattr(point, "model_dump") else dict(point)
+        entry = etree.SubElement(elem, "entry")
+        bp = etree.SubElement(entry, "bline_point")
+        for name in ("vertex", "t1", "t2"):
+            vector = data.get(name) or (0.0, 0.0)
+            v_el = etree.SubElement(bp, name)
+            vec_el = etree.SubElement(v_el, "vector")
+            x_el = etree.SubElement(vec_el, "x")
+            x_el.text = f"{float(vector[0]):.10f}"
+            y_el = etree.SubElement(vec_el, "y")
+            y_el.text = f"{float(vector[1]):.10f}"
+        width_el = etree.SubElement(bp, "width")
+        width_real = etree.SubElement(width_el, "real")
+        width_real.set("value", f"{float(data.get('width', 1.0)):.10f}")
+        origin_el = etree.SubElement(bp, "origin")
+        origin_real = etree.SubElement(origin_el, "real")
+        origin_real.set("value", f"{float(data.get('origin', 0.5)):.10f}")
+    return elem
 
 
 def synfig_value_to_xml(value: SynfigValue | dict[str, Any] | Any) -> etree._Element:
@@ -250,10 +367,25 @@ def synfig_value_to_xml(value: SynfigValue | dict[str, Any] | Any) -> etree._Ele
             y_el = etree.SubElement(elem, "y")
             y_el.text = f"{float(value.get('y', 0.0)):.10f}"
             return elem
+        if val_type == "gradient":
+            return _gradient_to_xml(value.get("cpoints") or [])
+        if val_type == "bline_point_list":
+            return _bline_to_xml(value.get("points") or [])
+        if val_type == "bline":
+            return _bline_to_xml(value.get("points") or [])
         if val_type == "canvas_ref":
             elem = etree.Element("canvas")
             elem.set("id", str(value.get("canvas_id", "")))
             return elem
+        if val_type == "valuenode_link":
+            elem = etree.Element("valuenode")
+            elem.set("id", str(value.get("link_id", "")))
+            return elem
+        raise SynfigError(
+            f"Unsupported parameter value type '{val_type}'. "
+            "Supported types: real, integer, bool, string, angle, time, color, "
+            "vector, gradient, bline_point_list, canvas_ref, valuenode_link."
+        )
 
     if isinstance(value, RealValue):
         elem = etree.Element("real")
@@ -315,6 +447,8 @@ def synfig_value_to_xml(value: SynfigValue | dict[str, Any] | Any) -> etree._Ele
         elem = etree.Element("canvas")
         elem.set("id", value.canvas_id)
         return elem
+    if isinstance(value, BLinePointListValue):
+        return _bline_to_xml([p.model_dump() for p in value.points])
     if isinstance(value, ValueNodeLinkValue):
         elem = etree.Element("valuenode")
         elem.set("id", value.link_id)
@@ -338,10 +472,10 @@ def synfig_value_to_xml(value: SynfigValue | dict[str, Any] | Any) -> etree._Ele
         elem.text = value
         return elem
 
-    # Default fallback string
-    elem = etree.Element("string")
-    elem.text = str(value)
-    return elem
+    raise SynfigError(
+        f"Unsupported parameter value of type '{type(value).__name__}'. "
+        "Pass a typed value such as {'type': 'real', 'value': 1.0}."
+    )
 
 
 class SifLayer:
@@ -402,9 +536,11 @@ class SifLayer:
     def set_param(self, name: str, value: SynfigValue | dict[str, Any] | Any) -> None:
         """Set or update a parameter value."""
         target_param: etree._Element | None = None
+        current_type: str | None = None
         for param in self.element.findall("param"):
             if param.get("name") == name:
                 target_param = param
+                current_type = _param_value_type(param)
                 break
 
         if target_param is None:
@@ -415,7 +551,7 @@ class SifLayer:
             for child in list(target_param):
                 target_param.remove(child)
 
-        new_val_el = synfig_value_to_xml(value)
+        new_val_el = synfig_value_to_xml(_coerce_value(value, current_type))
         target_param.append(new_val_el)
 
     def set_waypoint(
@@ -429,9 +565,11 @@ class SifLayer:
     ) -> None:
         """Insert or update a waypoint at a specific time on a parameter."""
         target_param = None
+        current_type: str | None = None
         for param in self.element.findall("param"):
             if param.get("name") == name:
                 target_param = param
+                current_type = _param_value_type(param)
                 break
 
         if target_param is None:
@@ -444,6 +582,7 @@ class SifLayer:
             old_type = (
                 etree.QName(str(old_child.tag)).localname if old_child is not None else "vector"
             )
+            current_type = current_type or old_type
             for child in list(target_param):
                 target_param.remove(child)
             animated_el = etree.SubElement(target_param, "animated")
@@ -458,8 +597,8 @@ class SifLayer:
                 target_wp = wp
                 break
 
-        interp_before = interpolation_in or interpolation
-        interp_after = interpolation_out or interpolation
+        interp_before = normalize_interpolation(interpolation_in or interpolation)
+        interp_after = normalize_interpolation(interpolation_out or interpolation)
 
         if target_wp is None:
             target_wp = etree.SubElement(animated_el, "waypoint")
@@ -473,7 +612,7 @@ class SifLayer:
             for c in list(target_wp):
                 target_wp.remove(c)
 
-        val_el = synfig_value_to_xml(value)
+        val_el = synfig_value_to_xml(_coerce_value(value, current_type))
         target_wp.append(val_el)
 
     def remove_waypoint(self, name: str, time: float) -> bool:
@@ -540,33 +679,80 @@ class SifLayer:
         return None
 
     def convert_param(self, name: str, valuenode_type: str) -> None:
-        """Wrap or convert a parameter to a linkable ValueNode type."""
+        """Convert a parameter into a linkable ValueNode of the requested type.
+
+        The generated XML follows the exact shape the Synfig engine expects
+        (``<linear type="real"><slope>...</slope><offset>...</offset></linear>``)
+        so the resulting document stays loadable.
+        """
         for param in self.element.findall("param"):
-            if param.get("name") == name:
-                children = list(param)
-                for c in children:
-                    param.remove(c)
-                vn_el = etree.SubElement(param, valuenode_type)
-                for c in children:
-                    vn_el.append(c)
-                return
+            if param.get("name") != name:
+                continue
+            children = list(param)
+            if not children:
+                raise SynfigError(
+                    f"Parameter '{name}' has no value that can be converted to a ValueNode."
+                )
+            current = children[0]
+            value_type = _param_value_type(param) or value_type_of(current)
+            if value_type in {"bline_point_list", "width_point_list", "dash_item_list"}:
+                raise SynfigError(
+                    f"Parameter '{name}' holds a complex '{value_type}' value which cannot "
+                    "be converted to a ValueNode."
+                )
+            new_node = build_valuenode_element(valuenode_type, value_type, current)
+            for child in children:
+                param.remove(child)
+            param.append(new_node)
+            return
+        raise SynfigError(f"Parameter '{name}' not found on layer.")
 
     def export_param(self, name: str, export_name: str, canvas_root: etree._Element) -> None:
-        """Export parameter to <defs><valuenode id="...">."""
-        defs = canvas_root.find("defs")
-        if defs is None:
-            defs = etree.SubElement(canvas_root, "defs")
+        """Export a parameter value into the canvas ``<defs>`` value node library.
+
+        Synfig stores exported value nodes as ``<defs><real id="name" .../></defs>``
+        and references them with ``<param name="x" use="name"/>``.  The ``<defs>``
+        section must appear *before* the layers that reference it, otherwise the
+        engine reports "Unknown ID referenced in parameter".
+        """
+        defs = self._find_or_create_defs(canvas_root)
+        for existing in defs.findall("valuenode"):
+            if existing.get("id") == export_name:
+                raise SynfigError(f"A value node named '{export_name}' already exists.")
+
         for param in self.element.findall("param"):
-            if param.get("name") == name:
-                children = list(param)
-                for c in children:
-                    param.remove(c)
-                vn = etree.SubElement(defs, "valuenode")
-                vn.set("id", export_name)
-                for c in children:
-                    vn.append(c)
-                param.set("use", export_name)
-                return
+            if param.get("name") != name:
+                continue
+            children = list(param)
+            if not children:
+                raise SynfigError(f"Parameter '{name}' has no value to export.")
+            current = children[0]
+            exported = etree.fromstring(etree.tostring(current))
+            exported.set("id", export_name)
+            defs.append(exported)
+            for child in children:
+                param.remove(child)
+            param.set("use", export_name)
+            return
+        raise SynfigError(f"Parameter '{name}' not found on layer.")
+
+    @staticmethod
+    def _find_or_create_defs(canvas_root: etree._Element) -> etree._Element:
+        """Return the ``<defs>`` section of a canvas, creating it before the layers."""
+        defs = canvas_root.find("defs")
+        if defs is not None:
+            return defs
+        defs = etree.Element("defs")
+        first_layer = None
+        for child in canvas_root:
+            if is_element_tag(child, "layer"):
+                first_layer = child
+                break
+        if first_layer is not None:
+            canvas_root.insert(canvas_root.index(first_layer), defs)
+        else:
+            canvas_root.append(defs)
+        return defs
 
     def get_params(self) -> dict[str, Any]:
         """Return dictionary of all defined parameters on this layer."""
@@ -750,13 +936,29 @@ class SifDocument:
         self.root.set("end-time", f"{val:.2f}s")
 
     def unexport_valuenode(self, export_name: str) -> bool:
-        """Remove an exported valuenode from <defs>."""
+        """Remove an exported valuenode from ``<defs>``.
+
+        Any parameter that referenced the exported node is rewritten with an
+        inline copy of the exported value so the document keeps its values and
+        stays loadable in Synfig.
+        """
         defs = self.root.find("defs")
-        if defs is not None:
-            for vn in defs.findall("valuenode"):
-                if vn.get("id") == export_name:
-                    defs.remove(vn)
-                    return True
+        if defs is None:
+            return False
+        for vn in list(defs):
+            if vn.get("id") != export_name:
+                continue
+            for param in self.root.iter("param"):
+                if param.get("use") != export_name:
+                    continue
+                inline = etree.fromstring(etree.tostring(vn))
+                inline.attrib.pop("id", None)
+                for child in list(param):
+                    param.remove(child)
+                param.append(inline)
+                param.attrib.pop("use", None)
+            defs.remove(vn)
+            return True
         return False
 
     @property
@@ -903,13 +1105,14 @@ class SifDocument:
         desc: str | None = None,
         params: dict[str, Any] | None = None,
         depth: int | None = None,
+        version: str | None = None,
     ) -> SifLayer:
         """Add a new layer to the specified canvas at the given depth."""
         canvas = self._resolve_canvas(canvas_path)
         elem = etree.Element("layer")
         elem.set("type", layer_type)
         elem.set("active", "true")
-        elem.set("version", "0.1")
+        elem.set("version", version or "0.1")
         elem.set("desc", desc or f"{layer_type.capitalize()}001")
 
         # Set default parameters according to layer type

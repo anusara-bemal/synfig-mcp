@@ -1,0 +1,566 @@
+{
+  "advanced_outline": {
+    "amount": "real",
+    "antialias": "bool",
+    "blend_method": "integer",
+    "bline": "list",
+    "blurtype": "integer",
+    "color": "color",
+    "cusp_type": "integer",
+    "dash_enabled": "bool",
+    "dash_offset": "real",
+    "dilist": "list",
+    "end_tip": "integer",
+    "expand": "real",
+    "feather": "real",
+    "homogeneous": "bool",
+    "invert": "bool",
+    "origin": "vector",
+    "smoothness": "real",
+    "start_tip": "integer",
+    "width": "real",
+    "winding_style": "integer",
+    "wplist": "list",
+    "z_depth": "real"
+  },
+  "bevel": {
+    "amount": "real",
+    "angle": "angle",
+    "blend_method": "integer",
+    "color1": "color",
+    "color2": "color",
+    "depth": "real",
+    "fake_origin": "vector",
+    "softness": "real",
+    "solid": "bool",
+    "type": "integer",
+    "use_luma": "bool",
+    "z_depth": "real"
+  },
+  "blur": {
+    "amount": "real",
+    "blend_method": "integer",
+    "size": "vector",
+    "type": "integer",
+    "z_depth": "real"
+  },
+  "checker_board": {
+    "amount": "real",
+    "antialias": "bool",
+    "blend_method": "integer",
+    "color": "color",
+    "origin": "vector",
+    "size": "vector",
+    "z_depth": "real"
+  },
+  "chromakey": {
+    "desaturate": "bool",
+    "invert": "bool",
+    "key_color": "color",
+    "lower_bound": "real",
+    "supersample_height": "integer",
+    "supersample_width": "integer",
+    "upper_bound": "real",
+    "z_depth": "real"
+  },
+  "circle": {
+    "amount": "real",
+    "blend_method": "integer",
+    "color": "color",
+    "feather": "real",
+    "invert": "bool",
+    "origin": "vector",
+    "radius": "real",
+    "z_depth": "real"
+  },
+  "clamp": {
+    "ceiling": "real",
+    "clamp_ceiling": "bool",
+    "floor": "real",
+    "invert_negative": "bool"
+  },
+  "colorcorrect": {
+    "brightness": "real",
+    "contrast": "real",
+    "exposure": "real",
+    "gamma": "real",
+    "hue_adjust": "angle",
+    "saturation": "real"
+  },
+  "conical_gradient": {
+    "amount": "real",
+    "angle": "angle",
+    "blend_method": "integer",
+    "center": "vector",
+    "gradient": "gradient",
+    "symmetric": "bool",
+    "z_depth": "real"
+  },
+  "curve_gradient": {
+    "amount": "real",
+    "blend_method": "integer",
+    "bline": "list",
+    "fast": "bool",
+    "gradient": "gradient",
+    "loop": "bool",
+    "origin": "vector",
+    "perpendicular": "bool",
+    "width": "real",
+    "z_depth": "real",
+    "zigzag": "bool"
+  },
+  "curve_warp": {
+    "bline": "list",
+    "end_point": "vector",
+    "fast": "bool",
+    "origin": "vector",
+    "perp_width": "real",
+    "start_point": "vector"
+  },
+  "duplicate": {
+    "amount": "real",
+    "blend_method": "integer",
+    "index": "real",
+    "z_depth": "real"
+  },
+  "filter_group": {
+    "amount": "real",
+    "blend_method": "integer",
+    "canvas": "canvas",
+    "children_lock": "bool",
+    "origin": "vector",
+    "outline_grow": "real",
+    "time_dilation": "real",
+    "time_offset": "time",
+    "transformation": "transformation",
+    "z_depth": "real"
+  },
+  "freetime": {
+    "time": "time",
+    "z_depth": "real"
+  },
+  "group": {
+    "amount": "real",
+    "blend_method": "integer",
+    "canvas": "canvas",
+    "children_lock": "bool",
+    "origin": "vector",
+    "outline_grow": "real",
+    "time_dilation": "real",
+    "time_offset": "time",
+    "transformation": "transformation",
+    "z_depth": "real",
+    "z_range": "bool",
+    "z_range_blur": "real",
+    "z_range_depth": "real",
+    "z_range_position": "real"
+  },
+  "halftone2": {
+    "amount": "real",
+    "angle": "angle",
+    "blend_method": "integer",
+    "color_dark": "color",
+    "color_light": "color",
+    "origin": "vector",
+    "size": "vector",
+    "type": "integer",
+    "z_depth": "real"
+  },
+  "halftone3": {
+    "amount": "real",
+    "blend_method": "integer",
+    "color[0]": "color",
+    "color[1]": "color",
+    "color[2]": "color",
+    "size": "vector",
+    "subtractive": "bool",
+    "tone[0].angle": "angle",
+    "tone[0].origin": "vector",
+    "tone[1].angle": "angle",
+    "tone[1].origin": "vector",
+    "tone[2].angle": "angle",
+    "tone[2].origin": "vector",
+    "type": "integer",
+    "z_depth": "real"
+  },
+  "import": {
+    "amount": "real",
+    "blend_method": "integer",
+    "br": "vector",
+    "c": "integer",
+    "filename": "string",
+    "gamma_adjust": "real",
+    "time_offset": "time",
+    "tl": "vector",
+    "z_depth": "real"
+  },
+  "inside_out": {
+    "origin": "vector"
+  },
+  "julia": {
+    "bailout": "real",
+    "broken": "bool",
+    "color_cycle": "bool",
+    "color_inside": "bool",
+    "color_outside": "bool",
+    "color_shift": "angle",
+    "distort_inside": "bool",
+    "distort_outside": "bool",
+    "icolor": "color",
+    "invert_inside": "bool",
+    "invert_outside": "bool",
+    "iterations": "integer",
+    "ocolor": "color",
+    "seed": "vector",
+    "shade_inside": "bool",
+    "shade_outside": "bool",
+    "smooth_outside": "bool",
+    "solid_inside": "bool",
+    "solid_outside": "bool"
+  },
+  "linear_gradient": {
+    "amount": "real",
+    "blend_method": "integer",
+    "gradient": "gradient",
+    "loop": "bool",
+    "p1": "vector",
+    "p2": "vector",
+    "z_depth": "real",
+    "zigzag": "bool"
+  },
+  "lumakey": {
+    "z_depth": "real"
+  },
+  "mandelbrot": {
+    "bailout": "real",
+    "broken": "bool",
+    "distort_inside": "bool",
+    "distort_outside": "bool",
+    "gradient_inside": "gradient",
+    "gradient_loop_inside": "bool",
+    "gradient_offset_inside": "real",
+    "gradient_offset_outside": "real",
+    "gradient_outside": "gradient",
+    "gradient_scale_outside": "real",
+    "invert_inside": "bool",
+    "invert_outside": "bool",
+    "iterations": "integer",
+    "shade_inside": "bool",
+    "shade_outside": "bool",
+    "smooth_outside": "bool",
+    "solid_inside": "bool",
+    "solid_outside": "bool"
+  },
+  "metaballs": {
+    "amount": "real",
+    "blend_method": "integer",
+    "centers": "list",
+    "gradient": "gradient",
+    "positive": "bool",
+    "radii": "list",
+    "threshold": "real",
+    "threshold2": "real",
+    "weights": "list",
+    "z_depth": "real"
+  },
+  "motion_blur": {
+    "aperture": "time",
+    "subsample_end": "real",
+    "subsample_start": "real",
+    "subsamples_factor": "real",
+    "subsampling_type": "integer"
+  },
+  "noise": {
+    "amount": "real",
+    "blend_method": "integer",
+    "detail": "integer",
+    "do_alpha": "bool",
+    "gradient": "gradient",
+    "seed": "integer",
+    "size": "vector",
+    "smooth": "integer",
+    "speed": "real",
+    "super_sample": "bool",
+    "turbulent": "bool",
+    "z_depth": "real"
+  },
+  "noise_distort": {
+    "amount": "real",
+    "blend_method": "integer",
+    "detail": "integer",
+    "displacement": "vector",
+    "seed": "integer",
+    "size": "vector",
+    "smooth": "integer",
+    "speed": "real",
+    "turbulent": "bool",
+    "z_depth": "real"
+  },
+  "outline": {
+    "amount": "real",
+    "antialias": "bool",
+    "blend_method": "integer",
+    "bline": "list",
+    "blurtype": "integer",
+    "color": "color",
+    "expand": "real",
+    "feather": "real",
+    "homogeneous_width": "bool",
+    "invert": "bool",
+    "origin": "vector",
+    "round_tip[0]": "bool",
+    "round_tip[1]": "bool",
+    "sharp_cusps": "bool",
+    "width": "real",
+    "winding_style": "integer",
+    "z_depth": "real"
+  },
+  "plant": {
+    "amount": "real",
+    "blend_method": "integer",
+    "bline": "list",
+    "drag": "real",
+    "gradient": "gradient",
+    "gravity": "vector",
+    "origin": "vector",
+    "perp_velocity": "real",
+    "random_factor": "real",
+    "reverse": "bool",
+    "seed": "integer",
+    "size": "real",
+    "size_as_alpha": "bool",
+    "split_angle": "angle",
+    "splits": "integer",
+    "sprouts": "integer",
+    "step": "real",
+    "use_width": "bool",
+    "velocity": "real",
+    "z_depth": "real"
+  },
+  "polygon": {
+    "amount": "real",
+    "antialias": "bool",
+    "blend_method": "integer",
+    "blurtype": "integer",
+    "color": "color",
+    "feather": "real",
+    "invert": "bool",
+    "origin": "vector",
+    "vector_list": "list",
+    "winding_style": "integer",
+    "z_depth": "real"
+  },
+  "radial_blur": {
+    "amount": "real",
+    "blend_method": "integer",
+    "fade_out": "bool",
+    "origin": "vector",
+    "size": "real",
+    "z_depth": "real"
+  },
+  "radial_gradient": {
+    "amount": "real",
+    "blend_method": "integer",
+    "center": "vector",
+    "gradient": "gradient",
+    "loop": "bool",
+    "radius": "real",
+    "z_depth": "real",
+    "zigzag": "bool"
+  },
+  "rectangle": {
+    "amount": "real",
+    "bevCircle": "bool",
+    "bevel": "real",
+    "blend_method": "integer",
+    "color": "color",
+    "expand": "real",
+    "feather_x": "real",
+    "feather_y": "real",
+    "invert": "bool",
+    "point1": "vector",
+    "point2": "vector",
+    "z_depth": "real"
+  },
+  "region": {
+    "amount": "real",
+    "antialias": "bool",
+    "blend_method": "integer",
+    "bline": "list",
+    "blurtype": "integer",
+    "color": "color",
+    "feather": "real",
+    "invert": "bool",
+    "origin": "vector",
+    "winding_style": "integer",
+    "z_depth": "real"
+  },
+  "rotate": {
+    "amount": "angle",
+    "origin": "vector"
+  },
+  "shade": {
+    "amount": "real",
+    "blend_method": "integer",
+    "color": "color",
+    "invert": "bool",
+    "origin": "vector",
+    "size": "vector",
+    "type": "integer",
+    "z_depth": "real"
+  },
+  "simple_circle": {
+    "amount": "real",
+    "blend_method": "integer",
+    "center": "vector",
+    "color": "color",
+    "radius": "real",
+    "z_depth": "real"
+  },
+  "skeleton": {
+    "amount": "real",
+    "bones": "list",
+    "name": "string",
+    "z_depth": "real"
+  },
+  "skeleton_deformation": {
+    "amount": "real",
+    "blend_method": "integer",
+    "bones": "list",
+    "point1": "vector",
+    "point2": "vector",
+    "x_subdivisions": "integer",
+    "y_subdivisions": "integer",
+    "z_depth": "real"
+  },
+  "solid_color": {
+    "amount": "real",
+    "blend_method": "integer",
+    "color": "color",
+    "z_depth": "real"
+  },
+  "sound": {
+    "delay": "time",
+    "filename": "string",
+    "volume": "real",
+    "z_depth": "real"
+  },
+  "spherize": {
+    "amount": "real",
+    "center": "vector",
+    "clip": "bool",
+    "radius": "real",
+    "type": "integer"
+  },
+  "spiral_gradient": {
+    "amount": "real",
+    "angle": "angle",
+    "blend_method": "integer",
+    "center": "vector",
+    "clockwise": "bool",
+    "gradient": "gradient",
+    "radius": "real",
+    "z_depth": "real"
+  },
+  "star": {
+    "amount": "real",
+    "angle": "angle",
+    "antialias": "bool",
+    "blend_method": "integer",
+    "blurtype": "integer",
+    "color": "color",
+    "feather": "real",
+    "invert": "bool",
+    "origin": "vector",
+    "points": "integer",
+    "radius1": "real",
+    "radius2": "real",
+    "regular_polygon": "bool",
+    "winding_style": "integer",
+    "z_depth": "real"
+  },
+  "stretch": {
+    "amount": "vector",
+    "center": "vector"
+  },
+  "stroboscope": {
+    "frequency": "real",
+    "z_depth": "real"
+  },
+  "super_sample": {
+    "height": "integer",
+    "width": "integer"
+  },
+  "switch": {
+    "amount": "real",
+    "blend_method": "integer",
+    "canvas": "canvas",
+    "children_lock": "bool",
+    "layer_depth": "integer",
+    "layer_name": "string",
+    "origin": "vector",
+    "outline_grow": "real",
+    "time_dilation": "real",
+    "time_offset": "time",
+    "transformation": "transformation",
+    "z_depth": "real"
+  },
+  "text": {
+    "amount": "real",
+    "blend_method": "integer",
+    "color": "color",
+    "compress": "real",
+    "direction": "integer",
+    "family": "string",
+    "grid_fit": "bool",
+    "invert": "bool",
+    "orient": "vector",
+    "origin": "vector",
+    "size": "vector",
+    "style": "integer",
+    "text": "string",
+    "use_kerning": "bool",
+    "vcompress": "real",
+    "weight": "integer",
+    "z_depth": "real"
+  },
+  "timeloop": {
+    "duration": "time",
+    "link_time": "time",
+    "local_time": "time",
+    "only_for_positive_duration": "bool",
+    "symmetrical": "bool",
+    "z_depth": "real"
+  },
+  "translate": {
+    "origin": "vector"
+  },
+  "twirl": {
+    "center": "vector",
+    "distort_inside": "bool",
+    "distort_outside": "bool",
+    "radius": "real",
+    "rotations": "angle"
+  },
+  "warp": {
+    "clip": "bool",
+    "dest_bl": "vector",
+    "dest_br": "vector",
+    "dest_tl": "vector",
+    "dest_tr": "vector",
+    "interpolation": "integer",
+    "src_br": "vector",
+    "src_tl": "vector"
+  },
+  "xor_pattern": {
+    "amount": "real",
+    "blend_method": "integer",
+    "origin": "vector",
+    "size": "vector",
+    "z_depth": "real"
+  },
+  "zoom": {
+    "amount": "real",
+    "center": "vector"
+  }
+}

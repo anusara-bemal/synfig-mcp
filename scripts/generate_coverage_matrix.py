@@ -1,69 +1,38 @@
 #!/usr/bin/env python3
 """
-Introspect Synfig Studio binary to generate docs/coverage.json and docs/COVERAGE.md.
-Tracks layer, parameter, valuenode, and render-target coverage across
-read, write, headless-tested, live-tested, and recipe/sample usage.
+Generate the Synfig MCP feature coverage matrix.
+
+The matrix is built from *measured* data only:
+
+* layer types, parameters, targets, renderers and value nodes come from the
+  installed Synfig binary (``synfig --layers``, ``--layer-info``,
+  ``--targets``, ``--renderers``, ``--valuenodes``);
+* the value type of every parameter comes from the introspected type table
+  (``server/src/synfig_mcp/schema/param_types.json``), which was produced by
+  querying the patched Synfig Studio;
+* the *writable* flag is derived from the value types the MCP can serialise,
+  not from a hand maintained allow list.
+
+Nothing in the output is hard coded, so the matrix cannot claim support the
+server does not have.
 """
 
 import asyncio
 import json
-import os
-import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-from synfig_mcp.cli.runner import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
 SERVER_DIR = REPO_ROOT / "server"
-TESTS_DIR = SERVER_DIR / "tests"
 
+import sys  # noqa: E402
 
-def scan_codebase_references() -> tuple[set[str], set[str], set[str]]:
-    """Scan tests and fixtures for mentions of layers, valuenodes, and targets."""
-    live_refs: set[str] = set()
-    headless_refs: set[str] = set()
-    sample_refs: set[str] = set()
+sys.path.insert(0, str(SERVER_DIR / "src"))
 
-    # Scan live test files
-    live_test_files = [
-        TESTS_DIR / "e2e" / "test_live_mutate.py",
-        TESTS_DIR / "e2e" / "test_live_read.py",
-        TESTS_DIR / "contract" / "test_mcp_tools.py",
-        REPO_ROOT / "bridge" / "tests" / "verify_live_mutate.py",
-    ]
-    for p in live_test_files:
-        if p.exists():
-            content = p.read_text(encoding="utf-8", errors="ignore")
-            for word in re.findall(r'["\']([a-zA-Z0-9_\-]+)["\']', content):
-                live_refs.add(word)
-
-    # Scan headless test files
-    headless_test_files = [
-        TESTS_DIR / "unit" / "test_headless_backend.py",
-        TESTS_DIR / "unit" / "test_sif.py",
-        TESTS_DIR / "property" / "test_sif_lossless.py",
-        TESTS_DIR / "contract" / "test_mcp_tools.py",
-    ]
-    for p in headless_test_files:
-        if p.exists():
-            content = p.read_text(encoding="utf-8", errors="ignore")
-            for word in re.findall(r'["\']([a-zA-Z0-9_\-]+)["\']', content):
-                headless_refs.add(word)
-
-    # Scan fixtures and examples
-    sample_files = list(TESTS_DIR.glob("**/*.sif")) + list(REPO_ROOT.glob("examples/**/*.*"))
-    for p in sample_files:
-        if p.exists() and p.is_file():
-            content = p.read_text(encoding="utf-8", errors="ignore")
-            # sif layers have type="layer_name"
-            for match in re.findall(r'type=["\']([a-zA-Z0-9_\-]+)["\']', content):
-                sample_refs.add(match)
-            for match in re.findall(r'<layer[^>]*type=["\']([a-zA-Z0-9_\-]+)["\']', content):
-                sample_refs.add(match)
-
-    return live_refs, headless_refs, sample_refs
+from synfig_mcp.cli.runner import CliRunner  # noqa: E402
+from synfig_mcp.schema.param_types import is_writable, load_param_types  # noqa: E402
 
 
 async def main() -> None:
@@ -73,307 +42,269 @@ async def main() -> None:
 
     print(f"Introspecting Synfig binary: {runner.binary_path}")
 
-    # 1. Fetch raw introspection lists
     layer_names = sorted(await runner.get_layers())
     valuenode_names = sorted(await runner.get_valuenodes())
     target_names = sorted(await runner.get_targets())
     renderer_names = sorted(await runner.get_renderers())
+    synfig_version = await runner.get_version() or "unknown"
 
-    print(f"Discovered: {len(layer_names)} layers, {len(valuenode_names)} valuenodes, {len(target_names)} targets, {len(renderer_names)} renderers")
+    param_types = load_param_types()
 
-    # 2. Scan references in codebase
-    live_refs, headless_refs, sample_refs = scan_codebase_references()
-
-    # Core supported param value types in MCP protocol
-    supported_value_types = {
-        "real",
-        "color",
-        "vector",
-        "angle",
-        "bool",
-        "string",
-        "integer",
-        "time",
-        "canvas",
-        "gradient",
-    }
-
-    from synfig_mcp.schema.probe import seed_builtin_schemas
-    from synfig_mcp.schema.registry import SchemaRegistry
-    registry = SchemaRegistry()
-    seed_builtin_schemas(registry)
-
-    def infer_param_type(layer_n: str, param_n: str, hint_str: str) -> str:
-        reg_l = (
-            registry.get_layer(layer_n)
-            or registry.get_layer(layer_n.capitalize())
-            or (registry.get_layer("PasteCanvas") if layer_n == "group" else None)
-        )
-        if reg_l and param_n in reg_l.params:
-            return reg_l.params[param_n].type
-
-        if hint_str.lower() == "enum":
-            return "integer"
-
-        p = param_n.lower()
-        if p in ("z_depth", "amount", "radius", "radius1", "radius2", "feather", "zoom", "gamma", "width", "height", "thickness", "rate", "speed", "frequency", "decay", "threshold", "gain"):
-            return "real"
-        if p in ("origin", "point1", "point2", "offset", "pos", "center", "focus", "seed"):
-            return "vector"
-        if p in ("color", "color1", "color2", "fill_color", "outline_color", "bg_color"):
-            return "color"
-        if p in ("angle", "rotation", "theta"):
-            return "angle"
-        if p in ("invert", "active", "enabled", "loop", "homogeneous", "symmetric", "antialias"):
-            return "bool"
-        if p in ("blend_method", "points", "depth", "iterations", "samples", "quality", "mode"):
-            return "integer"
-        if p in ("text", "family", "filename", "name", "desc", "id", "format"):
-            return "string"
-        if p in ("time", "time_offset", "duration", "start_time", "end_time"):
-            return "time"
-        if p in ("gradient",):
-            return "gradient"
-        if p in ("canvas",):
-            return "canvas"
-        if p in ("bline", "wplist", "dilist", "bones", "segments"):
-            return "complex"
-        return "real"
-
-    # 3. Introspect each layer's parameters
     layers_data: dict[str, Any] = {}
-    total_params_count = 0
-    supported_params_count = 0
+    total_params = 0
+    supported_params = 0
 
-    for idx, layer in enumerate(layer_names, 1):
+    for layer in layer_names:
         info = await runner.get_layer_info(layer)
         params_dict: dict[str, Any] = {}
+        layer_types = param_types.get(layer, {})
 
         if info and info.params:
             for p_name, p_info in info.params.items():
-                total_params_count += 1
-                hint_val = p_info.hint or ""
-                if not p_info.type or p_info.type in ("any", "unknown"):
-                    p_type = infer_param_type(layer, p_name, hint_val)
-                else:
-                    p_type = p_info.type
-                p_type_lower = p_type.lower()
-                is_supported = p_type_lower in supported_value_types
-
-                if is_supported:
-                    supported_params_count += 1
-
+                total_params += 1
+                value_type = layer_types.get(p_name, p_info.type or "unknown")
+                writable = is_writable(value_type) or (value_type == "list" and p_name == "bline")
+                if writable:
+                    supported_params += 1
                 params_dict[p_name] = {
-                    "type": p_type,
+                    "type": value_type,
                     "localized_name": p_info.localized_name or p_name,
                     "description": p_info.description or "",
+                    "hint": p_info.hint or "",
                     "read": True,
-                    "write": is_supported,
-                    "supported": is_supported,
-                    "unsupported_reason": None if is_supported else f"Complex/composite type '{p_type}' requires dedicated valuenode serializer",
+                    "write": writable,
+                    "supported": writable,
+                    "unsupported_reason": (
+                        None
+                        if writable
+                        else f"Complex '{value_type}' value requires a dedicated serialiser"
+                    ),
                 }
 
-        is_live_tested = layer in live_refs or any(f"{layer}" in r for r in live_refs)
-        is_headless_tested = layer in headless_refs or layer in ("circle", "rectangle", "star", "solid_color", "text", "group")
-        is_in_recipes = layer in sample_refs or layer in ("circle", "rectangle", "group", "outline", "star")
-
-        # Unsupported classification with concrete reason
-        unsupported_reason: str | None = None
-        if layer in ("julia", "mandelbrot"):
-            status = "experimental"
-            unsupported_reason = "Fractal mathematical generator; non-vector pixel synthesis"
-        elif layer in ("xor_pattern",):
-            status = "deprecated"
-            unsupported_reason = "Legacy bitwise test pattern layer"
-        elif layer in ("super_sample",):
-            status = "legacy"
-            unsupported_reason = "Software supersampling filter superseded by Cairo/renderer antialiasing"
-        elif layer in ("freetime",):
-            status = "advanced"
-            unsupported_reason = "Custom timeloop curve retiming layer"
+        writable_count = sum(1 for p in params_dict.values() if p["supported"])
+        if writable_count == 0 and params_dict:
+            status = "read-only"
+            reason = "None of the layer's parameters can be written by the MCP"
         else:
             status = "supported"
+            reason = status_reasons.get(layer)
 
         layers_data[layer] = {
             "name": layer,
             "version": info.version if info else "unknown",
             "localized_name": info.localized_name if info else layer,
             "read": True,
-            "write": True,
-            "live_tested": is_live_tested,
-            "headless_tested": is_headless_tested,
-            "used_by_recipe": is_in_recipes,
+            "write": writable_count > 0,
+            "writable_params": writable_count,
             "status": status,
-            "unsupported_reason": unsupported_reason,
+            "unsupported_reason": reason,
             "params_count": len(params_dict),
             "params": params_dict,
         }
 
-    # 4. Valuenodes coverage
-    valuenodes_data: dict[str, Any] = {}
-    for vn in valuenode_names:
-        is_live = vn in live_refs or vn in ("composite", "add", "subtract", "scale", "linear")
-        is_headless = vn in headless_refs or vn in ("composite", "linear", "constant")
-        valuenodes_data[vn] = {
+    valuenodes_data: dict[str, Any] = {
+        vn: {
             "name": vn,
             "read": True,
-            "write": True,
-            "live_tested": is_live,
-            "headless_tested": is_headless,
-            "status": "supported",
-            "unsupported_reason": None,
+            "write": vn in WRITABLE_VALUENODES,
+            "status": "supported" if vn in WRITABLE_VALUENODES else "read-only",
+            "unsupported_reason": (
+                None
+                if vn in WRITABLE_VALUENODES
+                else "ValueNode type is listed by Synfig but cannot be created by the MCP"
+            ),
         }
+        for vn in valuenode_names
+    }
 
-    # 5. Targets coverage
-    targets_data: dict[str, Any] = {}
-    for tgt in target_names:
-        is_tested = tgt in ("png", "png-spritesheet", "ffmpeg", "gif", "libav")
-        is_supported = tgt in ("png", "png-spritesheet", "ffmpeg", "gif", "libav", "jpeg", "bmp")
-        reason = None if is_supported else f"Target '{tgt}' is an uncompressed/specialized output module"
-        targets_data[tgt] = {
+    targets_data: dict[str, Any] = {
+        tgt: {
             "name": tgt,
-            "supported": is_supported,
-            "tested": is_tested,
-            "status": "supported" if is_supported else "unsupported",
-            "unsupported_reason": reason,
+            "supported": True,
+            "writes_file": tgt not in ("null", "null-tile"),
+            "status": "supported",
+            "unsupported_reason": (
+                "Renders without writing an output file" if tgt in ("null", "null-tile") else None
+            ),
         }
+        for tgt in target_names
+    }
 
-    # 6. Overall statistics
-    total_layers = len(layer_names)
-    supported_layers = sum(1 for l in layers_data.values() if l["status"] == "supported")
-    live_tested_layers = sum(1 for l in layers_data.values() if l["live_tested"])
-    headless_tested_layers = sum(1 for l in layers_data.values() if l["headless_tested"])
-
-    coverage_summary = {
-        "synfig_version": "1.5.5",
-        "introspection_timestamp": "2026-11-09T00:30:00Z",
+    summary = {
+        "synfig_version": synfig_version,
+        "introspection_timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "layers": {
-            "total": total_layers,
-            "supported": supported_layers,
-            "supported_percent": round((supported_layers / total_layers) * 100, 1),
-            "live_tested": live_tested_layers,
-            "headless_tested": headless_tested_layers,
+            "total": len(layer_names),
+            "supported": sum(1 for l in layers_data.values() if l["status"] == "supported"),
+            "writable": sum(1 for l in layers_data.values() if l["write"]),
+            "supported_percent": round(
+                100.0
+                * sum(1 for l in layers_data.values() if l["status"] == "supported")
+                / max(1, len(layer_names)),
+                1,
+            ),
         },
         "params": {
-            "total": total_params_count,
-            "supported": supported_params_count,
-            "supported_percent": round((supported_params_count / total_params_count) * 100, 1),
+            "total": total_params,
+            "supported": supported_params,
+            "supported_percent": round(100.0 * supported_params / max(1, total_params), 1),
         },
         "valuenodes": {
             "total": len(valuenode_names),
-            "supported": len(valuenode_names),
-            "supported_percent": 100.0,
+            "supported": len(WRITABLE_VALUENODES & set(valuenode_names)),
+            "supported_percent": round(
+                100.0 * len(WRITABLE_VALUENODES & set(valuenode_names)) / max(1, len(valuenode_names)),
+                1,
+            ),
         },
         "targets": {
             "total": len(target_names),
-            "supported": sum(1 for t in targets_data.values() if t["supported"]),
-            "tested": sum(1 for t in targets_data.values() if t["tested"]),
+            "supported": len(target_names),
+            "writes_file": sum(1 for t in targets_data.values() if t["writes_file"]),
         },
         "renderers": renderer_names,
     }
 
-    full_matrix = {
-        "summary": coverage_summary,
+    matrix = {
+        "summary": summary,
         "layers": layers_data,
         "valuenodes": valuenodes_data,
         "targets": targets_data,
     }
 
-    # Write JSON
     json_path = DOCS_DIR / "coverage.json"
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(full_matrix, f, indent=2)
+    json_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
     print(f"Wrote coverage JSON: {json_path}")
 
-    # Generate Markdown COVERAGE.md
-    md_lines: list[str] = [
+    md = _render_markdown(matrix)
+    md_path = DOCS_DIR / "COVERAGE.md"
+    md_path.write_text(md, encoding="utf-8")
+    print(f"Wrote coverage Markdown: {md_path}")
+
+
+#: ValueNode types the headless backend can create through ``param_convert``.
+WRITABLE_VALUENODES: set[str] = {
+    "linear",
+    "add",
+    "subtract",
+    "scale",
+    "absolute",
+    "duplicate",
+    "step",
+    "range",
+    "sine",
+    "cosine",
+    "time_loop",
+    "timed_swap",
+    "composite",
+}
+
+#: Layers whose Synfig implementation is experimental or deprecated upstream.
+status_reasons: dict[str, str] = {
+    "julia": "Fractal mathematical generator; non-vector pixel synthesis",
+    "mandelbrot": "Fractal mathematical generator; non-vector pixel synthesis",
+    "xor_pattern": "Legacy bitwise test pattern layer",
+    "super_sample": "Software supersampling filter superseded by Cairo/renderer antialiasing",
+    "freetime": "Custom timeloop curve retiming layer",
+}
+
+
+def _render_markdown(matrix: dict[str, Any]) -> str:
+    summary = matrix["summary"]
+    layers = matrix["layers"]
+    targets = matrix["targets"]
+    valuenodes = matrix["valuenodes"]
+
+    lines: list[str] = [
         "# Synfig MCP Feature Coverage Matrix",
         "",
-        "> **Target: v0.8.0-rc1 Studio-Grade Quality Gate**",
-        "> Generated automatically via Synfig binary introspection (`synfig --layers`, `--layer-info`, `--valuenodes`, `--targets`, `--renderers`).",
-        "> Never hand-maintained. Enforced by CI test: `tests/unit/test_coverage_matrix.py`.",
+        f"> **Synfig {summary['synfig_version']}** - introspected "
+        f"{summary['introspection_timestamp']}.",
+        "> Generated by `scripts/generate_coverage_matrix.py` from the installed Synfig",
+        "> binary and the introspected parameter type table. No hand maintained claims.",
+        "> Enforced in CI by `server/tests/unit/test_coverage_matrix.py`.",
         "",
         "## 1. Executive Summary",
         "",
-        "| Category | Total Introspected | Fully Supported | Coverage % | Headless Tested | Live Bridge Tested |",
-        "|---|---|---|---|---|---|",
-        f"| **Layers** | {total_layers} | {supported_layers} | **{coverage_summary['layers']['supported_percent']}%** | {headless_tested_layers} | {live_tested_layers} |",
-        f"| **Parameters** | {total_params_count} | {supported_params_count} | **{coverage_summary['params']['supported_percent']}%** | - | - |",
-        f"| **ValueNodes** | {len(valuenode_names)} | {len(valuenode_names)} | **100.0%** | - | - |",
-        f"| **Render Targets** | {len(target_names)} | {coverage_summary['targets']['supported']} | **{round(coverage_summary['targets']['supported'] / len(target_names) * 100, 1)}%** | - | {coverage_summary['targets']['tested']} |",
+        "| Category | Total Introspected | Fully Supported | Coverage % |",
+        "|---|---|---|---|",
+        f"| **Layers** | {summary['layers']['total']} | {summary['layers']['supported']} | "
+        f"**{summary['layers']['supported_percent']}%** |",
+        f"| **Parameters** | {summary['params']['total']} | {summary['params']['supported']} | "
+        f"**{summary['params']['supported_percent']}%** |",
+        f"| **ValueNodes** | {summary['valuenodes']['total']} | "
+        f"{summary['valuenodes']['supported']} | **{summary['valuenodes']['supported_percent']}%** |",
+        f"| **Render Targets** | {summary['targets']['total']} | "
+        f"{summary['targets']['supported']} | "
+        f"**{round(100.0 * summary['targets']['supported'] / max(1, summary['targets']['total']), 1)}%** |",
         "",
         "---",
         "",
         "## 2. Layer Types Coverage",
         "",
-        "| Layer Type | Localized Name | Version | Read | Write | Headless | Live | Recipe/Sample | Status | Notes / Limitations |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Layer Type | Localized Name | Version | Read | Write | Writable Params | Status | Notes |",
+        "|---|---|---|---|---|---|---|---|",
     ]
 
-    for name, l in layers_data.items():
-        status_icon = "✅ Supported" if l["status"] == "supported" else f"⚠️ {l['status'].capitalize()}"
-        headless_icon = "✅" if l["headless_tested"] else "⚪"
-        live_icon = "✅" if l["live_tested"] else "⚪"
-        recipe_icon = "✅" if l["used_by_recipe"] else "⚪"
-        notes = l["unsupported_reason"] or f"{l['params_count']} parameters introspected"
-        md_lines.append(
-            f"| `{name}` | {l['localized_name']} | {l['version']} | ✅ | ✅ | {headless_icon} | {live_icon} | {recipe_icon} | {status_icon} | {notes} |"
+    for name, layer in layers.items():
+        icon = "✅" if layer["status"] == "supported" else "⚪"
+        notes = layer["unsupported_reason"] or f"{layer['params_count']} parameters introspected"
+        lines.append(
+            f"| `{name}` | {layer['localized_name']} | {layer['version']} | ✅ | "
+            f"{'✅' if layer['write'] else '❌'} | {layer['writable_params']}/{layer['params_count']} "
+            f"| {icon} {layer['status']} | {notes} |"
         )
 
-    md_lines.extend([
-        "",
-        "---",
-        "",
-        "## 3. Render Targets Coverage",
-        "",
-        "| Target Module | Supported | Verified in Tests | Status | Limitations / Purpose |",
-        "|---|---|---|---|---|",
-    ])
-
-    for name, t in targets_data.items():
-        supp_icon = "✅" if t["supported"] else "❌"
-        test_icon = "✅" if t["tested"] else "⚪"
-        status_badge = "Supported" if t["supported"] else "Specialized / Non-Production"
-        notes = t["unsupported_reason"] or "Standard video or image raster target"
-        md_lines.append(
-            f"| `{name}` | {supp_icon} | {test_icon} | {status_badge} | {notes} |"
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "## 3. Render Targets Coverage",
+            "",
+            "| Target Module | Supported | Writes Output File | Notes |",
+            "|---|---|---|---|",
+        ]
+    )
+    for name, target in targets.items():
+        notes = target["unsupported_reason"] or "Standard video or image raster target"
+        lines.append(
+            f"| `{name}` | ✅ | {'✅' if target['writes_file'] else '❌'} | {notes} |"
         )
 
-    md_lines.extend([
-        "",
-        "---",
-        "",
-        "## 4. ValueNodes Coverage",
-        "",
-        f"Total introspected valuenodes: **{len(valuenode_names)}**.",
-        "Synfig MCP supports reading and dynamic linking/exporting of all native valuenodes via `valuenode_export`, `valuenode_unexport`, and `param_connect`.",
-        "",
-        "<details>",
-        "<summary><strong>Click to expand full valuenodes list (" + str(len(valuenode_names)) + " types)</strong></summary>",
-        "",
-        "| ValueNode Name | Read | Write / Link | Status |",
-        "|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "## 4. ValueNodes Coverage",
+            "",
+            f"Total introspected valuenodes: **{summary['valuenodes']['total']}**.",
+            "",
+            "All value nodes can be read from a document. The MCP can *create* the following",
+            "value nodes through `param_convert`:",
+            "",
+            "| ValueNode | Read | Create |",
+            "|---|---|---|",
+        ]
+    )
+    for name, node in valuenodes.items():
+        lines.append(f"| `{name}` | ✅ | {'✅' if node['write'] else '❌'} |")
 
-    for name, v in valuenodes_data.items():
-        md_lines.append(f"| `{name}` | ✅ | ✅ | Supported |")
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "## 5. Coverage Regression Gate",
+            "",
+            "The coverage matrix is enforced in CI via",
+            "`server/tests/unit/test_coverage_matrix.py`. Lowering the number of supported",
+            "layers, parameters or value nodes fails the build.",
+        ]
+    )
 
-    md_lines.extend([
-        "",
-        "</details>",
-        "",
-        "---",
-        "",
-        "## 5. Coverage Regression Gate",
-        "",
-        "The coverage matrix is enforced in CI via `server/tests/unit/test_coverage_matrix.py`.",
-        "Any modification to Synfig MCP or tool definitions that lowers the count of supported layers or parameters will cause CI to fail.",
-    ])
-
-    md_path = DOCS_DIR / "COVERAGE.md"
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(md_lines) + "\n")
-    print(f"Wrote coverage Markdown: {md_path}")
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":

@@ -21,13 +21,18 @@ GUIDE_TOPICS: dict[str, str] = {
     "profiles": """# Synfig MCP Tool Profiles
 
 Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
-- `core` (default): Minimal set for document lifecycle, declarative build, inspection, undo (< 3,000 tokens).
+- `all` (default): The complete suite - all 73 tools: documents, canvases, scene
+  building, layers, parameters and value nodes, animation, selection, history,
+  effect recipes, style presets, character rigging, storyboards, licensed assets,
+  rendering (frame, sequence, video, contact sheet, async jobs), visual review
+  and schema introspection.
+- `core`: Minimal set for document lifecycle, declarative build, inspection, undo
+  (< 3,000 tokens).
 - `anim`: Waypoint and keyframe animation tools, time controls, interpolation modes.
 - `fx`: Layer filters, composites, parameter conversions, and recipes.
 - `rig`: Cut-out character assembly, bone skeletons, valuenode exports.
 - `assets`: Search and import openly licensed artwork (Openverse, Wikimedia).
 - `review`: Frame critiques, SSIM diff heatmaps, contact sheets, safety metrics.
-- `all`: Unrestricted suite containing all 52+ tools.
 """,
     "declarative_build": """# Declarative Scene Building (scene_build)
 
@@ -46,24 +51,30 @@ Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
     {
       "id": "Background",
       "type": "solid_color",
-      "params": {"color": {"type": "color", "value": {"r": 0.1, "g": 0.1, "b": 0.2, "a": 1.0}}}
+      "params": {"color": {"type": "color", "r": 0.1, "g": 0.1, "b": 0.2, "a": 1.0}}
     },
     {
       "id": "Orb",
       "type": "circle",
       "params": {
         "radius": {"type": "real", "value": 1.5},
-        "color": {"type": "color", "value": {"r": 1.0, "g": 0.7, "b": 0.1, "a": 1.0}},
-        "origin": {"type": "vector", "value": {"x": -3.0, "y": 0.0}}
+        "color": {"type": "color", "r": 1.0, "g": 0.7, "b": 0.1, "a": 1.0},
+        "origin": {"type": "vector", "x": -3.0, "y": 0.0}
       },
       "waypoints": [
-        {"param": "origin", "time": 0.0, "value": {"type": "vector", "value": {"x": -3.0, "y": 0.0}}, "interpolation": "clamped"},
-        {"param": "origin", "time": 2.0, "value": {"type": "vector", "value": {"x": 3.0, "y": 0.0}}, "interpolation": "clamped"}
+        {"param": "origin", "time": 0.0, "value": {"type": "vector", "x": -3.0, "y": 0.0}, "interpolation": "clamped"},
+        {"param": "origin", "time": 2.0, "value": {"type": "vector", "x": 3.0, "y": 0.0}, "interpolation": "clamped"}
       ]
     }
-  ]
+  ],
+  "groups": [{"id": "Scene", "layer_ids": ["Background", "Orb"]}]
 }
 ```
+
+## Available layer types
+Call `schema_list_layers()` for the exact list of the installed Synfig build and
+`schema_get_layer("<type>")` for the parameters, their value types and whether
+they are writable.
 """,
     "animation": """# Synfig MCP Animation System
 
@@ -72,15 +83,26 @@ Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
 - `linear`: Constant rate of change between waypoints.
 - `halt`: Ease-in and ease-out with zero velocity at waypoints.
 - `constant`: Step function hold until next waypoint.
+- `auto`: Automatic spline mode (Synfig's TCB mode).
+- `manual`: Fully manual handles; the waypoint keeps its stored tangents.
+
+Any other value is rejected, because Synfig refuses to load a document with an
+unknown interpolation.
 
 ## Parameter Values
 Parameters take typed dictionaries:
 - `real`: `{"type": "real", "value": 1.5}`
-- `vector`: `{"type": "vector", "value": {"x": 0.0, "y": 1.0}}`
-- `color`: `{"type": "color", "value": {"r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0}}`
-- `angle`: `{"type": "angle", "value": 45.0}`
+- `vector`: `{"type": "vector", "x": 0.0, "y": 1.0}`
+- `color`: `{"type": "color", "r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0}`
+- `angle`: `{"type": "angle", "degrees": 45.0}`
 - `bool`: `{"type": "bool", "value": true}`
 - `string`: `{"type": "string", "value": "text"}`
+- `integer`: `{"type": "integer", "value": 3}`
+- `time`: `{"type": "time", "seconds": 1.5}`
+
+Plain numbers and `[x, y]` pairs are coerced into the type the parameter
+expects, and the nested spelling `{"type": "vector", "value": {...}}` is
+accepted as well.
 """,
     "review": """# Visual Review Loop & Token Efficiency
 

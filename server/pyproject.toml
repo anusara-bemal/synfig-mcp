@@ -131,3 +131,4 @@ test = "pytest -m 'not real_studio' -rs"
 live = "pytest -m real_studio -v -s"
 check = ["format-check", "lint", "typecheck", "test"]
 security = "bandit -r src/"
+verify-validity = "pytest tests/contract/test_sif_synfig_validity.py -v"

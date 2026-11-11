@@ -42,10 +42,17 @@ ProfileType = Literal["core", "anim", "fx", "rig", "assets", "review", "all"]
 
 
 def get_default_profile() -> ProfileType:
-    p = os.environ.get("SYNFIG_MCP_PROFILE", "core").lower()
+    """Resolve the active tool profile.
+
+    The default is ``all`` so a freshly installed server exposes the complete
+    Synfig feature set (every layer, parameter, animation, render and review
+    tool).  Token constrained clients can narrow it down with
+    ``SYNFIG_MCP_PROFILE=core|anim|fx|rig|assets|review``.
+    """
+    p = os.environ.get("SYNFIG_MCP_PROFILE", "all").lower()
     if p in ("core", "anim", "fx", "rig", "assets", "review", "all"):
         return p  # type: ignore[return-value]
-    return "core"
+    return "all"
 
 
 def get_default_backend_mode() -> Literal["auto", "live", "headless"]:
@@ -84,7 +91,7 @@ class Settings(BaseModel):
 
     profile: ProfileType = Field(
         default_factory=get_default_profile,
-        description="Tool profile to expose: 'core' (default, <3k tokens), 'anim', 'fx', 'rig', 'assets', 'review', or 'all'.",
+        description="Tool profile to expose: 'all' (default, every Synfig tool), 'core' (minimal), 'anim', 'fx', 'rig', 'assets', or 'review'.",
     )
     backend_mode: Literal["auto", "live", "headless"] = Field(
         default_factory=get_default_backend_mode,

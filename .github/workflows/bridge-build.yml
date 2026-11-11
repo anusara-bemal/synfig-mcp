@@ -65,7 +65,15 @@ jobs:
           # A session bus is required for Gtk::Application single-instance
           # forwarding, which one of the bridge tests exercises.
           dbus-run-session -- xvfb-run -a -s "-screen 0 1280x1024x24" \
-            pytest server/tests/e2e/test_live_mutate.py -m real_studio -v --durations=20
+            pytest server/tests/e2e/test_live_mutate.py server/tests/e2e/test_live_scene_build.py \
+            -m real_studio -v --durations=20
+
+      - name: Verify generated documents load in the Synfig engine
+        run: |
+          export PATH="${GITHUB_WORKSPACE}/build_synfig/build_linux/install/bin:${PATH}"
+          export LD_LIBRARY_PATH="${GITHUB_WORKSPACE}/build_synfig/build_linux/install/lib:${LD_LIBRARY_PATH}"
+          export SYNFIG_MODULE_DIR="${GITHUB_WORKSPACE}/build_synfig/build_linux/install/lib/synfig/modules"
+          pytest server/tests/contract/test_sif_synfig_validity.py -v
 
       - name: Package Linux Artifacts
         run: |

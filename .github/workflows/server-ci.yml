@@ -48,6 +48,43 @@ jobs:
           cd server
           uv run poe check
 
+  synfig-validity:
+    name: Synfig document validity gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Synfig engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y synfig
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          cd server
+          uv sync --locked --all-extras
+
+      - name: Verify every generated document loads in Synfig
+        run: |
+          cd server
+          uv run pytest tests/contract/test_sif_synfig_validity.py -v
+
+      - name: Run the standalone validity verifier
+        run: |
+          uv run python ../scripts/verify_synfig_validity.py
+
   docker-smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20

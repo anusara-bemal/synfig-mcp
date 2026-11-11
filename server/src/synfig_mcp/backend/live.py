@@ -16,6 +16,7 @@ from synfig_mcp.errors import BridgeConnectionError, DocumentNotFoundError
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.models import SynfigValue
 from synfig_mcp.security.sandbox import validate_path
+from synfig_mcp.sif.valuenodes import normalize_interpolation
 
 synfig_value_adapter: TypeAdapter[SynfigValue] = TypeAdapter(SynfigValue)
 
@@ -492,11 +493,11 @@ class LiveBackend(BackendBase):
             "value": val_dict,
         }
         if interpolation:
-            params["interpolation"] = interpolation
+            params["interpolation"] = normalize_interpolation(interpolation)
         if interpolation_in:
-            params["interpolation_in"] = interpolation_in
+            params["interpolation_in"] = normalize_interpolation(interpolation_in)
         if interpolation_out:
-            params["interpolation_out"] = interpolation_out
+            params["interpolation_out"] = normalize_interpolation(interpolation_out)
         res = await client.call("anim.waypoint_set", params)
         return dict(res)
 

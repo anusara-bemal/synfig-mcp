@@ -21,12 +21,10 @@ from synfig_mcp.errors import (
 )
 from synfig_mcp.render.jobs import job_manager
 from synfig_mcp.render.pipeline import CancellationToken
-from synfig_mcp.schema.probe import seed_builtin_schemas
-from synfig_mcp.schema.registry import SchemaRegistry
+from synfig_mcp.schema.probe import get_synfig_registry
 
-# Shared schema registry for schema tools
-_registry = SchemaRegistry()
-seed_builtin_schemas(_registry)
+# Schema registry for the introspection tools.  The registry is populated from
+# the installed Synfig binary on first use (see ``get_synfig_registry``).
 
 # Global security warning for document-derived data
 SECURITY_NOTICE = (
@@ -759,9 +757,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         param_name: str,
         type: str,
     ) -> dict[str, Any]:
-        """Convert a layer parameter into a linkable ValueNode (e.g. 'composite', 'scale', 'add', 'sine', 'linear', 'timeloop').
+        """Convert a layer parameter into a linkable ValueNode (e.g. 'linear', 'add', 'subtract', 'scale', 'composite', 'sine', 'duplicate', 'range', 'step', 'absolute').
         Returns: Object containing 'layer_id', 'param_name', and converted ValueNode 'type'.
-        Gotcha: Converting to an incompatible type (e.g. converting a Real number to 'composite').
+        Gotcha: Converting to an incompatible type (numeric parameters accept 'linear'/'add'/'subtract'/'scale'/'sine'; 'composite' only works on vector and color parameters).
         """
         return await backend.param_convert(
             doc_id=doc_id,
@@ -885,7 +883,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     ) -> dict[str, Any]:
         """Insert or update a waypoint for a layer parameter at a specific timeline timestamp.
         Returns: Dictionary containing 'waypoint' details and 'interpolated_value'.
-        Gotcha: Passing invalid interpolation strings (valid: 'linear', 'constant', 'halt', 'clamped', 'tcb').
+        Gotcha: Passing invalid interpolation strings (valid: 'linear', 'constant', 'halt', 'clamped', 'auto', 'manual').
         """
         return await backend.anim_waypoint_set(
             doc_id=doc_id,
@@ -1390,19 +1388,26 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("schema_list_layers", annotations=READ_ONLY)
     async def schema_list_layers() -> list[str]:
-        """List all layer types supported by Synfig (e.g. 'circle', 'rectangle', 'star', 'text', 'blur', 'outline').
+        """List all layer types supported by the installed Synfig build (e.g. 'circle', 'rectangle', 'star', 'text', 'blur', 'outline').
         Returns: Alphabetical list of supported layer type strings.
-        Gotcha: Guessing layer names without consulting this list.
+        Gotcha: The list is introspected from the Synfig binary, so it reflects the exact build installed on this machine.
         """
-        return _registry.list_layers()
+        registry = await get_synfig_registry()
+        return registry.list_layers()
 
     @tool_for("schema_get_layer", annotations=READ_ONLY)
     async def schema_get_layer(layer_type: str) -> dict[str, Any]:
         """Get parameter schemas, default values, and hints for a specific layer type.
-        Returns: LayerTypeInfo object containing 'name', 'category', 'description', and 'params' dictionary.
+        Returns: LayerTypeInfo object containing 'name', 'version', 'description', and 'params' dictionary.
         Gotcha: Looking for a parameter that belongs to a different layer type.
         """
-        info = _registry.get_layer(layer_type)
+        registry = await get_synfig_registry()
+        info = registry.get_layer(layer_type)
+        if info is None:
+            for candidate in registry.list_layers():
+                if candidate.lower() == layer_type.lower():
+                    info = registry.get_layer(candidate)
+                    break
         return info.model_dump() if info else {"error": f"Layer type '{layer_type}' not found"}
 
     @tool_for("schema_list_valuenodes", annotations=READ_ONLY)
@@ -1411,7 +1416,8 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Returns: List of valuenode type names.
         Gotcha: Confusing valuenodes with layer parameters.
         """
-        return _registry.list_valuenodes()
+        registry = await get_synfig_registry()
+        return registry.list_valuenodes()
 
     @tool_for("schema_list_targets", annotations=READ_ONLY)
     async def schema_list_targets() -> list[str]:
@@ -1419,7 +1425,8 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Returns: List of target format strings.
         Gotcha: Passing unsupported extensions (e.g. 'webp').
         """
-        return _registry.list_targets()
+        registry = await get_synfig_registry()
+        return registry.list_targets()
 
     @tool_for("schema_list_renderers", annotations=READ_ONLY)
     async def schema_list_renderers() -> list[str]:
@@ -1427,4 +1434,5 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Returns: List of renderer names.
         Gotcha: Assuming GPU renderer is present when Synfig is using Cobra software renderer.
         """
-        return _registry.list_renderers()
+        registry = await get_synfig_registry()
+        return registry.list_renderers()

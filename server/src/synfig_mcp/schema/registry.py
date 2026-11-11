@@ -4,7 +4,7 @@ Schema registry storing introspected Synfig layer types, parameters, valuenodes,
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class LayerParamInfo(BaseModel):
@@ -15,6 +15,16 @@ class LayerParamInfo(BaseModel):
     description: str = ""
     type: str = "any"
     hint: str = ""
+    #: Whether the MCP can write values of this parameter.
+    editable: bool = True
+
+    @model_validator(mode="after")
+    def _sync_editable(self) -> "LayerParamInfo":
+        from synfig_mcp.schema.param_types import is_editable_param
+
+        if self.type and self.type not in ("any", "unknown"):
+            object.__setattr__(self, "editable", is_editable_param(self.name, self.type))
+        return self
 
 
 class LayerTypeInfo(BaseModel):

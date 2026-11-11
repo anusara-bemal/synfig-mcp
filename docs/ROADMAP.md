@@ -20,6 +20,40 @@
 
 ---
 
+## Production Hardening Pass (2026-11-11)
+
+A dedicated pass to make every claim of the server verifiable. Every item below was
+reproduced against the *real* Synfig engine before it was fixed, and is now covered
+by a test that fails without the fix.
+
+| # | Area | Problem found (reproduced) | Resolution | Verification |
+|---|---|---|---|---|
+| 1 | Document integrity | `param_export` produced documents Synfig refused to load (`Unknown ID (myRadius) referenced in parameter`) | Value nodes are written as `<defs><real id=…/></defs>`, `<defs>` placed before the referencing layers | `test_param_export_produces_loadable_document` |
+| 2 | Document integrity | `param_convert` produced unloadable documents (`Missing attribute "type" in <linear>`) | Real linkable ValueNode layout per upstream `valuenode_*.cpp` | `test_param_convert_produces_loadable_document` (9 conversions) |
+| 3 | Animation | `interpolation="tcb"` produced unloadable documents | Interpolation validated against the engine's own set | `test_waypoint_interpolations_produce_loadable_documents` |
+| 4 | Parameter safety | Unsupported values were stringified into the document and reported as success | Typed error instead of silent corruption | `test_param_set_rejects_unsupported_value_types` |
+| 5 | Backend parity | Live `scene_build` dropped `groups` and `waypoints` | Bridge now applies both inside one undo step | `test_live_scene_build_applies_groups` / `..._applies_waypoints` |
+| 6 | Backend parity | Invalid parameter values were skipped silently | Typed error in `layer.add` and `scene.build` | `test_live_layer_add_rejects_invalid_parameter_values` |
+| 7 | Render honesty | `render_video` wrote GIF bytes into a `.mp4` | ffmpeg discovery + actionable error | `test_render_pipeline.py` |
+| 8 | Layer fidelity | Layers were written with `version="0.1"` | Real version from `synfig --layer-info` | `test_created_layers_use_the_introspected_layer_version` |
+| 9 | Input validation | Unknown layer types produced broken documents | Rejected with the list of valid types | `test_unknown_layer_type_is_rejected` |
+| 10 | Introspection | `schema_list_layers` reported 6 of 55 layer types; targets 7/13; renderers 3/8 (mangled); valuenodes 14/69 | Tools are backed by the installed binary | `test_schema_registry.py` |
+| 11 | Introspection | Parameter types were guessed by a name heuristic | Types introspected from the patched Studio (454 params) | `scripts/introspect_param_types.py` |
+| 12 | Documentation | `docs/tools.md` documented 47 of 73 tools; coverage matrix claimed 100% value node support | Both generated from measured data | `test_tool_docs.py`, `test_coverage_matrix.py` |
+| 13 | Reach | Default profile hid ~60% of the tools | Default profile is now `all` (73 tools) | `test_every_registered_tool_has_a_profile` |
+
+### Remaining gaps (documented, not implemented in this pass)
+
+| Gap | Impact | Next step |
+|---|---|---|
+| Complex parameters `wplist`, `dilist`, `bones`, `transformation`, `canvas` cannot be written | No weight-paint, bone rigging or transformation authoring through the MCP | Dedicated serialisers, verified by the validity gate |
+| 58 of 69 value nodes cannot be *created* (only read) | Limited procedural expression vocabulary | Extend `VALUENODE_LINK_SPECS` with the upstream link layouts |
+| No `param_link` tool | A parameter cannot be linked to an exported value node (wheel rotation = car translation) | Implement the `ValueDescConnect` action in the bridge |
+| Canvas create/rename/delete and per-canvas properties | `canvas.create` exists in the bridge but has no MCP tool | Expose the existing bridge method |
+| No `param_list` / `anim_waypoint_list` | Instance parameters and waypoints cannot be read back | Add read-only bridge methods |
+
+---
+
 ## LiveBackend Method Support Matrix (Verified against Real Studio)
 
 | Method | Wire Protocol | Python Client Wired | C++ Handler Implemented | Verified Live (Real Studio) | Undo Restores State |

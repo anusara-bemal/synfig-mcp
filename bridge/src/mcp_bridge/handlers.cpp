@@ -49,7 +49,9 @@ static synfig::Interpolation parse_interpolation(const std::string& str, synfig:
     if (str == "constant") return synfig::INTERPOLATION_CONSTANT;
     if (str == "halt") return synfig::INTERPOLATION_HALT;
     if (str == "clamped") return synfig::INTERPOLATION_CLAMPED;
-    if (str == "tcb") return synfig::INTERPOLATION_TCB;
+    if (str == "manual") return synfig::INTERPOLATION_MANUAL;
+    // "auto" is the name Synfig shows in the UI for the TCB spline mode.
+    if (str == "auto" || str == "tcb") return synfig::INTERPOLATION_TCB;
     return default_val;
 }
 #endif
@@ -975,9 +977,12 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             if (params.contains("params") && params["params"].is_object()) {
                 for (auto& item : params["params"].items()) {
                     synfig::ValueBase val = json_to_valuebase(item.value());
-                    if (val.is_valid()) {
-                        ci->change_value(synfigapp::ValueDesc(layer, item.key()), val);
+                    if (!val.is_valid()) {
+                        grouper.cancel();
+                        r["error"] = {{"code", -32602}, {"message", "Invalid value for parameter: " + item.key()}};
+                        return r;
                     }
+                    ci->change_value(synfigapp::ValueDesc(layer, item.key()), val);
                 }
             }
 
@@ -1025,19 +1030,81 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                     int depth = l_spec.value("depth", 0);
 
                     synfig::Layer::Handle layer = ci->add_layer_to(l_type, inst->get_canvas(), depth);
-                    if (layer) {
-                        if (!l_id.empty()) {
-                            layer->set_description(l_id);
-                        }
-                        created_ids.push_back(layer->get_description().empty() ? layer->get_guid().get_string() : layer->get_description());
+                    if (!layer) {
+                        grouper.cancel();
+                        r["error"] = {{"code", -32000}, {"message", "Failed to create layer of type: " + l_type}};
+                        return r;
+                    }
+                    if (!l_id.empty()) {
+                        layer->set_description(l_id);
+                    }
+                    created_ids.push_back(layer->get_description().empty() ? layer->get_guid().get_string() : layer->get_description());
 
-                        if (l_spec.contains("params") && l_spec["params"].is_object()) {
-                            for (auto& item : l_spec["params"].items()) {
-                                synfig::ValueBase val = json_to_valuebase(item.value());
-                                if (val.is_valid()) {
-                                    ci->change_value(synfigapp::ValueDesc(layer, item.key()), val);
-                                }
+                    if (l_spec.contains("params") && l_spec["params"].is_object()) {
+                        for (auto& item : l_spec["params"].items()) {
+                            synfig::ValueBase val = json_to_valuebase(item.value());
+                            if (!val.is_valid()) {
+                                grouper.cancel();
+                                r["error"] = {{"code", -32602}, {"message", "Invalid value for parameter: " + item.key()}};
+                                return r;
                             }
+                            ci->change_value(synfigapp::ValueDesc(layer, item.key()), val);
+                        }
+                    }
+
+                    // Waypoints keep the animation of the declarative spec.
+                    if (l_spec.contains("waypoints") && l_spec["waypoints"].is_array()) {
+                        for (auto& wp_spec : l_spec["waypoints"]) {
+                            std::string param_name = wp_spec.value("param", "");
+                            double wp_time = wp_spec.value("time", 0.0);
+                            synfig::ValueBase wp_val = json_to_valuebase(wp_spec.value("value", nlohmann::json::object()));
+                            if (!wp_val.is_valid()) {
+                                grouper.cancel();
+                                r["error"] = {{"code", -32602}, {"message", "Invalid waypoint value for parameter: " + param_name}};
+                                return r;
+                            }
+                            std::string interp_str = wp_spec.value("interpolation", "");
+                            if (!interp_str.empty()) {
+                                synfigapp::Main::set_interpolation(parse_interpolation(interp_str));
+                            }
+                            synfigapp::Action::Handle wp_action = synfigapp::Action::create("ValueDescSet");
+                            if (wp_action) {
+                                wp_action->set_param("canvas", inst->get_canvas());
+                                wp_action->set_param("canvas_interface", ci);
+                                wp_action->set_param("time", synfig::Time(wp_time));
+                                wp_action->set_param("value_desc", synfigapp::ValueDesc(layer, param_name));
+                                wp_action->set_param("new_value", wp_val);
+                                wp_action->set_param("animate", true);
+                                inst->perform_action(wp_action);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Groups encapsulate the referenced layers into a PasteCanvas layer.
+            if (params.contains("groups") && params["groups"].is_array()) {
+                for (auto& g_spec : params["groups"]) {
+                    std::string g_id = g_spec.value("id", "Group");
+                    std::vector<std::string> g_layer_ids = g_spec.value("layer_ids", std::vector<std::string>());
+
+                    synfigapp::Action::Handle group_action = synfigapp::Action::create("LayerEncapsulate");
+                    if (group_action) {
+                        group_action->set_param("canvas", inst->get_canvas());
+                        group_action->set_param("canvas_interface", ci);
+                        group_action->set_param("description", synfig::String(g_id));
+
+                        bool any = false;
+                        for (const auto& lid : g_layer_ids) {
+                            synfig::Layer::Handle l = find_layer_in_canvas(inst->get_canvas(), lid);
+                            if (l) {
+                                group_action->set_param("layer", l);
+                                any = true;
+                            }
+                        }
+                        if (any) {
+                            inst->perform_action(group_action);
+                            created_ids.push_back(g_id);
                         }
                     }
                 }

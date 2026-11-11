@@ -6,7 +6,6 @@ contact sheet generation, progress notifications, cancellation, and cache integr
 import asyncio
 import contextlib
 import inspect
-import os
 import shutil
 import subprocess
 import tempfile
@@ -218,46 +217,55 @@ class RenderPipeline:
                 return out_p.is_file()
 
             # 2. Video via ffmpeg
-            ffmpeg_bin = shutil.which("ffmpeg") or r"C:\msys64\ucrt64\bin\ffmpeg.exe"
-            if os.path.isfile(ffmpeg_bin) or shutil.which(ffmpeg_bin):
-                input_pattern = str(tmp_seq_dir / "frame_%04d.png")
-                cmd = [
-                    ffmpeg_bin,
-                    "-y",
-                    "-framerate",
-                    str(frame_rate),
-                    "-i",
-                    input_pattern,
-                    "-c:v",
-                    "libx264",
-                    "-pix_fmt",
-                    "yuv420p",
-                    str(out_p),
-                ]
-                proc = await asyncio.to_thread(
-                    subprocess.run,
-                    cmd,
-                    capture_output=True,
-                    text=True,
+            ffmpeg_bin = self._find_ffmpeg()
+            if not ffmpeg_bin:
+                raise SynfigError(
+                    "ffmpeg is required to encode a video but was not found on this "
+                    "system. Install ffmpeg (on PATH, in C:\\Program Files\\Synfig\\bin "
+                    "or C:\\msys64\\ucrt64\\bin) or render a .gif instead."
                 )
-                if proc.returncode != 0:
-                    logger.error("ffmpeg failed: %s", proc.stderr)
-                    raise SynfigError(f"ffmpeg video encoding failed: {proc.stderr[:200]}")
-                return out_p.is_file()
-
-            # Fallback if no ffmpeg: assemble as GIF with renamed suffix warning
-            logger.warning("ffmpeg not found on PATH; falling back to GIF animation")
-            fallback_gif = out_p.with_suffix(".gif")
-            frames = [Image.open(f) for f in frame_files]
-            frames[0].save(
-                fallback_gif,
-                save_all=True,
-                append_images=frames[1:],
-                duration=int(1000.0 / frame_rate),
-                loop=0,
+            input_pattern = str(tmp_seq_dir / "frame_%04d.png")
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-framerate",
+                str(frame_rate),
+                "-i",
+                input_pattern,
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(out_p),
+            ]
+            proc = await asyncio.to_thread(
+                subprocess.run,
+                cmd,
+                capture_output=True,
+                text=True,
             )
-            shutil.copy2(fallback_gif, out_p)
-            return out_p.is_file()
+            if proc.returncode != 0:
+                logger.error("ffmpeg failed: %s", proc.stderr)
+                raise SynfigError(f"ffmpeg video encoding failed: {proc.stderr[:200]}")
+            if not out_p.is_file():
+                raise SynfigError("ffmpeg reported success but produced no output file")
+            return True
+
+    def _find_ffmpeg(self) -> str | None:
+        """Locate an ffmpeg binary (PATH, Synfig bundle, MSYS2)."""
+        found = shutil.which("ffmpeg")
+        if found:
+            return found
+        candidates = [
+            Path(r"C:\Program Files\Synfig\bin\ffmpeg.exe"),
+            Path(r"C:\msys64\ucrt64\bin\ffmpeg.exe"),
+            Path("/usr/bin/ffmpeg"),
+            Path("/usr/local/bin/ffmpeg"),
+        ]
+        for candidate in candidates:
+            if candidate.is_file():
+                return str(candidate)
+        return None
 
     async def render_contact_sheet(
         self,

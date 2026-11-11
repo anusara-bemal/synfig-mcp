@@ -15,6 +15,69 @@ logger = get_logger("synfig_mcp.protocol.fake_bridge")
 MAX_MESSAGE_SIZE = 10 * 1024 * 1024
 DEFAULT_FAKE_TOKEN = "0123456789abcdef0123456789abcdef"  # nosec B105
 
+#: Layer types of Synfig 1.5.5.  The fake bridge rejects unknown types exactly
+#: like the native bridge does, so the contract tests exercise the same paths.
+KNOWN_LAYER_TYPES: frozenset[str] = frozenset(
+    {
+        "advanced_outline",
+        "bevel",
+        "blur",
+        "checker_board",
+        "chromakey",
+        "circle",
+        "clamp",
+        "colorcorrect",
+        "conical_gradient",
+        "curve_gradient",
+        "curve_warp",
+        "duplicate",
+        "filter_group",
+        "freetime",
+        "group",
+        "halftone2",
+        "halftone3",
+        "import",
+        "inside_out",
+        "julia",
+        "linear_gradient",
+        "lumakey",
+        "mandelbrot",
+        "metaballs",
+        "motion_blur",
+        "noise",
+        "noise_distort",
+        "outline",
+        "PasteCanvas",
+        "plant",
+        "polygon",
+        "radial_blur",
+        "radial_gradient",
+        "rectangle",
+        "region",
+        "rotate",
+        "shade",
+        "simple_circle",
+        "skeleton",
+        "skeleton_deformation",
+        "solid_color",
+        "sound",
+        "spherize",
+        "spiral_gradient",
+        "star",
+        "stretch",
+        "stroboscope",
+        "super_sample",
+        "switch",
+        "text",
+        "timeloop",
+        "translate",
+        "twirl",
+        "warp",
+        "xor_pattern",
+        "zoom",
+    }
+)
+
 
 class FakeBridgeServer:
     """In-process TCP server simulating Synfig Studio's C++ mcp_bridge."""
@@ -349,17 +412,29 @@ class FakeBridgeServer:
             }
 
         if method == "layer.add":
+            layer_type = params.get("layer_type", "circle")
+            if layer_type not in KNOWN_LAYER_TYPES:
+                # The real bridge refuses unknown layer types; the fake has to
+                # behave the same so the contract tests stay meaningful.
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -32000,
+                        "message": f"Failed to create layer of type: {layer_type}",
+                    },
+                }
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {
                     "doc_id": params.get("doc_id", "doc_0"),
                     "layer_id": "circle_001",
-                    "layer_type": params.get("layer_type", "circle"),
+                    "layer_type": layer_type,
                     "description": params.get("description", "Circle001"),
                     "depth": params.get("depth", 0),
                     "diff": {
-                        "action": "layer_add",
+                        "action": "layer.add",
                         "created": ["circle_001"],
                         "modified": [],
                         "deleted": [],
@@ -663,11 +738,23 @@ class FakeBridgeServer:
                         "type": lyr.get("type", "circle"),
                         "depth": lyr.get("depth", 0),
                         "params": lyr.get("params", {}),
+                        "waypoints": lyr.get("waypoints", []),
                     }
                 )
             for g in groups_spec:
                 g_id = g.get("id", "Group")
                 created.append(g_id)
+                doc_layers.append(
+                    {
+                        "id": g_id,
+                        "name": g_id,
+                        "type": "group",
+                        "depth": 0,
+                        "params": {},
+                        "waypoints": [],
+                        "children": g.get("layer_ids", []),
+                    }
+                )
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,

@@ -1,8 +1,8 @@
 # MCP Tools API Reference
 
-`synfig-mcp` exposes tools grouped into functional **profiles** configured via the `SYNFIG_MCP_PROFILE` environment variable (default: `core`).
+`synfig-mcp` exposes tools grouped into functional **profiles** configured via the `SYNFIG_MCP_PROFILE` environment variable (default: `all`).
 
-Profiles allow LLMs to operate with maximum context token efficiency by surfacing only the relevant tools for a specific animation workflow.
+The default profile exposes the **complete** Synfig feature set (all 73 tools) so a freshly installed server can create, animate, render and review animations without further configuration. The narrower profiles exist for clients with a tight context budget.
 
 ---
 
@@ -10,19 +10,19 @@ Profiles allow LLMs to operate with maximum context token efficiency by surfacin
 
 | Profile | Target Tokens (cl100k) | Tools Count | Primary Purpose |
 |---|---|---|---|
-| `core` (default) | < 3,000 (~2,658 actual) | 12 | Scene setup, declarative build, inspection, undo/redo, single-frame render. |
-| `anim` | < 4,500 | 14 | Timeline navigation, keyframe manipulation, parameter animation, waypoints. |
-| `fx` | < 4,500 | 21 | Layer tree modifications, effects recipes, style presets, parameters. |
-| `rig` | < 3,000 | 12 | Bone hierarchies, cut-out character rigging, pose application, storyboards. |
-| `assets` | < 2,000 | 10 | Licensed asset search, previews, hardened downloads, local imports. |
-| `review` | < 4,000 | 15 | Visual critique, objective quality metrics, sequence review, diff heatmaps. |
-| `all` | < 22,000 | 56 | Unrestricted full access to all tools, low-level schemas, and jobs. |
+| `all` (default) | < 22,000 (~17,900 actual) | 73 | Unrestricted full access to every tool: documents, layers, parameters, animation, rendering, review, assets. |
+| `core` | < 3,000 (~2,700 actual) | 13 | Scene setup, declarative build, inspection, undo/redo, single-frame render. |
+| `anim` | < 5,000 | 19 | Timeline navigation, keyframe manipulation, parameter animation, waypoints. |
+| `fx` | < 5,500 | 24 | Layer tree modifications, effects recipes, style presets, parameters. |
+| `rig` | < 4,000 | 17 | Bone hierarchies, cut-out character rigging, pose application, storyboards. |
+| `assets` | < 2,500 | 12 | Licensed asset search, previews, hardened downloads, local imports. |
+| `review` | < 4,500 | 18 | Visual critique, objective quality metrics, sequence review, diff heatmaps. |
 
 ---
 
 ## 2. Tool Reference by Profile
 
-### Profile: `core` (Default Profile)
+### Profile: `core` (Minimal Profile)
 Designed for atomic declarative generation, quick iterations, and minimal token footprint.
 
 - `health_check()`: Verifies server connectivity, active backend (`live` vs `headless`), and Synfig runtime status.
@@ -103,8 +103,8 @@ Closed-loop visual critique, objective image analytics, and rendering pipelines.
 
 ---
 
-### Profile: `all`
-Includes every tool listed above, plus low-level schema inspection:
+### Profile: `all` (Default Profile)
+Includes every tool of every profile above - all 73 tools: documents, canvases, scene building, layers, parameters and value nodes, animation and keyframes, selection, history, effects recipes, style presets, character rigging, storyboards, licensed assets, rendering (frame, sequence, video, contact sheet, async jobs), visual review and low-level schema inspection:
 - `schema_list_layers()` / `schema_get_layer(layer_type)`
 - `schema_list_valuenodes()`
 - `schema_list_renderers()`

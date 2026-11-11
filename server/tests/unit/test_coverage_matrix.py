@@ -92,3 +92,54 @@ async def test_live_binary_introspection_consistency() -> None:
         f"Mismatch between binary layers and coverage matrix! "
         f"Missing: {live_layers - matrix_layers}, Extra: {matrix_layers - live_layers}"
     )
+
+
+@pytest.mark.asyncio
+async def test_coverage_counts_are_internally_consistent() -> None:
+    """The summary numbers must be derived from the per-entry data."""
+    with open(COVERAGE_JSON, encoding="utf-8") as f:
+        data: dict[str, Any] = json.load(f)
+
+    layers = data["layers"]
+    summary = data["summary"]
+
+    assert summary["layers"]["total"] == len(layers)
+    assert summary["layers"]["supported"] == sum(
+        1 for layer in layers.values() if layer["status"] == "supported"
+    )
+
+    total_params = sum(len(layer["params"]) for layer in layers.values())
+    supported_params = sum(
+        1 for layer in layers.values() for param in layer["params"].values() if param["supported"]
+    )
+    assert summary["params"]["total"] == total_params
+    assert summary["params"]["supported"] == supported_params
+
+    assert summary["valuenodes"]["total"] == len(data["valuenodes"])
+    assert summary["targets"]["total"] == len(data["targets"])
+
+
+def test_coverage_does_not_claim_unsupported_parameters() -> None:
+    """Complex value types must never be reported as writable."""
+    with open(COVERAGE_JSON, encoding="utf-8") as f:
+        data: dict[str, Any] = json.load(f)
+
+    for layer_name, layer in data["layers"].items():
+        for param_name, param in layer["params"].items():
+            if param["supported"]:
+                assert (
+                    param["type"]
+                    not in (
+                        "list",
+                        "transformation",
+                        "canvas",
+                    )
+                    or param_name == "bline"
+                ), (
+                    f"{layer_name}.{param_name} claims write support for a complex "
+                    f"'{param['type']}' value"
+                )
+            else:
+                assert param["unsupported_reason"], (
+                    f"{layer_name}.{param_name} is unsupported without a reason"
+                )

@@ -16,7 +16,7 @@ from synfig_mcp.cli.runner import CliRunner
 from synfig_mcp.errors import DocumentNotFoundError, SynfigError
 from synfig_mcp.protocol.models import SynfigValue
 from synfig_mcp.security.sandbox import validate_path
-from synfig_mcp.sif.parser import SifDocument, parse_synfig_time
+from synfig_mcp.sif.parser import SifDocument, SifLayer, parse_synfig_time
 from synfig_mcp.sif.writer import save_sif
 
 
@@ -252,6 +252,33 @@ class HeadlessBackend(BackendBase):
     # Layer Operations
     # -----------------------------------------------------------------------
 
+    async def _create_layer(
+        self,
+        doc: SifDocument,
+        layer_type: str,
+        *,
+        canvas_path: str = "",
+        desc: str | None = None,
+        params: dict[str, Any] | None = None,
+        depth: int | None = None,
+    ) -> SifLayer:
+        """Create a layer, validating the type and stamping the real version."""
+        if not await self.runner.is_valid_layer_type(layer_type):
+            catalog = await self.runner.get_layer_catalog()
+            raise SynfigError(
+                f"Unknown Synfig layer type '{layer_type}'. "
+                f"Valid layer types: {', '.join(sorted(catalog))}."
+            )
+        version = await self.runner.get_layer_version(layer_type)
+        return doc.add_layer(
+            layer_type,
+            canvas_path=canvas_path,
+            desc=desc,
+            params=params,
+            depth=depth,
+            version=version,
+        )
+
     async def layer_add(
         self,
         doc_id: str,
@@ -266,7 +293,13 @@ class HeadlessBackend(BackendBase):
 
         self._save_undo_state(doc_id)
         doc = self._documents[doc_id]
-        layer = doc.add_layer(layer_type, canvas_path=canvas_path, params=params)
+        layer = await self._create_layer(
+            doc,
+            layer_type,
+            canvas_path=canvas_path,
+            params=params,
+            desc=description or None,
+        )
         if description:
             layer.desc = description
 
@@ -953,8 +986,9 @@ class HeadlessBackend(BackendBase):
             )
 
         for l_spec in parsed_spec.layers:
-            layer = doc.add_layer(
-                layer_type=l_spec.type,
+            layer = await self._create_layer(
+                doc,
+                l_spec.type,
                 canvas_path=parsed_spec.canvas_path,
                 desc=l_spec.id,
                 params=l_spec.params,
