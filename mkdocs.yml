@@ -37,6 +37,7 @@ theme:
 nav:
   - Home: index.md
   - Getting started:
+      - Installation: install.md
       - Install on Windows: install-windows.md
       - Build on Windows: build-windows.md
       - Build on Linux: build-linux.md
