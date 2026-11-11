@@ -131,6 +131,63 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_canvas_management_and_listing(live_studio: BridgeClient) -> None:
+    """Canvas management, parameter listing and waypoint listing must work live."""
+    created = await live_studio.call("canvas.create", {"doc_id": "doc_0", "id": "shot1"})
+    assert created.get("canvas_id") == "shot1"
+
+    configured = await live_studio.call(
+        "canvas.set_properties",
+        {
+            "doc_id": "doc_0",
+            "canvas_id": "shot1",
+            "width": 640,
+            "height": 480,
+            "fps": 30.0,
+        },
+    )
+    assert configured.get("width") == 640
+    assert configured.get("fps") == 30.0
+
+    renamed = await live_studio.call(
+        "canvas.rename", {"doc_id": "doc_0", "canvas_id": "shot1", "name": "Shot One"}
+    )
+    assert renamed.get("name") == "Shot One"
+
+    layer = await live_studio.call(
+        "layer.add", {"doc_id": "doc_0", "layer_type": "circle", "description": "listed"}
+    )
+    params = await live_studio.call(
+        "param.list", {"doc_id": "doc_0", "layer_id": layer["layer_id"]}
+    )
+    entries = params.get("params", [])
+    assert entries, "the bridge reported no parameters"
+    assert any(p.get("name") == "radius" for p in entries), (
+        f"the parameter list is incomplete: {[p.get('name') for p in entries]}"
+    )
+
+    await live_studio.call(
+        "anim.waypoint_set",
+        {
+            "doc_id": "doc_0",
+            "layer_id": layer["layer_id"],
+            "param_name": "radius",
+            "time": 0.0,
+            "value": {"type": "real", "value": 1.0},
+        },
+    )
+    waypoints = await live_studio.call(
+        "anim.waypoint_list",
+        {"doc_id": "doc_0", "layer_id": layer["layer_id"], "param_name": "radius"},
+    )
+    assert waypoints.get("waypoints"), "the bridge reported no waypoints"
+
+    deleted = await live_studio.call("canvas.delete", {"doc_id": "doc_0", "canvas_id": "shot1"})
+    assert deleted.get("canvas_id") == "shot1"
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_history_and_canvas_lists_keep_their_contract(
     live_studio: BridgeClient,
 ) -> None:

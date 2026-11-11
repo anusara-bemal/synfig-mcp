@@ -11,9 +11,31 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Edits are applied on the GTK main thread as regular `synfigapp` actions, so they appear instantly on the canvas, participate in undo/redo, and coexist safely with manual artist work.
+**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 80 · **Profile:** `all` enabled by default
 
-> **Current status: `v0.8.0-rc2` pre-release.** The server API is stable enough for daily use; the tool surface may still evolve before `1.0.0`.
+Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
+
+---
+
+## Table of contents
+
+- [Why Synfig MCP](#why-synfig-mcp)
+- [Architecture](#architecture)
+- [How an edit reaches the canvas](#how-an-edit-reaches-the-canvas)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Connect an MCP client](#connect-an-mcp-client)
+- [Operating modes](#operating-modes)
+- [Tool profiles](#tool-profiles)
+- [What you can do](#what-you-can-do)
+- [Configuration](#configuration)
+- [Docker](#docker)
+- [Security model](#security-model)
+- [How we prove it works](#how-we-prove-it-works)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Documentation](#documentation)
+- [License](#license)
 
 ---
 
@@ -23,28 +45,95 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 |---|---|
 | **Live editing** | Drives a running, patched Synfig Studio through an authenticated local bridge. Every mutation is an undoable Studio action. |
 | **Headless fallback** | Works without a GUI through a lossless `.sif` / `.sifz` / `.sfg` engine and the `synfig` CLI. Ideal for CI, containers, and render farms. |
-| **Small context footprint** | Tool profiles keep definitions between ~3.0k and ~18.5k tokens; the complete 73-tool surface ships enabled by default and can be narrowed per client. |
+| **Complete surface** | All 74 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
+| **Verified output** | Every generated document is loaded by the *real* Synfig engine in CI — a document the engine rejects never passes. |
 | **Visual feedback loop** | Renders frames and returns base64 previews plus objective metrics: SSIM, palette, safe areas, clipping, strobe/photosensitivity, diff heatmaps. |
-| **Hardened by default** | Token-authenticated bridge, loopback-only binding, sandboxed file access, SSRF-resistant asset downloads, and SVG sanitization. |
-| **Reproducible releases** | Cross-platform Studio bundles, a GPL source bundle, Python wheel/sdist, SHA-256 checksums, and a signed-in-CI GHCR container. |
+| **Hardened by default** | Token-authenticated bridge, loopback-only binding, sandboxed file access, SSRF-resistant asset downloads, SVG sanitization. |
+| **Reproducible releases** | Cross-platform Studio bundles, a GPL source bundle, Python wheel/sdist, SHA-256 checksums, and a CI-published GHCR container. |
 
 ---
 
-## Contents
+## Architecture
 
-- [Requirements](#requirements)
-- [Quick start](#quick-start)
-- [Connect an MCP client](#connect-an-mcp-client)
-- [Operating modes](#operating-modes)
-- [Tool profiles](#tool-profiles)
-- [Configuration](#configuration)
-- [Docker](#docker)
-- [Security model](#security-model)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development)
-- [Releases and verification](#releases-and-verification)
-- [Documentation](#documentation)
-- [License](#license)
+```mermaid
+graph TB
+    subgraph clients["MCP clients"]
+        CD["Claude Desktop"]
+        CC["Claude Code"]
+        CU["Cursor / VS Code / Codex"]
+        ANY["Any MCP client"]
+    end
+
+    subgraph server["synfig-mcp server (Python · MIT)"]
+        TOOLS["74 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
+        SCHEMA["Schema introspection<br/>layer types · parameters · value nodes · targets"]
+        PIPE["Render pipeline<br/>frame · sequence · video · contact sheet"]
+        REVIEW["Visual review<br/>SSIM · palette · clipping · strobe"]
+        SANDBOX["Security sandbox<br/>workspace roots · path validation"]
+    end
+
+    subgraph backends["Backends (auto-selected)"]
+        LIVE["LiveBackend<br/>JSON-RPC over TCP"]
+        HEAD["HeadlessBackend<br/>lossless SIF DOM"]
+    end
+
+    subgraph studio["Synfig Studio 1.5.5 (patched)"]
+        BRIDGE["mcp_bridge<br/>token auth · GTK dispatcher"]
+        ACTIONS["synfigapp actions<br/>PassiveGrouper · undo stack"]
+        ENGINE["Cobra renderer"]
+    end
+
+    CLI["synfig CLI<br/>headless render"]
+
+    CD & CC & CU & ANY -->|stdio / streamable HTTP| TOOLS
+    TOOLS --> SCHEMA & PIPE & REVIEW & SANDBOX
+    TOOLS --> LIVE & HEAD
+    LIVE <-->|127.0.0.1:19998 · token| BRIDGE
+    BRIDGE --> ACTIONS --> ENGINE
+    HEAD --> CLI
+    PIPE --> CLI
+    ENGINE --> PNG frames
+
+    classDef server fill:#e8f0fe,stroke:#4285f4,color:#111
+    classDef studio fill:#fef7e0,stroke:#f9ab00,color:#111
+    classDef ext fill:#e6f4ea,stroke:#34a853,color:#111
+    class TOOLS,SCHEMA,PIPE,REVIEW,SANDBOX server
+    class BRIDGE,ACTIONS,ENGINE studio
+    class CLI ext
+```
+
+**Two backends, one tool surface.** `auto` mode picks the live bridge when a patched Studio is listening and falls back to the headless engine otherwise — the model never has to know which one is active, and both are held to the same contract tests.
+
+---
+
+## How an edit reaches the canvas
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as MCP client
+    participant S as synfig-mcp
+    participant B as mcp_bridge (Studio)
+    participant G as GTK main thread
+    participant A as Synfig action stack
+
+    M->>S: scene_build(spec)
+    S->>S: validate spec · resolve doc_id
+    S->>B: JSON-RPC "scene.build"
+    B->>B: authenticate session token
+    B->>G: marshal to main thread
+    G->>A: Action::PassiveGrouper
+    G->>A: LayerAdd · ValueDescSet · LayerEncapsulate
+    A-->>G: one undo step · canvas redraw
+    G-->>B: diff {created, modified, deleted}
+    B-->>S: result
+    S-->>M: diff + security notice
+    M->>M: review_frame() → PNG + metrics
+```
+
+- **Thread safety** — the bridge never touches Synfig state from the socket thread; a `Glib::Dispatcher` marshals every request onto the GTK main loop.
+- **Undo integrity** — all sub-actions of one tool call are grouped, so `history_undo` reverses exactly one MCP call, even when interleaved with manual edits.
+- **Fail loudly** — a rejected action returns a typed error instead of a silent no-op.
 
 ---
 
@@ -52,88 +141,82 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 
 | Component | Requirement |
 |---|---|
-| Python server | Python **3.12+**, `uv` recommended |
+| Python server | Python **3.12+**, [`uv`](https://docs.astral.sh/uv/) recommended |
 | Live mode | Patched Synfig Studio from the [Releases](https://github.com/anusara-bemal/synfig-mcp/releases) page |
 | Windows | Windows 10/11 x64 (prebuilt Studio bundle) |
-| Linux | x64 with X11/GTK runtime; prebuilt Studio bundle targets Ubuntu 22.04+ / glibc 2.35+ |
-| macOS | Python server and headless mode only; no prebuilt Studio bridge yet |
-| Headless rendering | `synfig` CLI on `PATH`, or the container image (already includes it) |
+| Linux | x64 with X11/GTK runtime; prebuilt bundle targets Ubuntu 22.04+ / glibc 2.35+ |
+| macOS | Python server and headless mode (no prebuilt Studio bridge yet) |
+| Headless rendering | `synfig` CLI on `PATH`, or use the container image (it bundles Synfig) |
 
-A stock Synfig Studio installation **cannot** use live mode. The native bridge is compiled into the bundled Studio builds.
+> A stock Synfig Studio installation **cannot** use live mode — the native bridge is compiled into the bundled Studio builds.
 
 ---
 
-## Quick start
+## Installation
 
-### 1. Install the Python server
-
-From the latest release wheel:
+### Option A — one command (recommended)
 
 ```bash
-uv pip install "synfig-mcp @ https://github.com/anusara-bemal/synfig-mcp/releases/download/v0.8.0-rc2/synfig_mcp-0.8.0rc2-py3-none-any.whl"
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/anusara-bemal/synfig-mcp/main/scripts/install.sh | bash
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/anusara-bemal/synfig-mcp/main/scripts/install.ps1 | iex
 ```
 
-Or install directly from source:
+The script installs the server with `uv`, verifies the installation with
+`synfig-mcp doctor`, and prints the ready-to-paste client configuration.
+
+### Option B — from source
 
 ```bash
 git clone https://github.com/anusara-bemal/synfig-mcp.git
 cd synfig-mcp
-uv pip install "./server[dev]"
+cd server && uv sync --all-extras && cd ..
+server/.venv/bin/synfig-mcp doctor      # or server\.venv\Scripts\synfig-mcp.exe doctor
 ```
 
-Verify the installation:
+### Option C — release wheel
 
 ```bash
+pip install synfig-mcp
 synfig-mcp doctor
 ```
 
-`doctor` reports Python version, backend selection, bridge reachability, sandbox roots, and optional CLI availability.
-
-> PyPI publication is prepared in the release workflow and can be enabled with the `PUBLISH_TO_PYPI` repository variable. Until then, use the release wheel or source install — both are fully supported.
-
-### 2. Get the patched Synfig Studio (live mode)
-
-Download the bundle for your platform from [Releases](https://github.com/anusara-bemal/synfig-mcp/releases):
-
-- **Windows:** `synfigstudio-windows-ucrt64-mcp-<sha>.zip`
-- **Linux:** `synfigstudio-linux-mcp-<sha>.tar.gz`
-
-Windows:
-
-```powershell
-Expand-Archive synfigstudio-windows-ucrt64-mcp-*.zip -DestinationPath .\synfig-mcp-studio
-.\synfig-mcp-studio\bin\synfigstudio.exe
-```
-
-Linux:
+### Run it
 
 ```bash
-tar -xzf synfigstudio-linux-mcp-*.tar.gz
-cd synfigstudio-linux-mcp-*
-LD_LIBRARY_PATH="$PWD/lib" ./bin/synfigstudio
-```
-
-Then enable the bridge in **Tools → MCP Bridge**, or launch Studio with `SYNFIG_MCP_ENABLE=1`.
-
-### 3. Run the server
-
-```bash
-# stdio transport (default, for MCP clients)
+# stdio transport (default, used by MCP clients)
 synfig-mcp
 
-# streamable HTTP (for remote/container deployments)
-synfig-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --token "$MCP_TOKEN"
+# streamable HTTP (remote / container deployments)
+synfig-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --token "$SYNFIG_MCP_TOKEN"
+
+# diagnostics
+synfig-mcp doctor
+```
+
+```mermaid
+graph LR
+    A["Install"] --> B{"Studio<br/>running?"}
+    B -->|yes| C["LiveBackend<br/>live canvas"]
+    B -->|no| D["HeadlessBackend<br/>files + CLI"]
+    C --> E["SYNFIG_MCP_BACKEND=auto"]
+    D --> E
+    E --> F["synfig-mcp doctor<br/>reports the active backend"]
+
+    classDef ok fill:#e6f4ea,stroke:#34a853,color:#111
+    class C,D,F ok
 ```
 
 ---
 
 ## Connect an MCP client
 
-The server is transport-agnostic. Use stdio for local desktop clients.
-
 ### Claude Desktop
 
-Edit `claude_desktop_config.json`:
+`claude_desktop_config.json` (`%APPDATA%\Claude\claude_desktop_config.json` on Windows,
+`~/Library/Application Support/Claude/` on macOS):
 
 ```json
 {
@@ -149,19 +232,6 @@ Edit `claude_desktop_config.json`:
 }
 ```
 
-If `synfig-mcp` is not on the GUI application's `PATH`, use an absolute path to the executable or `uvx`:
-
-```json
-{
-  "mcpServers": {
-    "synfig": {
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/anusara-bemal/synfig-mcp.git#subdirectory=server", "synfig-mcp"]
-    }
-  }
-}
-```
-
 ### Claude Code
 
 ```bash
@@ -170,11 +240,18 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
 
 ### Cursor
 
-Add to `~/.cursor/mcp.json` using the same `mcpServers` block shown above.
+```json
+{
+  "mcpServers": {
+    "synfig": {
+      "command": "synfig-mcp",
+      "env": { "SYNFIG_MCP_PROFILE": "all", "SYNFIG_MCP_BACKEND": "auto" }
+    }
+  }
+}
+```
 
 ### VS Code
-
-Add to `.vscode/mcp.json`:
 
 ```json
 {
@@ -182,9 +259,7 @@ Add to `.vscode/mcp.json`:
     "synfig": {
       "type": "stdio",
       "command": "synfig-mcp",
-      "env": {
-        "SYNFIG_MCP_PROFILE": "all"
-      }
+      "env": { "SYNFIG_MCP_PROFILE": "all" }
     }
   }
 }
@@ -208,46 +283,97 @@ Add to `.vscode/mcp.json`:
 }
 ```
 
-After connecting, call `health_check` to confirm the active backend and `synfig_help` for in-client guidance.
-
 ---
 
 ## Operating modes
 
-| Mode | Backend | When to use |
+```mermaid
+flowchart TD
+    START["MCP tool call"] --> MODE{"SYNFIG_MCP_BACKEND"}
+    MODE -->|auto| PROBE{"Bridge reachable on<br/>127.0.0.1:19998?"}
+    PROBE -->|yes| LIVE["LiveBackend<br/>• real canvas redraw<br/>• undoable actions<br/>• GUI selection"]
+    PROBE -->|no| HEAD["HeadlessBackend<br/>• .sif / .sifz / .sfg<br/>• CLI rendering<br/>• no GUI needed"]
+    MODE -->|live| LIVE
+    MODE -->|headless| HEAD
+    LIVE --> RES["Unified result"]
+    HEAD --> RES
+
+    classDef live fill:#fef7e0,stroke:#f9ab00,color:#111
+    classDef head fill:#e8f0fe,stroke:#4285f4,color:#111
+    class LIVE live
+    class HEAD head
+```
+
+| Mode | Use it when | Needs |
 |---|---|---|
-| `auto` (default) | Live if reachable, otherwise headless | Normal desktop use |
-| `live` | Patched Synfig Studio bridge | Interactive editing, canvas previews, undo/redo |
-| `headless` | Pure-Python SIF engine + `synfig` CLI | Servers, CI, containers, render farms |
+| `auto` *(default)* | Always — picks the best available | nothing extra |
+| `live` | The artist is in front of Studio | patched Studio + bridge enabled |
+| `headless` | CI, containers, batch rendering | `synfig` CLI on `PATH` |
 
-Live mode uses JSON-RPC over TCP on `127.0.0.1:19998` with a per-session bearer token written to `~/.synfig/mcp_token`. The bridge is opt-in and loopback-only.
-
-Headless mode never needs a GUI. It is fully lossless for SIF documents and delegates raster/video rendering to the `synfig` CLI.
+> **Tip:** in live mode open the patched Studio, enable **Tools → MCP Bridge**, and the model works on the canvas you have selected. Never call `doc_new`/`doc_open` unless the user asked for it.
 
 ---
 
 ## Tool profiles
 
-All 74 tools are exposed by default. Set `SYNFIG_MCP_PROFILE` to expose only the tools a workflow needs.
+All 80 tools are exposed by default. Narrow the surface when the client has a tight context budget:
 
-| Profile | Tools | Approx. tokens (cl100k) | Focus |
+| Profile | Tools | ≈ tokens (cl100k) | Focus |
 |---|---:|---:|---|
-| `all` (default) | 74 | ~18,500 | Complete Synfig surface: documents, layers, parameters, animation, FX, rigging, review, assets |
-| `core` | 13 | ~2,970 | Scene build/export, inspection, undo/redo, single-frame render |
-| `anim` | 19 | ~4,600 | Keyframes, timeline, waypoints, interpolation |
-| `fx` | 24 | ~5,600 | Layer hierarchy, effects recipes, style presets |
-| `rig` | 17 | ~3,800 | Cut-out rigging, poses, motion cycles, storyboards |
-| `assets` | 12 | ~2,700 | Licensed asset search, hardened downloads, attribution |
-| `review` | 18 | ~4,900 | Frame/sequence/compare review, objective metrics, jobs |
+| `all` *(default)* | 80 | ~20,100 | Everything: documents, layers, parameters, animation, FX, rigging, review, assets |
+| `core` | 13 | ~2,980 | Scene build/export, inspection, undo/redo, single-frame render |
+| `anim` | 21 | ~5,000 | Keyframes, timeline, waypoints, interpolation |
+| `fx` | 25 | ~6,000 | Layer hierarchy, effect recipes, style presets |
+| `rig` | 22 | ~4,400 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
+| `assets` | 12 | ~2,800 | Licensed asset search, hardened downloads, attribution |
+| `review` | 18 | ~5,200 | Frame/sequence/compare review, objective metrics, jobs |
 
-Examples:
+```bash
+SYNFIG_MCP_PROFILE=core synfig-mcp
+```
 
-- **Scene assembly:** `core`
-- **Rigging a character:** `rig` + `core`
-- **Visual QA loop:** `review` + `core`
-- **Power-user agent:** `all`
+---
 
-See the [full tool reference](docs/api.md) and the generated [coverage matrix](docs/COVERAGE.md).
+## What you can do
+
+```mermaid
+graph LR
+    subgraph build["Build"]
+        B1["scene_build<br/>atomic, one undo step"]
+        B2["layer_add / group / duplicate<br/>55 layer types"]
+        B3["param_set / convert / export / link<br/>value nodes"]
+    end
+    subgraph animate["Animate"]
+        A1["anim_animate_param<br/>bulk waypoints"]
+        A2["anim_keyframe_add<br/>timeline poses"]
+        A3["param_link<br/>shared values"]
+    end
+    subgraph fx["Look"]
+        F1["recipe_apply<br/>14 effect stacks"]
+        F2["style_apply<br/>5 aesthetic presets"]
+        F3["character_rig_from_parts<br/>cut-out puppets"]
+    end
+    subgraph ship["Ship"]
+        S1["render_frame / sequence / video"]
+        S2["review_frame / compare<br/>metrics + heatmaps"]
+        S3["doc_save<br/>.sif / .sifz / .sfg"]
+    end
+    B1 --> A1 --> F1 --> S1
+    B2 --> A2 --> F2 --> S2
+    B3 --> A3 --> F3 --> S3
+
+    classDef grp fill:#f8f9fa,stroke:#6c757d,color:#111
+    class B1,B2,B3,A1,A2,A3,F1,F2,F3,S1,S2,S3 grp
+```
+
+- **Every Synfig layer type** — all 55 discovered from the installed binary (`schema_list_layers`), with real parameter names, value types and writability (`schema_get_layer`).
+- **Animation** — keyframes, waypoints, every interpolation mode Synfig understands (`linear`, `constant`, `halt`, `clamped`, `auto`, `manual`).
+- **Value nodes** — export a value, link another parameter to it, convert a parameter into a procedural node.
+- **Effects** — 14 parameterised recipes (speed lines, impact frames, energy auras, film grain, camera shake…) and 5 neutral style presets.
+- **Characters** — cut-out puppet assembly, pose presets, motion cycles, storyboard animatics.
+- **Rendering** — single frames, sequences, MP4/GIF video, contact sheets, plus the visual review loop.
+
+Full reference: [`docs/tools.md`](docs/tools.md) (all 74 tools) and [`docs/api.md`](docs/api.md).
 
 ---
 
@@ -255,158 +381,144 @@ See the [full tool reference](docs/api.md) and the generated [coverage matrix](d
 
 | Environment variable | Default | Description |
 |---|---|---|
-| `SYNFIG_MCP_PROFILE` | `all` | Tool profile: `all` (complete surface), `core`, `anim`, `fx`, `rig`, `assets`, `review` |
+| `SYNFIG_MCP_PROFILE` | `all` | Tool profile: `all`, `core`, `anim`, `fx`, `rig`, `assets`, `review` |
 | `SYNFIG_MCP_BACKEND` | `auto` | `auto`, `live`, or `headless` |
-| `SYNFIG_MCP_HOST` | `127.0.0.1` | Bridge host probed by live mode |
+| `SYNFIG_MCP_HOST` | `127.0.0.1` | Bridge host probed in live mode |
 | `SYNFIG_MCP_PORT` | `19998` | Bridge TCP port |
 | `SYNFIG_MCP_TOKEN_PATH` | `~/.synfig/mcp_token` | Explicit bridge token path |
-| `SYNFIG_MCP_WORKSPACE_ROOTS` | `~/Documents/SynfigMCP` | Sandbox roots; `os.pathsep` or comma separated |
-| `SYNFIG_MCP_ENABLE` | unset | Set `1` to auto-enable the bridge in patched Studio |
-| `SYNFIG_MCP_HTTP_TOKEN` | unset | Bearer token for streamable HTTP transport |
-
-The working directory is **never** an allowed workspace root by default. Add project directories explicitly.
+| `SYNFIG_MCP_WORKSPACE_ROOTS` | `~/Documents/SynfigMCP` | Directories the server may read/write (path-separated) |
+| `SYNFIG_MCP_CLI_PATH` | auto-discovered | Explicit path to the `synfig` binary |
 
 ---
 
 ## Docker
 
-The container ships the headless backend and the `synfig` CLI.
-
 ```bash
-docker run --rm -i \
-  -v "$PWD/workspace:/workspace" \
+docker run -i --rm \
+  -v "$PWD:/workspace" \
   -e SYNFIG_MCP_WORKSPACE_ROOTS=/workspace \
-  ghcr.io/anusara-bemal/synfig-mcp:0.8.0-rc2
+  ghcr.io/anusara-bemal/synfig-mcp:latest
 ```
 
-Build locally:
-
-```bash
-docker build -t synfig-mcp .
-docker run --rm -i -v "$PWD/workspace:/workspace" \
-  -e SYNFIG_MCP_WORKSPACE_ROOTS=/workspace synfig-mcp
-```
-
-HTTP mode:
-
-```bash
-docker run --rm -p 8000:8000 \
-  -e SYNFIG_MCP_WORKSPACE_ROOTS=/workspace \
-  ghcr.io/anusara-bemal/synfig-mcp:0.8.0-rc2 \
-  --transport streamable-http --host 0.0.0.0 --port 8000 --token "$MCP_TOKEN"
-```
-
-The image runs as UID 1000. Make mounted directories writable by that user or pass `--user "$(id -u):$(id -g)"`.
+The image ships the Synfig CLI, so headless rendering works out of the box.
 
 ---
 
 ## Security model
 
-- **Loopback-only bridge.** Live mode binds to `127.0.0.1` and refuses non-loopback interfaces unless an HTTP token is configured.
-- **Session tokens.** Studio writes a random token to a user-only file; every bridge request is authenticated.
-- **Sandboxed files.** Read/write operations are resolved and constrained to explicit workspace roots, including symlink/junction checks.
-- **Untrusted input handling.** Document-derived strings are wrapped with security notices, SVG is DOM-sanitized, raster downloads validate magic bytes, and remote asset URLs are DNS-resolved and blocked against loopback/private/link-local/metadata ranges.
-- **No shell execution from tool arguments.** Renders invoke the Synfig CLI with fixed argument shapes.
+```mermaid
+flowchart TB
+    subgraph boundary["Trust boundary"]
+        TOKEN["Session token<br/>owner-only ACL, 0600"]
+        LOOP["Loopback only<br/>remote binding needs --token"]
+        SANDBOX["Workspace sandbox<br/>path + junction escape checks"]
+        SSRF["SSRF guard<br/>DNS-resolved IP checks"]
+        SVG["SVG sanitiser<br/>DOM allow-list"]
+        NOTICE["Untrusted-data notice<br/>on every document-derived reply"]
+    end
+    IN["MCP client"] --> TOKEN --> LOOP --> SANDBOX
+    ASSET["Asset downloads"] --> SSRF --> SVG
+    OUT["Replies"] --> NOTICE
 
-See [docs/security.md](docs/security.md) and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+    classDef s fill:#fce8e6,stroke:#d93025,color:#111
+    class TOKEN,LOOP,SANDBOX,SSRF,SVG,NOTICE s
+```
 
-> Never bind HTTP mode to `0.0.0.0` without `--token`, a reverse proxy, and network access controls.
+- The bridge binds to `127.0.0.1` only and requires a per-session token stored with owner-only permissions.
+- File access is restricted to the configured workspace roots; junctions and symlinks that escape them are rejected.
+- Remote binding requires an explicit `--token`.
+- Document-derived strings are flagged as untrusted so a model never executes instructions embedded in a layer name.
+
+---
+
+## How we prove it works
+
+Correctness is not asserted, it is **measured against the real Synfig engine**:
+
+```mermaid
+graph LR
+    T1["Every mutation<br/>→ saved → loaded by<br/>the real synfig binary"]
+    T2["Every value node<br/>→ engine-verified"]
+    T3["Every render target<br/>→ rendered and inspected"]
+    T4["Both backends<br/>→ same contract"]
+    T5["Live Studio<br/>→ 37 E2E tests"]
+    T1 & T2 & T3 & T4 & T5 --> G["CI gate"]
+
+    classDef gate fill:#e6f4ea,stroke:#34a853,color:#111
+    class G gate
+```
+
+| Gate | What it proves | Where |
+|---|---|---|
+| Document validity | Every mutation produces a file the Synfig engine loads with zero errors | `server/tests/contract/test_sif_synfig_validity.py` |
+| Render targets | Each output module's real behaviour (frame / sequence / converter / none) | `server/tests/contract/test_render_targets.py` |
+| Backend parity | Headless and Studio answer with the same shapes and semantics | `server/tests/contract/test_backend_parity.py` |
+| Wire format | Every type the bridge emits validates against the Python models | `server/tests/unit/test_protocol_models.py` |
+| Live E2E | The patched Studio performs the work, undoable, in one step | `server/tests/e2e/` |
+| Coverage | The published matrix is generated from measured capability | `docs/COVERAGE.md` |
+
+```bash
+cd server
+uv run poe check        # format, lint, mypy, unit + contract
+uv run poe live         # against a real patched Synfig Studio
+```
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| `Connection refused` on port 19998 | Start the patched Studio build and enable **Tools → MCP Bridge**, or set `SYNFIG_MCP_BACKEND=headless`. |
-| Client reports JSON parse errors | Ensure nothing writes to stdout. `synfig-mcp` logs to stderr only. |
-| `RenderError: Frame render produced no output` | Install the `synfig` CLI, add it to `PATH`, or switch to the container image. |
-| File access denied | Add the directory to `SYNFIG_MCP_WORKSPACE_ROOTS`; `cwd` is intentionally not allowed. |
-| Studio bundle won't start on Linux | Export `LD_LIBRARY_PATH` to the bundle's `lib` directory and run under X11. |
-| Missing settings/plugin warnings on first run | Expected on a clean profile; Synfig creates `~/Synfig` on first launch. |
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Bridge error 2001: Document not found` | No Studio document is open | Open a document in Studio, or create one with `doc_new` |
+| Tools fail with "not connected" | Bridge not enabled | Studio → **Tools → MCP Bridge** |
+| `render_frame` writes nothing | Target cannot write a single frame | Use `png`, `jpeg`, `bmp`, `gif`, `ppm`, `yuv420p` |
+| "Outside the workspace" | Path not under `SYNFIG_MCP_WORKSPACE_ROOTS` | Add the directory, or use the default `~/Documents/SynfigMCP` |
+| Slow first layer | Layer catalogue is being introspected | It is cached afterwards; the first run takes ~20 s |
 
-More fixes: [docs/troubleshooting.md](docs/troubleshooting.md).
+More: [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ---
 
 ## Development
 
 ```bash
-git clone https://github.com/anusara-bemal/synfig-mcp.git
-cd synfig-mcp/server
-uv sync --locked --all-extras
-
-uv run poe check     # ruff format-check + ruff lint + mypy --strict + pytest
-uv run poe live      # real-Studio end-to-end tests (requires patched Studio)
+cd server
+uv sync --all-extras
+uv run poe check        # format-check, lint, mypy, tests
+uv run poe live         # real Studio end-to-end
+uv run poe verify-validity   # load every generated document in the real engine
 ```
 
-Repository tasks from the root:
+Build the patched Studio:
 
 ```bash
-uv run poe check
-uv run poe test
-```
-
-CI runs the same suite on Ubuntu, macOS, and Windows with Python 3.12 and 3.13, plus Docker smoke tests, CodeQL, and a strict documentation build.
-
-Contribution guidelines, commit conventions, and the release checklist live in [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## Releases and verification
-
-Every `v*` tag builds and publishes:
-
-- patched Synfig Studio bundles for Windows (UCRT64) and Linux,
-- a source bundle for GPL compliance,
-- the Python wheel and sdist,
-- `SHA256SUMS.txt` and per-asset checksums,
-- a GHCR container image at `ghcr.io/anusara-bemal/synfig-mcp`.
-
-A tag push is the only event that publishes a release; branch pushes run build and smoke tests but intentionally skip publishing. This keeps every published artifact tied to an immutable tag.
-
-Verify a download:
-
-```bash
-sha256sum -c SHA256SUMS.txt
-```
-
-Smoke-test a published Windows binary on a clean runner:
-
-```bash
-python bridge/scripts/clean_runner_smoke.py path/to/synfigstudio.exe
+bash bridge/scripts/build_windows_msys2.sh    # Windows (MSYS2 UCRT64)
+bash bridge/scripts/build_linux.sh            # Linux
 ```
 
 ---
 
 ## Documentation
 
-| Guide | Description |
+| Document | Contents |
 |---|---|
-| [Tools API](docs/api.md) | Every tool, grouped by profile |
-| [Architecture](docs/architecture.md) | Bridge, backends, threading, and data flow |
-| [Protocol](docs/protocol.md) | JSON-RPC bridge contract |
-| [Security](docs/security.md) | Threat model and hardening |
-| [Coverage](docs/COVERAGE.md) | Native layer, parameter, valuenode, and target coverage |
-| [Recipes](docs/recipes.md) | 14 native effects and 5 style presets |
-| [Assets](docs/assets.md) | Licensed asset pipeline and attribution |
-| [Token budget](docs/TOKEN_BUDGET.md) | Profile measurements and optimization |
-| [Build: Windows](docs/build-windows.md) / [Linux](docs/build-linux.md) | Compile the patched Studio |
-| [Troubleshooting](docs/troubleshooting.md) | Common failures and verified fixes |
-| [GPL compliance](docs/gpl-compliance.md) | Source availability and third-party licenses |
+| [`docs/tools.md`](docs/tools.md) | All 74 tools with typed parameters |
+| [`docs/api.md`](docs/api.md) | Tool surface per profile |
+| [`docs/architecture.md`](docs/architecture.md) | Bridge protocol, threading, undo model |
+| [`docs/protocol.md`](docs/protocol.md) | JSON-RPC wire format |
+| [`docs/COVERAGE.md`](docs/COVERAGE.md) | Measured feature coverage of the Synfig engine |
+| [`docs/recipes.md`](docs/recipes.md) | Effect recipes and style presets |
+| [`docs/scope.md`](docs/scope.md) | Scope, non-goals and IP policy |
+| [`docs/gpl-compliance.md`](docs/gpl-compliance.md) | GPL obligations of the native bridge |
 
 ---
 
 ## License
 
-- `server/` — **MIT License** ([LICENSE](LICENSE)).
-- `bridge/` and patched Studio binaries — **GPL-3.0-or-later**, because they are linked with Synfig Studio. The complete corresponding source is published with every binary release.
-- Third-party components retain their upstream licenses; see [bridge/THIRD_PARTY_LICENSES.md](bridge/THIRD_PARTY_LICENSES.md).
+**Author: Anusara Bemal** — with the synfig-mcp contributors.
 
-Synfig Studio is a trademark of the Synfig project. This project is an independent integration and is not affiliated with or endorsed by the Synfig maintainers.
-
----
-
-<p align="center">
-  Built for artists, animators, and agents that need real vector animation tools.
-</p>
+- The Python **server** (`server/`) is MIT licensed — see [`LICENSE`](LICENSE).
+- The native **bridge** (`bridge/`) is compiled into Synfig Studio and is a
+  derivative work, therefore **GPL-3.0** — see [`bridge/GPL_NOTICE.txt`](bridge/GPL_NOTICE.txt)
+  and [`docs/gpl-compliance.md`](docs/gpl-compliance.md).
+- Synfig Studio itself is © the Synfig Project, GPL-3.0.

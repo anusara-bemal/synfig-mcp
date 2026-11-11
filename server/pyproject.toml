@@ -10,7 +10,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [
-    { name = "Synfig MCP Contributors" }
+    { name = "Anusara Bemal", email = "anusarabemal805@gmail.com" },
+    { name = "Synfig MCP Contributors" },
 ]
 keywords = ["mcp", "synfig", "animation", "llm", "ai"]
 classifiers = [

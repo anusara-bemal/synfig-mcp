@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate layer ids**: every new layer of the same type received the same description (`Circle001`, `Circle002`, ... per type), so the first layer of a type became unreachable for every subsequent operation. Generated descriptions are now unique per canvas.
 
 ### Added
+- **Canvas management**: `canvas_create`, `canvas_rename`, `canvas_delete` and `canvas_set_properties` expose Synfig's sub-canvases (resolution, frame rate, time range, background colour) in both backends.
+- **Read-back tools**: `param_list` reports every parameter of a layer with its current value, `anim_waypoint_list` reports the waypoints of an animated parameter.
+- **Sound import**: `import_asset` accepts audio files (.wav, .ogg, .mp3, .flac, .au) and creates a Synfig `sound` layer; image formats keep using the `import` layer.
+- **15 more value nodes**: `reciprocal`, `derivative`, `reverse`, `vectorlength`, `vectorangle`, `vectorx`, `vectory`, `exp`, `logarithm`, `modulo`, `atan2`, `gradient_rotate`, `map_range`, `stripes` and `twotone` are now creatable - 28 of 69 value nodes, all verified against the Synfig engine.
 - **Value node linking (`param_link`)**: a parameter can now be linked to an exported value node, so independent properties follow one shared value - the "wheel rotation follows the car translation" rig. Implemented with the native `LayerParamConnect` action in the bridge (`<param use="id"/>` in the headless engine) and verified live in Synfig Studio.
 - **Synfig validity gate**: `server/tests/contract/test_sif_synfig_validity.py` performs every mutation, saves the document and requires the *real* `synfig` binary to load and render it without a single error. `synfig_mcp.validation` provides the same check programmatically.
 - **Live parity gate**: `server/tests/e2e/test_live_scene_build.py` verifies waypoints, groups, single-step undo and engine-loadability of documents saved through the bridge.

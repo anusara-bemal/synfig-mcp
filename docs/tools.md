@@ -1,14 +1,14 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 74 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 80 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
 
 ## Table of Contents
 
-- [Animation & Keyframes](#animation-keyframes) (9 tools)
-- [Canvas & Scene](#canvas-scene) (5 tools)
+- [Animation & Keyframes](#animation-keyframes) (10 tools)
+- [Canvas & Scene](#canvas-scene) (9 tools)
 - [Character Rigging](#character-rigging) (3 tools)
 - [Core & Diagnostics](#core-diagnostics) (2 tools)
 - [Document Management](#document-management) (8 tools)
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Parameters & ValueNodes](#parameters-valuenodes) (6 tools)
+- [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
 - [Selection](#selection) (2 tools)
@@ -24,7 +24,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 74 tools.**
+**Total: 80 tools.**
 
 ## Animation & Keyframes
 
@@ -123,6 +123,26 @@ Gotcha: Specifying a time where no keyframe exists.
 | `doc_id` | `string` | Yes | - |
 | `time` | `number` | Yes | - |
 | `canvas_path` | `string` | No | - |
+
+---
+
+### `anim_waypoint_list`
+
+*Profiles: all, anim*
+
+List the waypoints of an animated parameter.
+
+Returns: Array of {time, time_string, value, interpolation_in, interpolation_out} objects.
+
+Gotcha: The parameter has to be animated - a static parameter returns an empty list.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | Yes | - |
+| `layer_id` | `string` | Yes | - |
+| `param_name` | `string` | Yes | - |
 
 ---
 
@@ -288,6 +308,89 @@ Gotcha: Defaults to the currently selected document; call this first to confirm 
 | :--- | :--- | :---: | :--- |
 | `doc_id` | `string` | No | - |
 | `budget_tokens` | `integer` | No | - |
+
+---
+
+### `canvas_create`
+
+*Profiles: all, rig*
+
+Create a child canvas (a sub-canvas that group layers can reference).
+
+Returns: Object with 'canvas_id' and a diff summary.
+
+Gotcha: The canvas id must be unique inside the document.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `canvas_id` | `string` | No | - |
+
+---
+
+### `canvas_rename`
+
+*Profiles: all, rig*
+
+Rename a child canvas.
+
+Returns: Object with 'canvas_id', 'name', 'previous_name' and a diff summary.
+
+Gotcha: Passing the id of a canvas that does not exist.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `canvas_id` | `string` | No | - |
+| `name` | `string` | No | - |
+
+---
+
+### `canvas_delete`
+
+*Profiles: all, rig*
+
+Delete a child canvas and everything inside it.
+
+Returns: Object with 'canvas_id' and a diff summary.
+
+Gotcha: The root canvas cannot be deleted.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `canvas_id` | `string` | No | - |
+
+---
+
+### `canvas_set_properties`
+
+*Profiles: all, rig*
+
+Change the resolution, frame rate, time range or background colour of a canvas.
+
+Returns: Object with the updated canvas properties and a diff summary.
+
+Gotcha: Setting end_time before start_time.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `canvas_id` | `string` | No | - |
+| `width` | `any` | No | - |
+| `height` | `any` | No | - |
+| `fps` | `any` | No | - |
+| `start_time` | `any` | No | - |
+| `end_time` | `any` | No | - |
+| `background_color` | `any` | No | - |
 
 ---
 
@@ -851,9 +954,9 @@ Gotcha: Calling ungroup on a non-group layer (e.g. a circle).
 
 *Profiles: all, assets*
 
-Import an external asset file (e.g. .png, .jpg, .svg) into the canvas as an image layer.
+Import an external asset file (e.g. .png, .jpg, .svg, .wav, .ogg) into the canvas.
 
-Returns: Layer dictionary for the newly imported image layer.
+Returns: Layer dictionary for the newly imported image or sound layer.
 
 Gotcha: Verify document ID before invoking.
 
@@ -1034,6 +1137,26 @@ Gotcha: Exporting under a name that already exists in the document library.
 | `layer_id` | `string` | Yes | - |
 | `param_name` | `string` | Yes | - |
 | `name` | `string` | Yes | - |
+
+---
+
+### `param_list`
+
+*Profiles: all*
+
+List every parameter of a layer with its current value.
+
+Returns: Array of {name, value} objects.
+
+Gotcha: The list contains the layer's dynamic parameters (including the ones Synfig adds itself).
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | Yes | - |
+| `layer_id` | `string` | Yes | - |
+| `canvas_path` | `string` | No | - |
 
 ---
 

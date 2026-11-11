@@ -95,6 +95,28 @@ def format_synfig_time(seconds: float, fps: float = 24.0) -> str:
     return f"{s}s {f}f"
 
 
+def _find_or_create_defs(canvas_root: etree._Element) -> etree._Element:
+    """Return the ``<defs>`` section of a canvas, creating it before the layers.
+
+    Synfig resolves the value nodes of a canvas before it loads the layers, so
+    the section has to come first.
+    """
+    defs = canvas_root.find("defs")
+    if defs is not None:
+        return defs
+    defs = etree.Element("defs")
+    first_layer = None
+    for child in canvas_root:
+        if is_element_tag(child, "layer"):
+            first_layer = child
+            break
+    if first_layer is not None:
+        canvas_root.insert(canvas_root.index(first_layer), defs)
+    else:
+        canvas_root.append(defs)
+    return defs
+
+
 def _param_value_type(param: etree._Element) -> str | None:
     """Determine the value type of a ``<param>`` element."""
     for child in param:
@@ -732,7 +754,7 @@ class SifLayer:
         section must appear *before* the layers that reference it, otherwise the
         engine reports "Unknown ID referenced in parameter".
         """
-        defs = self._find_or_create_defs(canvas_root)
+        defs = _find_or_create_defs(canvas_root)
         for existing in defs.findall("valuenode"):
             if existing.get("id") == export_name:
                 raise SynfigError(f"A value node named '{export_name}' already exists.")
@@ -752,24 +774,6 @@ class SifLayer:
             param.set("use", export_name)
             return
         raise SynfigError(f"Parameter '{name}' not found on layer.")
-
-    @staticmethod
-    def _find_or_create_defs(canvas_root: etree._Element) -> etree._Element:
-        """Return the ``<defs>`` section of a canvas, creating it before the layers."""
-        defs = canvas_root.find("defs")
-        if defs is not None:
-            return defs
-        defs = etree.Element("defs")
-        first_layer = None
-        for child in canvas_root:
-            if is_element_tag(child, "layer"):
-                first_layer = child
-                break
-        if first_layer is not None:
-            canvas_root.insert(canvas_root.index(first_layer), defs)
-        else:
-            canvas_root.append(defs)
-        return defs
 
     def link_param(self, name: str, link_id: str) -> None:
         """Link a parameter to an exported value node.
@@ -802,6 +806,59 @@ class SifLayer:
             param.set("use", link_id)
             return
         raise SynfigError(f"Parameter '{name}' not found on layer.")
+
+    def get_param_list(self) -> list[dict[str, Any]]:
+        """Return the parameters of this layer with their current values."""
+        result: list[dict[str, Any]] = []
+        for param in self.element.findall("param"):
+            name = param.get("name")
+            if not name:
+                continue
+            link_id = param.get("use")
+            if link_id:
+                value = self._resolve_exported_value(link_id)
+            else:
+                value = None
+                for child in param:
+                    value = xml_to_synfig_value(child)
+                    if value is not None:
+                        break
+            result.append(
+                {
+                    "name": name,
+                    "value": value.model_dump() if value is not None else None,
+                }
+            )
+        return result
+
+    def get_waypoints(self, name: str) -> list[dict[str, Any]]:
+        """Return the waypoints of an animated parameter."""
+        for param in self.element.findall("param"):
+            if param.get("name") != name:
+                continue
+            animated = param.find("animated")
+            if animated is None:
+                return []
+            waypoints: list[dict[str, Any]] = []
+            for wp in animated.findall("waypoint"):
+                time_str = wp.get("time", "0s")
+                value = None
+                for child in wp:
+                    value = xml_to_synfig_value(child)
+                    if value is not None:
+                        break
+                waypoints.append(
+                    {
+                        "time": parse_synfig_time(time_str),
+                        "time_string": time_str,
+                        "value": value.model_dump() if value is not None else None,
+                        "interpolation_in": wp.get("before", "linear"),
+                        "interpolation_out": wp.get("after", "linear"),
+                    }
+                )
+            waypoints.sort(key=lambda w: float(w["time"]))
+            return waypoints
+        return []
 
     def get_params(self) -> dict[str, Any]:
         """Return dictionary of all defined parameters on this layer."""
@@ -1128,6 +1185,111 @@ class SifDocument:
                 if c_id:
                     paths.append(f"defs/{c_id}")
         return paths
+
+    # -----------------------------------------------------------------------
+    # Canvas management
+    # -----------------------------------------------------------------------
+
+    def create_canvas(self, canvas_id: str) -> etree._Element:
+        """Create an empty child canvas in the document's ``<defs>`` section.
+
+        Child canvases are the SIF representation of a Synfig sub-canvas; a
+        group layer references one through its ``canvas`` parameter.
+        """
+        if not canvas_id:
+            raise SynfigError("A canvas id is required.")
+        defs = _find_or_create_defs(self.root)
+        for child in defs:
+            if child.get("id") == canvas_id:
+                raise SynfigError(f"A canvas with the id '{canvas_id}' already exists.")
+
+        canvas = etree.SubElement(defs, "canvas")
+        assert isinstance(canvas, etree._Element)
+        canvas.set("id", canvas_id)
+        canvas.set("version", "1.2")
+        canvas.set("width", str(self.width))
+        canvas.set("height", str(self.height))
+        canvas.set("fps", f"{self.fps:.3f}")
+        canvas.set("antialias", "2")
+        canvas.set("begin-time", f"{self.start_time:.2f}s")
+        canvas.set("end-time", f"{self.end_time:.2f}s")
+        canvas.set("bgcolor", "0.500000 0.500000 0.500000 1.000000")
+        name_el = etree.SubElement(canvas, "name")
+        name_el.text = canvas_id
+        return canvas
+
+    def find_canvas(self, canvas_id: str) -> etree._Element | None:
+        """Find a child canvas by its id."""
+        defs = self.root.find("defs")
+        if defs is None:
+            return None
+        for child in defs:
+            if is_element_tag(child, "canvas") and child.get("id") == canvas_id:
+                return child
+        return None
+
+    def rename_canvas(self, canvas_id: str, name: str) -> str:
+        """Rename a child canvas and return its previous name."""
+        canvas = self.find_canvas(canvas_id)
+        if canvas is None:
+            raise SynfigError(f"Canvas '{canvas_id}' not found.")
+        name_el = canvas.find("name")
+        previous = name_el.text if name_el is not None and name_el.text else canvas_id
+        if name_el is None:
+            name_el = etree.Element("name")
+            canvas.insert(0, name_el)
+        name_el.text = name
+        return previous
+
+    def delete_canvas(self, canvas_id: str) -> bool:
+        """Remove a child canvas from the document."""
+        canvas = self.find_canvas(canvas_id)
+        if canvas is None:
+            return False
+        defs = self.root.find("defs")
+        if defs is not None:
+            defs.remove(canvas)
+        return True
+
+    def set_canvas_properties(
+        self,
+        canvas_id: str,
+        *,
+        width: int | None = None,
+        height: int | None = None,
+        fps: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        background_color: dict[str, float] | None = None,
+    ) -> etree._Element:
+        """Update the resolution, frame rate, time range or background of a canvas."""
+        canvas = self.find_canvas(canvas_id)
+        if canvas is None:
+            raise SynfigError(f"Canvas '{canvas_id}' not found.")
+        if width is not None:
+            canvas.set("width", str(int(width)))
+        if height is not None:
+            canvas.set("height", str(int(height)))
+        if fps is not None:
+            canvas.set("fps", f"{float(fps):.3f}")
+        if start_time is not None:
+            canvas.set("begin-time", f"{float(start_time):.2f}s")
+        if end_time is not None:
+            canvas.set("end-time", f"{float(end_time):.2f}s")
+        if background_color is not None:
+            canvas.set(
+                "bgcolor",
+                " ".join(
+                    f"{float(background_color.get(channel, default)):.6f}"
+                    for channel, default in (
+                        ("r", 0.5),
+                        ("g", 0.5),
+                        ("b", 0.5),
+                        ("a", 1.0),
+                    )
+                ),
+            )
+        return canvas
 
     # -----------------------------------------------------------------------
     # Layer Operations

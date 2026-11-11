@@ -251,6 +251,50 @@ class BackendBase(ABC):
         """Link a parameter to an exported ValueNode."""
         ...
 
+    @abstractmethod
+    async def param_list(
+        self, doc_id: str, layer_id: str, canvas_path: str = ""
+    ) -> list[dict[str, Any]]:
+        """List the parameters of a layer with their current values."""
+        ...
+
+    @abstractmethod
+    async def anim_waypoint_list(
+        self, doc_id: str, layer_id: str, param_name: str
+    ) -> list[dict[str, Any]]:
+        """List the waypoints of an animated parameter."""
+        ...
+
+    @abstractmethod
+    async def canvas_create(self, doc_id: str, canvas_id: str) -> dict[str, Any]:
+        """Create a child canvas."""
+        ...
+
+    @abstractmethod
+    async def canvas_rename(self, doc_id: str, canvas_id: str, name: str) -> dict[str, Any]:
+        """Rename a child canvas."""
+        ...
+
+    @abstractmethod
+    async def canvas_delete(self, doc_id: str, canvas_id: str) -> dict[str, Any]:
+        """Delete a child canvas."""
+        ...
+
+    @abstractmethod
+    async def canvas_set_properties(
+        self,
+        doc_id: str,
+        canvas_id: str,
+        width: int | None = None,
+        height: int | None = None,
+        fps: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        background_color: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """Update the resolution, frame rate, time range or background of a canvas."""
+        ...
+
     # -----------------------------------------------------------------------
     # Animation & Keyframe Operations
     # -----------------------------------------------------------------------

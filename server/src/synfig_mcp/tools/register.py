@@ -72,6 +72,10 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "doc_set_properties": {"all"},
     "doc_set_time_range": {"anim", "all"},
     "canvas_list": {"all"},
+    "canvas_create": {"rig", "all"},
+    "canvas_rename": {"rig", "all"},
+    "canvas_delete": {"rig", "all"},
+    "canvas_set_properties": {"rig", "all"},
     # Scene & Declarative Build
     "scene_tree": {"all"},
     "scene_build": {"core", "all"},
@@ -100,6 +104,8 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "param_export": {"rig", "all"},
     "param_unexport": {"rig", "all"},
     "param_link": {"rig", "fx", "anim", "all"},
+    "param_list": {"all"},
+    "anim_waypoint_list": {"anim", "all"},
     # Animation & Keyframes
     "anim_time_get": {"anim", "all"},
     "anim_time_set": {"anim", "all"},
@@ -412,6 +418,58 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     # Layer Operations
     # -----------------------------------------------------------------------
 
+    @tool_for("canvas_create", annotations=MUTATING)
+    async def canvas_create(doc_id: str = "doc_0", canvas_id: str = "canvas1") -> dict[str, Any]:
+        """Create a child canvas (a sub-canvas that group layers can reference).
+        Returns: Object with 'canvas_id' and a diff summary.
+        Gotcha: The canvas id must be unique inside the document.
+        """
+        return await backend.canvas_create(doc_id=doc_id, canvas_id=canvas_id)
+
+    @tool_for("canvas_rename", annotations=MUTATING)
+    async def canvas_rename(
+        doc_id: str = "doc_0", canvas_id: str = "", name: str = ""
+    ) -> dict[str, Any]:
+        """Rename a child canvas.
+        Returns: Object with 'canvas_id', 'name', 'previous_name' and a diff summary.
+        Gotcha: Passing the id of a canvas that does not exist.
+        """
+        return await backend.canvas_rename(doc_id=doc_id, canvas_id=canvas_id, name=name)
+
+    @tool_for("canvas_delete", annotations=DESTRUCTIVE)
+    async def canvas_delete(doc_id: str = "doc_0", canvas_id: str = "") -> dict[str, Any]:
+        """Delete a child canvas and everything inside it.
+        Returns: Object with 'canvas_id' and a diff summary.
+        Gotcha: The root canvas cannot be deleted.
+        """
+        return await backend.canvas_delete(doc_id=doc_id, canvas_id=canvas_id)
+
+    @tool_for("canvas_set_properties", annotations=IDEMPOTENT)
+    async def canvas_set_properties(
+        doc_id: str = "doc_0",
+        canvas_id: str = "",
+        width: int | None = None,
+        height: int | None = None,
+        fps: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        background_color: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """Change the resolution, frame rate, time range or background colour of a canvas.
+        Returns: Object with the updated canvas properties and a diff summary.
+        Gotcha: Setting end_time before start_time.
+        """
+        return await backend.canvas_set_properties(
+            doc_id=doc_id,
+            canvas_id=canvas_id,
+            width=width,
+            height=height,
+            fps=fps,
+            start_time=start_time,
+            end_time=end_time,
+            background_color=background_color,
+        )
+
     @tool_for("scene_tree", annotations=READ_ONLY)
     async def scene_tree(doc_id: str = "doc_0", canvas_path: str = "") -> dict[str, Any]:
         """Get the full visual hierarchy of layers in depth order (topmost layer at index 0).
@@ -540,8 +598,8 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         file_path: str,
         canvas_path: str = "",
     ) -> dict[str, Any]:
-        """Import an external asset file (e.g. .png, .jpg, .svg) into the canvas as an image layer.
-        Returns: Layer dictionary for the newly imported image layer.
+        """Import an external asset file (e.g. .png, .jpg, .svg, .wav, .ogg) into the canvas.
+        Returns: Layer dictionary for the newly imported image or sound layer.
         Gotcha: Verify document ID before invoking.
         """
         return await backend.import_asset(
@@ -797,6 +855,24 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             name=name,
         )
 
+    @tool_for("param_list", annotations=READ_ONLY)
+    async def param_list(
+        doc_id: str,
+        layer_id: str,
+        canvas_path: str = "",
+    ) -> list[dict[str, Any]]:
+        """List every parameter of a layer with its current value.
+        Returns: Array of {name, value} objects.
+        Gotcha: The list contains the layer's dynamic parameters (including the ones Synfig adds itself).
+        """
+        params = await backend.param_list(doc_id=doc_id, layer_id=layer_id, canvas_path=canvas_path)
+        res: list[dict[str, Any]] = []
+        for param in params:
+            item = dict(param)
+            item["_security_notice"] = SECURITY_NOTICE
+            res.append(item)
+        return res
+
     @tool_for("param_link", annotations=MUTATING)
     async def param_link(
         doc_id: str,
@@ -899,6 +975,26 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             doc_id=doc_id, time=time, canvas_path=canvas_path
         )
         return {"removed": success}
+
+    @tool_for("anim_waypoint_list", annotations=READ_ONLY)
+    async def anim_waypoint_list(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+    ) -> list[dict[str, Any]]:
+        """List the waypoints of an animated parameter.
+        Returns: Array of {time, time_string, value, interpolation_in, interpolation_out} objects.
+        Gotcha: The parameter has to be animated - a static parameter returns an empty list.
+        """
+        waypoints = await backend.anim_waypoint_list(
+            doc_id=doc_id, layer_id=layer_id, param_name=param_name
+        )
+        res: list[dict[str, Any]] = []
+        for waypoint in waypoints:
+            item = dict(waypoint)
+            item["_security_notice"] = SECURITY_NOTICE
+            res.append(item)
+        return res
 
     @tool_for("anim_waypoint_set", annotations=MUTATING)
     async def anim_waypoint_set(

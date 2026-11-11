@@ -417,12 +417,37 @@ class HeadlessBackend(BackendBase):
     async def import_asset(
         self, doc_id: str, file_path: str, canvas_path: str = ""
     ) -> dict[str, Any]:
-        """Import an external image or media asset into the canvas."""
+        """Import an external image or media asset into the canvas.
+
+        Images become an ``import`` layer, audio files a ``sound`` layer.
+        """
         safe_path = validate_path(
             file_path,
-            allowed_extensions={".png", ".jpg", ".jpeg", ".bmp", ".svg"},
+            allowed_extensions={
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".bmp",
+                ".svg",
+                ".gif",
+                ".tif",
+                ".tiff",
+                ".wav",
+                ".ogg",
+                ".mp3",
+                ".flac",
+                ".au",
+            },
             must_exist=True,
         )
+        audio_extensions = {".wav", ".ogg", ".mp3", ".flac", ".au"}
+        if safe_path.suffix.lower() in audio_extensions:
+            return await self.layer_add(
+                doc_id=doc_id,
+                layer_type="sound",
+                canvas_path=canvas_path,
+                params={"filename": {"type": "string", "value": str(safe_path)}},
+            )
         return await self.layer_add(
             doc_id=doc_id,
             layer_type="import",
@@ -840,6 +865,126 @@ class HeadlessBackend(BackendBase):
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
         self._selections[doc_id] = list(layer_ids)
         return list(layer_ids)
+
+    # -----------------------------------------------------------------------
+    # Parameter and canvas introspection
+    # -----------------------------------------------------------------------
+
+    async def param_list(
+        self, doc_id: str, layer_id: str, canvas_path: str = ""
+    ) -> list[dict[str, Any]]:
+        """List the parameters of a layer with their current values."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        layer = self._documents[doc_id].get_layer(layer_id, canvas_path)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+        return layer.get_param_list()
+
+    async def anim_waypoint_list(
+        self, doc_id: str, layer_id: str, param_name: str
+    ) -> list[dict[str, Any]]:
+        """List the waypoints of an animated parameter."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        layer = self._documents[doc_id].get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+        return layer.get_waypoints(param_name)
+
+    async def canvas_create(self, doc_id: str, canvas_id: str) -> dict[str, Any]:
+        """Create a child canvas."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        self._save_undo_state(doc_id)
+        self._documents[doc_id].create_canvas(canvas_id)
+        return {
+            "doc_id": doc_id,
+            "canvas_id": canvas_id,
+            "diff": {
+                "action": "canvas.create",
+                "created": [canvas_id],
+                "modified": [],
+                "deleted": [],
+            },
+        }
+
+    async def canvas_rename(self, doc_id: str, canvas_id: str, name: str) -> dict[str, Any]:
+        """Rename a child canvas."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        self._save_undo_state(doc_id)
+        previous = self._documents[doc_id].rename_canvas(canvas_id, name)
+        return {
+            "doc_id": doc_id,
+            "canvas_id": canvas_id,
+            "name": name,
+            "previous_name": previous,
+            "diff": {
+                "action": "canvas.rename",
+                "created": [],
+                "modified": [canvas_id],
+                "deleted": [],
+            },
+        }
+
+    async def canvas_delete(self, doc_id: str, canvas_id: str) -> dict[str, Any]:
+        """Delete a child canvas."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        self._save_undo_state(doc_id)
+        ok = self._documents[doc_id].delete_canvas(canvas_id)
+        if not ok:
+            raise SynfigError(f"Canvas '{canvas_id}' not found.")
+        return {
+            "doc_id": doc_id,
+            "canvas_id": canvas_id,
+            "diff": {
+                "action": "canvas.delete",
+                "created": [],
+                "modified": [],
+                "deleted": [canvas_id],
+            },
+        }
+
+    async def canvas_set_properties(
+        self,
+        doc_id: str,
+        canvas_id: str,
+        width: int | None = None,
+        height: int | None = None,
+        fps: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        background_color: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """Update the resolution, frame rate, time range or background of a canvas."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        self._save_undo_state(doc_id)
+        canvas = self._documents[doc_id].set_canvas_properties(
+            canvas_id,
+            width=width,
+            height=height,
+            fps=fps,
+            start_time=start_time,
+            end_time=end_time,
+            background_color=background_color,
+        )
+        return {
+            "doc_id": doc_id,
+            "canvas_id": canvas_id,
+            "name": (canvas.findtext("name") or canvas_id),
+            "width": canvas.get("width"),
+            "height": canvas.get("height"),
+            "fps": canvas.get("fps"),
+            "diff": {
+                "action": "canvas.set_properties",
+                "created": [],
+                "modified": [canvas_id],
+                "deleted": [],
+            },
+        }
 
     # -----------------------------------------------------------------------
     # Rendering Operations

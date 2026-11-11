@@ -41,8 +41,8 @@
         },
         {
           "name": "SYNFIG_MCP_PROFILE",
-          "description": "Tool profile to expose",
-          "default": "core",
+          "description": "Tool profile to expose ('all' exposes every tool)",
+          "default": "all",
           "choices": [
             "core",
             "anim",

@@ -115,6 +115,9 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `scene.build` | `doc_id`, `layers[]`, `groups?` | `canvas_interface->add_layer_to()` + `Action::ValueDescSet` (waypoints) + `Action::LayerEncapsulate` (groups), all inside one `PassiveGrouper` | Verified |
 | `canvas.list` | `doc_id` | `canvas->children()`, `canvas->get_root()` | Verified |
 | `canvas.create` | `doc_id`, `id` | `Action::CanvasAdd::create()` | Verified |
+| `canvas.rename` | `doc_id`, `canvas_id`, `name` | `Canvas::set_name()` | Verified |
+| `canvas.delete` | `doc_id`, `canvas_id` | `Canvas::remove_child_canvas()` | Verified |
+| `canvas.set_properties` | `doc_id`, `canvas_id`, `width?`, `height?`, `fps?`, `start_time?`, `end_time?`, `background_color?` | `Canvas::rend_desc()` | Verified |
 | `layer.add` | `doc_id`, `layer_type`, `canvas_path`, `depth?`, `params?` | `canvas_interface->add_layer_to()` (`Action::LayerAdd`) | Verified |
 | `layer.remove` | `doc_id`, `layer_id` | `Action::LayerRemove::create()` | Verified |
 | `layer.duplicate` | `doc_id`, `layer_id` | `Action::LayerDuplicate::create()` | Verified |
@@ -124,12 +127,14 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `layer.group` | `doc_id`, `layer_ids[]`, `group_name` | `Action::LayerEncapsulate::create()` | Verified |
 | `layer.ungroup` | `doc_id`, `group_layer_id` | `Action::LayerExtract::create()` | Verified |
 | `param.get` | `doc_id`, `layer_id`, `param_name` | `layer->get_param(param_name)` | Verified |
+| `param.list` | `doc_id`, `layer_id`, `canvas_path?` | `layer->get_param_list()` | Verified |
 | `param.set` | `doc_id`, `layer_id`, `param_name`, `value` | `Action::LayerParamSet::create()` or `canvas_interface->change_value()` | Verified |
 | `param.link` | `doc_id`, `layer_id`, `param_name`, `link_id`| `Action::LayerParamConnect::create()` | Verified |
 | `param.convert` | `doc_id`, `layer_id`, `param_name`, `type` | `synfigapp::Action::ValueDescConvert::create()` | Verified |
 | `param.export` | `doc_id`, `layer_id`, `param_name`, `name` | `synfigapp::Action::ValueDescExport::create()` | Verified |
 | `param.unexport` | `doc_id`, `name` | `synfigapp::Action::ValueNodeRemove::create()` | Verified |
 | `anim.time_get` | `doc_id` | `canvas_interface->get_time()` | Verified |
+| `anim.waypoint_list` | `doc_id`, `layer_id`, `param_name` | `ValueNode_Animated::waypoint_list()` | Verified |
 | `anim.keyframe_list` | `doc_id`, `canvas_path?` | `canvas->keyframe_list()` | Verified |
 | `anim.time_set` | `doc_id`, `time` | `canvas_interface->seek_time(time)` | Verified |
 | `anim.keyframe_add` | `doc_id`, `time`, `description?` | `synfigapp::Action::KeyframeAdd::create()` | Verified |

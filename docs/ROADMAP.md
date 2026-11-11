@@ -46,6 +46,7 @@ by a test that fails without the fix.
 | 16 | Value node accuracy | `param_convert` advertised three ValueNode names Synfig does not have (`cosine`, `time_loop`, `stepwise`) | Names, links and accepted value types taken from upstream; every conversion verified against the engine | `test_every_supported_conversion_is_accepted_by_synfig` |
 | 17 | Render target accuracy | All 13 output modules were claimed as supported | 6 write a single frame, 4 are sequence encoders, 1 is a converter, 2 write nothing - classified and verified | `test_render_targets.py` |
 | 19 | Backend parity | The two backends answered `scene_tree` with different shapes (metadata, layer keys, id semantics) | Same document metadata and layer keys; the live layer id is the description | `test_scene_tree_has_the_same_shape_in_both_backends`, `test_live_scene_tree_has_the_documented_shape` |
+| 21 | Synfig surface | Canvas management, parameter/waypoint read-back, sound import and 15 more value nodes were unreachable | 6 new tools + 15 verified value nodes | `test_live_canvas_management_and_listing`, `test_every_supported_conversion_is_accepted_by_synfig` |
 | 20 | Tool contract | `history_list` and `canvas_list` answered with different keys in Studio than documented | Both tools answer with the documented shape in either backend | `test_history_and_canvas_lists_keep_their_contract` |
 | 18 | Wire format | The bridge answered gradients as `value`, spline points as `bline_point` and canvas references as `canvas`, while the documented format and the models use `cpoints`, `bline_point_list` and `canvas_ref` - those parameters were unreadable in Studio | Bridge follows the documented format, accepts gradients on write, and a test compares every emitted type with the models | `test_live_gradient_parameters_round_trip`, `test_every_type_the_bridge_emits_is_known_to_the_model` |
 
@@ -54,9 +55,8 @@ by a test that fails without the fix.
 | Gap | Impact | Next step |
 |---|---|---|
 | Complex parameters `wplist`, `dilist`, `bones`, `transformation`, `canvas` cannot be written | No weight-paint, bone rigging or transformation authoring through the MCP | Dedicated serialisers, verified by the validity gate |
-| 56 of 69 value nodes cannot be *created* (only read) | Limited procedural expression vocabulary | Extend `VALUENODE_SPECS` with the upstream link layouts |
-| Canvas create/rename/delete and per-canvas properties | `canvas.create` exists in the bridge but has no MCP tool | Expose the existing bridge method |
-| No `param_list` / `anim_waypoint_list` | Instance parameters and waypoints cannot be read back | Add read-only bridge methods |
+| 41 of 69 value nodes cannot be *created* (28 can) | Limited procedural expression vocabulary | Extend `VALUENODE_SPECS` with the remaining upstream link layouts |
+| Live mode cannot *write* splines | The headless engine writes `bline` points; the bridge needs Synfig's `ValueNode_BLine` API | Implement the spline write in the bridge |
 | Bone rigging (`rig.skeleton_create`, `rig.bone_add`) | Skeletons can be created as layers but bones cannot be authored | Probe `ValueDescCreateChildBone` with golden project files |
 
 ---

@@ -6,25 +6,25 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 74 tools, 68,533 bytes, **18,496 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 80 tools, 74,339 bytes, **20,087 tokens** (`cl100k_base`).
 - **Minimal Profile (`core`)**: 13 tools, 11,262 bytes, **2,984 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **18,496 tokens** to **2,984 tokens**.
+> from **20,087 tokens** to **2,984 tokens**.
 
 ### Profile Allocations & Measured Counts
 
 | Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
 |---|---|---|---|---|
 | `core` | 13 | **2,984** | 2,991 | ✅ Pass (< 3000) |
-| `anim` | 20 | **4,885** | 4,890 | ❌ Exceeds (4500) |
+| `anim` | 21 | **5,158** | 5,164 | ❌ Exceeds (4500) |
 | `fx` | 25 | **5,900** | 5,907 | ❌ Exceeds (4500) |
-| `rig` | 18 | **4,050** | 4,058 | ❌ Exceeds (3000) |
-| `assets` | 12 | **2,678** | 2,683 | ❌ Exceeds (2000) |
+| `rig` | 22 | **5,101** | 5,112 | ❌ Exceeds (3000) |
+| `assets` | 12 | **2,682** | 2,687 | ❌ Exceeds (2000) |
 | `review` | 18 | **4,904** | 4,915 | ❌ Exceeds (4000) |
-| `all` | 74 | **18,496** | 18,516 | ❌ Exceeds (16000) |
+| `all` | 80 | **20,087** | 20,111 | ❌ Exceeds (16000) |
 
 ---
 
@@ -35,18 +35,18 @@ Measured against real server output in headless mode:
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
 | `health_check()` | 298 | **96** | 97 | < 200 |
-| `doc_new(160x120)` | 193 | **83** | 83 | < 200 |
-| `doc_list()` | 389 | **121** | 121 | < 242 |
-| `layer_add(circle)` | 251 | **84** | 84 | < 200 |
-| `scene_tree()` | 1179 | **349** | 349 | < 698 |
-| `doc_info()` | 389 | **121** | 121 | < 242 |
-| `param_set(radius=2.5)` | 325 | **117** | 117 | < 234 |
+| `doc_new(160x120)` | 193 | **84** | 84 | < 200 |
+| `doc_list()` | 389 | **122** | 122 | < 244 |
+| `layer_add(circle)` | 251 | **85** | 85 | < 200 |
+| `scene_tree()` | 1228 | **363** | 363 | < 726 |
+| `doc_info()` | 389 | **122** | 122 | < 244 |
+| `param_set(radius=2.5)` | 325 | **118** | 118 | < 236 |
 | `param_get(radius)` | 232 | **56** | 56 | < 200 |
 | `anim_time_set(1.5s)` | 17 | **11** | 11 | < 200 |
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 138 | **55** | 55 | < 200 |
+| `render_frame(160x120)` | 138 | **53** | 53 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
 | `schema_get_layer(circle)` | 1683 | **454** | 453 | < 908 |
 
@@ -81,6 +81,7 @@ Vision model consumption per single preview or contact-sheet image:
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
 | `render_sequence` | 1,544 | **445** | 445 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `canvas_set_properties` | 1,468 | **413** | 413 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `doc_set_properties` | 1,380 | **405** | 405 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_start` | 1,351 | **390** | 390 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_contact_sheet` | 1,332 | **380** | 380 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
@@ -94,7 +95,6 @@ Vision model consumption per single preview or contact-sheet image:
 | `param_convert` | 1,133 | **312** | 314 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `recipe_apply` | 1,147 | **309** | 310 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `doc_set_time_range` | 1,055 | **298** | 299 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `param_get` | 1,012 | **295** | 294 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 

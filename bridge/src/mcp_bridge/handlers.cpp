@@ -130,6 +130,29 @@ static synfig::Layer::Handle find_layer_in_canvas(synfig::Canvas::Handle canvas,
     return nullptr;
 }
 
+static std::string interpolation_to_string(synfig::Interpolation interpolation) {
+    switch (interpolation) {
+    case synfig::INTERPOLATION_LINEAR: return "linear";
+    case synfig::INTERPOLATION_CONSTANT: return "constant";
+    case synfig::INTERPOLATION_HALT: return "halt";
+    case synfig::INTERPOLATION_CLAMPED: return "clamped";
+    case synfig::INTERPOLATION_MANUAL: return "manual";
+    case synfig::INTERPOLATION_TCB: return "auto";
+    default: return "linear";
+    }
+}
+
+static synfig::Canvas::Handle find_canvas_by_id(synfig::Canvas::Handle canvas, const std::string& canvas_id) {
+    if (!canvas) return nullptr;
+    if (canvas_id.empty() || canvas_id == ":" || canvas_id == "root") return canvas;
+    if (canvas->get_id() == canvas_id || canvas->get_name() == canvas_id) return canvas;
+    for (auto& child : canvas->children()) {
+        synfig::Canvas::Handle found = find_canvas_by_id(child, canvas_id);
+        if (found) return found;
+    }
+    return nullptr;
+}
+
 static nlohmann::json build_layer_params(synfig::Layer::Handle layer) {
     nlohmann::json params = nlohmann::json::object();
     if (!layer) return params;
@@ -934,6 +957,147 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    if (method == "canvas.rename") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string canvas_id = params.value("canvas_id", params.value("id", ""));
+        std::string new_name = params.value("name", "");
+
+        return run_on_main_thread([&, doc_id, canvas_id, new_name]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            if (new_name.empty()) {
+                r["error"] = {{"code", -32602}, {"message", "Missing canvas name"}};
+                return r;
+            }
+            synfig::Canvas::Handle target = find_canvas_by_id(inst->get_canvas(), canvas_id);
+            if (!target) {
+                r["error"] = {{"code", 2002}, {"message", "Canvas not found: " + canvas_id}};
+                return r;
+            }
+            const synfig::String previous = target->get_name();
+            target->set_name(new_name);
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_id", canvas_id},
+                {"name", new_name},
+                {"previous_name", previous},
+                {"diff", make_diff("canvas.rename", {}, {canvas_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_id", canvas_id},
+                {"name", new_name},
+                {"diff", make_diff("canvas.rename", {}, {canvas_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "canvas.delete") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string canvas_id = params.value("canvas_id", params.value("id", ""));
+
+        return run_on_main_thread([&, doc_id, canvas_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            synfig::Canvas::Handle root = inst->get_canvas();
+            synfig::Canvas::Handle target = find_canvas_by_id(root, canvas_id);
+            if (!target || target == root) {
+                r["error"] = {{"code", 2002}, {"message", "Canvas not found: " + canvas_id}};
+                return r;
+            }
+            root->remove_child_canvas(target);
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_id", canvas_id},
+                {"diff", make_diff("canvas.delete", {}, {}, {canvas_id})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_id", canvas_id},
+                {"diff", make_diff("canvas.delete", {}, {}, {canvas_id})}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "canvas.set_properties") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string canvas_id = params.value("canvas_id", params.value("id", ""));
+
+        return run_on_main_thread([&, doc_id, canvas_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            synfig::Canvas::Handle target = find_canvas_by_id(inst->get_canvas(), canvas_id);
+            if (!target) {
+                r["error"] = {{"code", 2002}, {"message", "Canvas not found: " + canvas_id}};
+                return r;
+            }
+            synfig::RendDesc& desc = target->rend_desc();
+            if (params.contains("width")) desc.set_w(params["width"].get<int>());
+            if (params.contains("height")) desc.set_h(params["height"].get<int>());
+            if (params.contains("fps")) desc.set_frame_rate(params["fps"].get<float>());
+            if (params.contains("start_time")) desc.set_time_start(synfig::Time(params["start_time"].get<double>()));
+            if (params.contains("end_time")) desc.set_time_end(synfig::Time(params["end_time"].get<double>()));
+            if (params.contains("background_color")) {
+                const nlohmann::json& c = params["background_color"];
+                desc.set_bg_color(synfig::Color(
+                    c.value("r", 0.5f), c.value("g", 0.5f),
+                    c.value("b", 0.5f), c.value("a", 1.0f)));
+            }
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_id", canvas_id},
+                {"name", target->get_name()},
+                {"width", desc.get_w()},
+                {"height", desc.get_h()},
+                {"fps", static_cast<double>(desc.get_frame_rate())},
+                {"start_time", static_cast<double>(desc.get_time_start())},
+                {"end_time", static_cast<double>(desc.get_time_end())},
+                {"diff", make_diff("canvas.set_properties", {}, {canvas_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_id", canvas_id},
+                {"diff", make_diff("canvas.set_properties", {}, {canvas_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
     // --- 4. SCENE & LAYER METHODS ---
     if (method == "scene.tree") {
         std::string doc_id = params.value("doc_id", "doc_0");
@@ -1413,6 +1577,110 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 {"diff", make_diff("layer.ungroup", {}, {}, {group_id})}
             };
             return r;
+        });
+    }
+
+    if (method == "param.list") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+
+        return run_on_main_thread([&, doc_id, layer_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+            nlohmann::json list = nlohmann::json::array();
+            for (const auto& item : layer->get_param_list()) {
+                if (!item.second.is_valid()) continue;
+                nlohmann::json entry = nlohmann::json::object();
+                entry["name"] = item.first;
+                entry["value"] = valuebase_to_json(item.second);
+                list.push_back(entry);
+            }
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"params", list}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"params", nlohmann::json::array()}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "anim.waypoint_list") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+
+        return run_on_main_thread([&, doc_id, layer_id, param_name]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+            synfig::ValueNode::Handle value_node;
+            {
+                const synfig::Layer::DynamicParamList& dynamic = layer->dynamic_param_list();
+                auto it = dynamic.find(param_name);
+                if (it != dynamic.end()) value_node = it->second;
+            }
+            synfig::ValueNode_Animated::Handle animated =
+                synfig::ValueNode_Animated::Handle::cast_dynamic(value_node);
+            nlohmann::json waypoints = nlohmann::json::array();
+            if (animated) {
+                for (const auto& wp : animated->waypoint_list()) {
+                    nlohmann::json entry = nlohmann::json::object();
+                    entry["time"] = static_cast<double>(wp.get_time());
+                    entry["value"] = valuebase_to_json(wp.get_value());
+                    entry["interpolation_in"] = interpolation_to_string(wp.get_before());
+                    entry["interpolation_out"] = interpolation_to_string(wp.get_after());
+                    waypoints.push_back(entry);
+                }
+            }
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"waypoints", waypoints}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"waypoints", nlohmann::json::array()}
+            };
+            return r;
+#endif
         });
     }
 

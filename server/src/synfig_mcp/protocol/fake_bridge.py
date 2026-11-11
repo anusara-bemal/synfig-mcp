@@ -779,6 +779,71 @@ class FakeBridgeServer:
                 },
             }
 
+        if method == "param.list":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", ""),
+                    "params": [
+                        {"name": "radius", "value": {"type": "real", "value": 1.5}},
+                        {
+                            "name": "color",
+                            "value": {"type": "color", "r": 0.2, "g": 0.6, "b": 1.0, "a": 1.0},
+                        },
+                    ],
+                },
+            }
+
+        if method == "anim.waypoint_list":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", ""),
+                    "param_name": params.get("param_name", ""),
+                    "waypoints": [
+                        {
+                            "time": 0.0,
+                            "value": {"type": "real", "value": 1.0},
+                            "interpolation_in": "linear",
+                            "interpolation_out": "linear",
+                        },
+                        {
+                            "time": 1.0,
+                            "value": {"type": "real", "value": 3.0},
+                            "interpolation_in": "linear",
+                            "interpolation_out": "linear",
+                        },
+                    ],
+                },
+            }
+
+        if method in ("canvas.create", "canvas.rename", "canvas.delete", "canvas.set_properties"):
+            canvas_id = params.get("canvas_id", params.get("id", "canvas1"))
+            action = method.split(".")[1]
+            result: dict[str, Any] = {
+                "doc_id": params.get("doc_id", "doc_0"),
+                "canvas_id": canvas_id,
+                "diff": {
+                    "action": f"canvas.{action}",
+                    "created": [canvas_id] if action == "create" else [],
+                    "modified": [canvas_id] if action in ("rename", "set_properties") else [],
+                    "deleted": [canvas_id] if action == "delete" else [],
+                },
+            }
+            if action == "rename":
+                result["name"] = params.get("name", "")
+                result["previous_name"] = canvas_id
+            if action == "set_properties":
+                result["name"] = canvas_id
+                result["width"] = params.get("width", 1920)
+                result["height"] = params.get("height", 1080)
+                result["fps"] = params.get("fps", 24.0)
+            return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
         if method == "param.link":
             link_id = params.get("link_id", params.get("name", ""))
             if not link_id:

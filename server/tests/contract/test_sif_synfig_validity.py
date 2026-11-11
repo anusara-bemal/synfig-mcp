@@ -374,15 +374,16 @@ async def test_every_supported_conversion_is_accepted_by_synfig(
         assert valuenode_type in real_valuenodes, (
             f"'{valuenode_type}' is advertised as a conversion but Synfig has no such ValueNode"
         )
-        layer = await backend.layer_add(
-            doc_id=doc_id,
-            layer_type="circle",
-            params={"radius": {"type": "real", "value": 2.0}},
+        layer_type, param_name, value = _conversion_target(valuenode_type)
+        layer = await backend.layer_add(doc_id=doc_id, layer_type=layer_type, params={})
+        # The parameter has to exist before it can be converted.
+        await backend.param_set(
+            doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, value=value
         )
         await backend.param_convert(
             doc_id=doc_id,
             layer_id=layer["layer_id"],
-            param_name="radius",
+            param_name=param_name,
             type=valuenode_type,
         )
 
@@ -400,6 +401,22 @@ async def test_every_supported_conversion_is_accepted_by_synfig(
     )
 
     await assert_loadable(backend, doc_id, tmp_path)
+
+
+def _conversion_target(valuenode_type: str) -> tuple[str, str, dict[str, Any]]:
+    """Pick a parameter whose type the given ValueNode accepts."""
+    spec = VALUENODE_SPECS[valuenode_type]
+    if "real" in spec.value_types:
+        return "circle", "radius", {"type": "real", "value": 2.0}
+    if "angle" in spec.value_types:
+        return "star", "angle", {"type": "angle", "degrees": 45.0}
+    if "vector" in spec.value_types:
+        return "circle", "origin", {"type": "vector", "x": 1.0, "y": 2.0}
+    if "gradient" in spec.value_types:
+        return "linear_gradient", "gradient", {"type": "gradient", "cpoints": []}
+    if "string" in spec.value_types:
+        return "text", "text", {"type": "string", "value": "Synfig"}
+    raise AssertionError(f"no test parameter for the ValueNode '{valuenode_type}'")
 
 
 async def test_param_convert_rejects_unsupported_valuenode() -> None:
@@ -579,6 +596,70 @@ async def test_scene_build_with_groups_and_waypoints_produces_loadable_document(
     content = sif.read_text(encoding="utf-8")
     assert "<waypoint" in content, "scene_build dropped the requested waypoints"
     assert "bundle" in content, "scene_build dropped the requested group"
+
+
+async def test_canvas_management_produces_a_loadable_document(tmp_path: Path) -> None:
+    """Creating, renaming, configuring and deleting a child canvas must stay loadable."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+
+    await backend.canvas_create(doc_id=doc_id, canvas_id="shot1")
+    await backend.canvas_set_properties(
+        doc_id=doc_id,
+        canvas_id="shot1",
+        width=640,
+        height=480,
+        fps=30.0,
+        start_time=0.0,
+        end_time=2.0,
+        background_color={"r": 0.1, "g": 0.2, "b": 0.3, "a": 1.0},
+    )
+    await backend.canvas_rename(doc_id=doc_id, canvas_id="shot1", name="Shot One")
+    await assert_loadable(backend, doc_id, tmp_path)
+
+    await backend.canvas_delete(doc_id=doc_id, canvas_id="shot1")
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_param_and_waypoint_listing_round_trips(tmp_path: Path) -> None:
+    """Listing the parameters and waypoints of a layer must reflect the document."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(
+        doc_id=doc_id,
+        layer_type="circle",
+        params={"radius": {"type": "real", "value": 2.5}},
+    )
+
+    params = await backend.param_list(doc_id=doc_id, layer_id=layer["layer_id"])
+    names = {p["name"] for p in params}
+    assert "radius" in names, f"the parameter list is incomplete: {sorted(names)}"
+    radius = next(p for p in params if p["name"] == "radius")
+    assert abs(float(radius["value"]["value"]) - 2.5) < 1e-6
+
+    await backend.anim_waypoint_set(
+        doc_id=doc_id,
+        layer_id=layer["layer_id"],
+        param_name="radius",
+        time=0.0,
+        value={"type": "real", "value": 1.0},
+    )
+    await backend.anim_waypoint_set(
+        doc_id=doc_id,
+        layer_id=layer["layer_id"],
+        param_name="radius",
+        time=1.0,
+        value={"type": "real", "value": 3.0},
+    )
+
+    waypoints = await backend.anim_waypoint_list(
+        doc_id=doc_id, layer_id=layer["layer_id"], param_name="radius"
+    )
+    assert len(waypoints) == 2, f"the waypoints were not listed: {waypoints}"
+    assert abs(float(waypoints[0]["time"]) - 0.0) < 1e-6
+    assert abs(float(waypoints[1]["time"]) - 1.0) < 1e-6
+
+    await assert_loadable(backend, doc_id, tmp_path)
 
 
 async def test_document_properties_and_time_range_produce_loadable_document(

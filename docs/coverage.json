@@ -1,7 +1,7 @@
 {
   "summary": {
     "synfig_version": "1.5.5",
-    "introspection_timestamp": "2026-11-11T13:10:22+00:00",
+    "introspection_timestamp": "2026-11-11T15:24:37+00:00",
     "layers": {
       "total": 55,
       "supported": 55,
@@ -15,8 +15,8 @@
     },
     "valuenodes": {
       "total": 69,
-      "supported": 13,
-      "supported_percent": 18.8
+      "supported": 28,
+      "supported_percent": 40.6
     },
     "targets": {
       "total": 13,
@@ -5343,9 +5343,9 @@
     "atan2": {
       "name": "atan2",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "average": {
       "name": "average",
@@ -5448,9 +5448,9 @@
     "derivative": {
       "name": "derivative",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "dilist": {
       "name": "dilist",
@@ -5490,9 +5490,9 @@
     "exp": {
       "name": "exp",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "fromangle": {
       "name": "fromangle",
@@ -5518,9 +5518,9 @@
     "gradient_rotate": {
       "name": "gradient_rotate",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "gradientcolor": {
       "name": "gradientcolor",
@@ -5560,23 +5560,23 @@
     "logarithm": {
       "name": "logarithm",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "map_range": {
       "name": "map_range",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "modulo": {
       "name": "modulo",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "not": {
       "name": "not",
@@ -5630,9 +5630,9 @@
     "reciprocal": {
       "name": "reciprocal",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "reference": {
       "name": "reference",
@@ -5651,9 +5651,9 @@
     "reverse": {
       "name": "reverse",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "scale": {
       "name": "scale",
@@ -5700,9 +5700,9 @@
     "stripes": {
       "name": "stripes",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "subtract": {
       "name": "subtract",
@@ -5742,37 +5742,37 @@
     "twotone": {
       "name": "twotone",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "vectorangle": {
       "name": "vectorangle",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "vectorlength": {
       "name": "vectorlength",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "vectorx": {
       "name": "vectorx",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "vectory": {
       "name": "vectory",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "weighted_average": {
       "name": "weighted_average",

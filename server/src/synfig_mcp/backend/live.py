@@ -324,15 +324,34 @@ class LiveBackend(BackendBase):
     async def import_asset(
         self, doc_id: str, file_path: str, canvas_path: str = ""
     ) -> dict[str, Any]:
-        """Import an external image or media asset into the canvas."""
+        """Import an external image or media asset into the canvas.
+
+        Images become an ``import`` layer, audio files a ``sound`` layer.
+        """
         safe_path = validate_path(
             file_path,
-            allowed_extensions={".png", ".jpg", ".jpeg", ".bmp", ".svg"},
+            allowed_extensions={
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".bmp",
+                ".svg",
+                ".gif",
+                ".tif",
+                ".tiff",
+                ".wav",
+                ".ogg",
+                ".mp3",
+                ".flac",
+                ".au",
+            },
             must_exist=True,
         )
+        audio_extensions = {".wav", ".ogg", ".mp3", ".flac", ".au"}
+        layer_type = "sound" if safe_path.suffix.lower() in audio_extensions else "import"
         return await self.layer_add(
             doc_id=doc_id,
-            layer_type="import",
+            layer_type=layer_type,
             canvas_path=canvas_path,
             params={"filename": {"type": "string", "value": str(safe_path)}},
         )
@@ -435,6 +454,77 @@ class LiveBackend(BackendBase):
                 "link_id": link_id,
             },
         )
+        return dict(res)
+
+    async def param_list(
+        self, doc_id: str, layer_id: str, canvas_path: str = ""
+    ) -> list[dict[str, Any]]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "param.list",
+            {"doc_id": doc_id, "layer_id": layer_id, "canvas_path": canvas_path},
+        )
+        if isinstance(res, dict):
+            params = res.get("params", [])
+            return [p for p in params if isinstance(p, dict)]
+        return []
+
+    async def anim_waypoint_list(
+        self, doc_id: str, layer_id: str, param_name: str
+    ) -> list[dict[str, Any]]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "anim.waypoint_list",
+            {"doc_id": doc_id, "layer_id": layer_id, "param_name": param_name},
+        )
+        if isinstance(res, dict):
+            waypoints = res.get("waypoints", [])
+            return [w for w in waypoints if isinstance(w, dict)]
+        return []
+
+    async def canvas_create(self, doc_id: str, canvas_id: str) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call("canvas.create", {"doc_id": doc_id, "id": canvas_id})
+        return dict(res)
+
+    async def canvas_rename(self, doc_id: str, canvas_id: str, name: str) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "canvas.rename", {"doc_id": doc_id, "canvas_id": canvas_id, "name": name}
+        )
+        return dict(res)
+
+    async def canvas_delete(self, doc_id: str, canvas_id: str) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call("canvas.delete", {"doc_id": doc_id, "canvas_id": canvas_id})
+        return dict(res)
+
+    async def canvas_set_properties(
+        self,
+        doc_id: str,
+        canvas_id: str,
+        width: int | None = None,
+        height: int | None = None,
+        fps: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        background_color: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        payload: dict[str, Any] = {"doc_id": doc_id, "canvas_id": canvas_id}
+        if width is not None:
+            payload["width"] = width
+        if height is not None:
+            payload["height"] = height
+        if fps is not None:
+            payload["fps"] = fps
+        if start_time is not None:
+            payload["start_time"] = start_time
+        if end_time is not None:
+            payload["end_time"] = end_time
+        if background_color is not None:
+            payload["background_color"] = background_color
+        res = await client.call("canvas.set_properties", payload)
         return dict(res)
 
     async def anim_time_get(self, doc_id: str) -> float:

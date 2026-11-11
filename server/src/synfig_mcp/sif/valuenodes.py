@@ -137,6 +137,21 @@ def _color(r: float, g: float, b: float, a: float) -> etree._Element:
     return elem
 
 
+def _default_value(type_name: str, value: float | int | bool) -> etree._Element:
+    """Build a link element with an explicit default value."""
+    if type_name == "integer":
+        return _integer(int(value))
+    if type_name == "bool":
+        return _bool(bool(value))
+    if type_name == "angle":
+        return _angle(float(value))
+    if type_name == "time":
+        return _time(float(value))
+    if type_name == "string":
+        return _string(str(value))
+    return _real(float(value))
+
+
 def _default_for(type_name: str, value_type: str) -> etree._Element:
     """Build a neutral default value element for ``type_name``."""
     if type_name == "real":
@@ -194,6 +209,9 @@ class LinkSpec:
     #: Optional component of the source value feeding this link
     #: (``x``/``y`` for vectors, ``r``/``g``/``b``/``a`` for colors).
     component: str | None = None
+    #: Default value of the link.  Zero is not always valid - a modulo node
+    #: with a zero divisor crashes the Synfig loader.
+    default: float | int | bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +235,8 @@ _INTEGER = "integer"
 _TIME = "time"
 _VECTOR = "vector"
 _GRADIENT = "gradient"
+_STRING = "string"
+_BOOL = "bool"
 
 _NUMERIC = frozenset({_REAL, _ANGLE, _INTEGER, _TIME})
 _MIXED = frozenset({_REAL, _ANGLE, _COLOR, _INTEGER, _TIME, _VECTOR})
@@ -319,6 +339,111 @@ VALUENODE_SPECS: dict[str, ValueNodeSpec] = {
         ),
         _MIXED,
     ),
+    "reciprocal": ValueNodeSpec(
+        "reciprocal",
+        (
+            LinkSpec("link", _REAL, True),
+            LinkSpec("epsilon", _REAL, default=0.000001),
+            LinkSpec("infinite", _REAL, default=1000000000.0),
+        ),
+        frozenset({_REAL}),
+    ),
+    "derivative": ValueNodeSpec(
+        "derivative",
+        (
+            LinkSpec("link", "same", True),
+            LinkSpec("order", _INTEGER, default=1),
+            LinkSpec("accuracy", _INTEGER, default=1),
+            LinkSpec("interval", _REAL, default=1.0),
+        ),
+        frozenset({_REAL, _ANGLE, _TIME, _VECTOR}),
+    ),
+    "reverse": ValueNodeSpec(
+        "reverse",
+        (LinkSpec("link", "same", True),),
+        frozenset({_STRING, _GRADIENT}),
+    ),
+    "vectorlength": ValueNodeSpec(
+        "vectorlength",
+        (LinkSpec("vector", _VECTOR),),
+        frozenset({_REAL}),
+    ),
+    "vectorangle": ValueNodeSpec(
+        "vectorangle",
+        (LinkSpec("vector", _VECTOR),),
+        frozenset({_ANGLE}),
+    ),
+    "vectorx": ValueNodeSpec(
+        "vectorx",
+        (LinkSpec("vector", _VECTOR),),
+        frozenset({_REAL}),
+    ),
+    "vectory": ValueNodeSpec(
+        "vectory",
+        (LinkSpec("vector", _VECTOR),),
+        frozenset({_REAL}),
+    ),
+    "exp": ValueNodeSpec(
+        "exp",
+        (LinkSpec("exp", _REAL, True), LinkSpec("scale", _REAL)),
+        frozenset({_REAL}),
+    ),
+    "logarithm": ValueNodeSpec(
+        "logarithm",
+        (
+            LinkSpec("link", _REAL, True),
+            LinkSpec("epsilon", _REAL, default=0.000001),
+            LinkSpec("infinite", _REAL, default=1000000000.0),
+        ),
+        frozenset({_REAL}),
+    ),
+    "modulo": ValueNodeSpec(
+        "modulo",
+        (
+            LinkSpec("link", "same", True),
+            LinkSpec("divisor", _INTEGER, default=2),
+            LinkSpec("scalar", _REAL, default=1.0),
+        ),
+        frozenset({_REAL, _ANGLE, _INTEGER, _TIME}),
+    ),
+    "atan2": ValueNodeSpec(
+        "atan2",
+        (LinkSpec("y", _REAL, True), LinkSpec("x", _REAL)),
+        frozenset({_ANGLE}),
+    ),
+    "gradient_rotate": ValueNodeSpec(
+        "gradient_rotate",
+        (LinkSpec("gradient", _GRADIENT, True), LinkSpec("offset", _REAL)),
+        frozenset({_GRADIENT}),
+    ),
+    "map_range": ValueNodeSpec(
+        "map_range",
+        (
+            LinkSpec("link", "same", True),
+            LinkSpec("from_min", _REAL),
+            LinkSpec("from_max", _REAL),
+            LinkSpec("to_min", _REAL),
+            LinkSpec("to_max", _REAL),
+            LinkSpec("clamp", _BOOL),
+            LinkSpec("interpolation", _INTEGER),
+        ),
+        _NUMERIC,
+    ),
+    "stripes": ValueNodeSpec(
+        "stripes",
+        (
+            LinkSpec("color1", _COLOR),
+            LinkSpec("color2", _COLOR),
+            LinkSpec("stripes", _INTEGER),
+            LinkSpec("width", _REAL),
+        ),
+        frozenset({_GRADIENT}),
+    ),
+    "twotone": ValueNodeSpec(
+        "twotone",
+        (LinkSpec("color1", _COLOR), LinkSpec("color2", _COLOR)),
+        frozenset({_GRADIENT}),
+    ),
 }
 
 #: Composite ValueNodes use a different link layout per value type.
@@ -398,6 +523,8 @@ def build_valuenode_element(
         link_type = value_type if link.type == "same" else link.type
         if link.carries_value and seed is not None:
             child.append(_seed_element(seed, link, link_type))
+        elif link.default is not None:
+            child.append(_default_value(link_type, link.default))
         else:
             child.append(_default_for(link_type, value_type))
 

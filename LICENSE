@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 synfig-mcp contributors
+Copyright (c) 2026 Anusara Bemal and the synfig-mcp contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The Python server in `server/` is distributed under the MIT license above.
+
+The native bridge in `bridge/` is compiled into Synfig Studio and is therefore
+a derivative work of Synfig Studio. It is distributed under the GNU General
+Public License version 3 (GPL-3.0); see `bridge/GPL_NOTICE.txt` and
+`docs/gpl-compliance.md` for the full notice and the corresponding source
+offer. Synfig Studio itself is copyright (c) the Synfig Project and is
+distributed under the GPL-3.0.
