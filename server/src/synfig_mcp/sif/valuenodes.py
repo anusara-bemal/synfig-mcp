@@ -196,41 +196,129 @@ class LinkSpec:
     component: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ValueNodeSpec:
+    """A linkable ValueNode the headless backend can create."""
+
+    name: str
+    links: tuple[LinkSpec, ...]
+    #: Value types the Synfig engine accepts for this ValueNode.
+    value_types: frozenset[str]
+
+    def supports(self, value_type: str) -> bool:
+        return value_type.lower() in self.value_types
+
+
+#: Value types of the Synfig engine, as used by the value nodes.
+_REAL = "real"
+_ANGLE = "angle"
+_COLOR = "color"
+_INTEGER = "integer"
+_TIME = "time"
+_VECTOR = "vector"
+_GRADIENT = "gradient"
+
+_NUMERIC = frozenset({_REAL, _ANGLE, _INTEGER, _TIME})
+_MIXED = frozenset({_REAL, _ANGLE, _COLOR, _INTEGER, _TIME, _VECTOR})
+
 #: Link layout of every linkable ValueNode the headless backend can create.
 #:
-#: The link names mirror ``ValueNode::get_children_vocab()`` of the upstream
-#: implementation; the engine rejects unknown link names.
-VALUENODE_LINK_SPECS: dict[str, tuple[LinkSpec, ...]] = {
-    "linear": (LinkSpec("slope", "same"), LinkSpec("offset", "same", True)),
-    "add": (LinkSpec("lhs", "same", True), LinkSpec("rhs", "same"), LinkSpec("scalar", "real")),
-    "subtract": (
-        LinkSpec("lhs", "same", True),
-        LinkSpec("rhs", "same"),
-        LinkSpec("scalar", "real"),
+#: The names, the links and the accepted value types mirror the upstream
+#: implementation (``valuenodes/valuenode_*.cpp``).  The engine rejects
+#: unknown ValueNode names and unsupported value types, so both are checked
+#: before anything is written.
+VALUENODE_SPECS: dict[str, ValueNodeSpec] = {
+    "linear": ValueNodeSpec(
+        "linear",
+        (LinkSpec("slope", "same"), LinkSpec("offset", "same", True)),
+        _MIXED,
     ),
-    "scale": (LinkSpec("link", "same", True), LinkSpec("scalar", "real")),
-    "absolute": (LinkSpec("link", "same", True),),
-    "duplicate": (
-        LinkSpec("from", "real"),
-        LinkSpec("to", "real", True),
-        LinkSpec("step", "real"),
+    "add": ValueNodeSpec(
+        "add",
+        (
+            LinkSpec("lhs", "same", True),
+            LinkSpec("rhs", "same"),
+            LinkSpec("scalar", _REAL),
+        ),
+        frozenset({_REAL, _ANGLE, _COLOR, _INTEGER, _TIME, _VECTOR, _GRADIENT}),
     ),
-    "step": (
-        LinkSpec("link", "same", True),
-        LinkSpec("duration", "time"),
-        LinkSpec("start_time", "time"),
-        LinkSpec("intersection", "real"),
+    "subtract": ValueNodeSpec(
+        "subtract",
+        (
+            LinkSpec("lhs", "same", True),
+            LinkSpec("rhs", "same"),
+            LinkSpec("scalar", _REAL),
+        ),
+        frozenset({_REAL, _ANGLE, _COLOR, _INTEGER, _TIME, _VECTOR, _GRADIENT}),
     ),
-    "range": (
-        LinkSpec("min", "same"),
-        LinkSpec("max", "same"),
-        LinkSpec("link", "same", True),
+    "scale": ValueNodeSpec(
+        "scale",
+        (LinkSpec("link", "same", True), LinkSpec("scalar", _REAL)),
+        _MIXED,
     ),
-    "sine": (LinkSpec("angle", "angle"), LinkSpec("amp", "real", True)),
-    "cosine": (LinkSpec("angle", "angle"), LinkSpec("amp", "real", True)),
-    "time_loop": (LinkSpec("link", "same", True), LinkSpec("duration", "time")),
-    "timed_swap": (LinkSpec("before", "same", True), LinkSpec("after", "same")),
-    "stepwise": (LinkSpec("link", "same", True),),
+    "absolute": ValueNodeSpec(
+        "absolute",
+        (LinkSpec("link", "same", True),),
+        frozenset({_REAL, _ANGLE, _INTEGER}),
+    ),
+    "duplicate": ValueNodeSpec(
+        "duplicate",
+        (
+            LinkSpec("from", _REAL),
+            LinkSpec("to", _REAL, True),
+            LinkSpec("step", _REAL),
+        ),
+        frozenset({_REAL}),
+    ),
+    "step": ValueNodeSpec(
+        "step",
+        (
+            LinkSpec("link", "same", True),
+            LinkSpec("duration", _TIME),
+            LinkSpec("start_time", _TIME),
+            LinkSpec("intersection", _REAL),
+        ),
+        _MIXED,
+    ),
+    "range": ValueNodeSpec(
+        "range",
+        (
+            LinkSpec("min", "same"),
+            LinkSpec("max", "same"),
+            LinkSpec("link", "same", True),
+        ),
+        _NUMERIC,
+    ),
+    "sine": ValueNodeSpec(
+        "sine",
+        (LinkSpec("angle", _ANGLE), LinkSpec("amp", _REAL, True)),
+        frozenset({_REAL}),
+    ),
+    "cos": ValueNodeSpec(
+        "cos",
+        (LinkSpec("angle", _ANGLE), LinkSpec("amp", _REAL, True)),
+        frozenset({_REAL}),
+    ),
+    "timeloop": ValueNodeSpec(
+        "timeloop",
+        (
+            LinkSpec("link", "same", True),
+            LinkSpec("link_time", _TIME),
+            LinkSpec("local_time", _TIME),
+            LinkSpec("duration", _TIME),
+        ),
+        _MIXED,
+    ),
+    "timed_swap": ValueNodeSpec(
+        "timed_swap",
+        (
+            LinkSpec("before", "same", True),
+            LinkSpec("after", "same"),
+            LinkSpec("time", _TIME),
+            LinkSpec("length", _TIME),
+        ),
+        _MIXED,
+    ),
 }
 
 #: Composite ValueNodes use a different link layout per value type.
@@ -240,21 +328,21 @@ VALUENODE_LINK_SPECS: dict[str, tuple[LinkSpec, ...]] = {
 #: are built from the *components* of the source value (real numbers).
 COMPOSITE_LINK_SPECS: dict[str, tuple[LinkSpec, ...]] = {
     "vector": (
-        LinkSpec("x", "real", True, "x"),
-        LinkSpec("y", "real", True, "y"),
+        LinkSpec("x", _REAL, True, "x"),
+        LinkSpec("y", _REAL, True, "y"),
     ),
     "color": (
-        LinkSpec("red", "real", True, "r"),
-        LinkSpec("green", "real", True, "g"),
-        LinkSpec("blue", "real", True, "b"),
-        LinkSpec("alpha", "real", True, "a"),
+        LinkSpec("red", _REAL, True, "r"),
+        LinkSpec("green", _REAL, True, "g"),
+        LinkSpec("blue", _REAL, True, "b"),
+        LinkSpec("alpha", _REAL, True, "a"),
     ),
 }
 
 
 def supported_conversions() -> list[str]:
     """Return the ValueNode types the headless backend can convert to."""
-    return sorted({*VALUENODE_LINK_SPECS.keys(), "composite"})
+    return sorted({*VALUENODE_SPECS.keys(), "composite"})
 
 
 def build_valuenode_element(
@@ -272,7 +360,8 @@ def build_valuenode_element(
             link so the converted parameter keeps its value.
 
     Raises:
-        SynfigError: when the conversion is not supported.
+        SynfigError: when the conversion is not supported, or when Synfig does
+            not accept the value type for that ValueNode.
     """
     name = valuenode_type.strip().lower()
     if name == "composite":
@@ -284,12 +373,18 @@ def build_valuenode_element(
                 f"(composite supports: {', '.join(sorted(COMPOSITE_LINK_SPECS))})."
             )
     else:
-        specs = VALUENODE_LINK_SPECS.get(name)
-        if specs is None:
+        node_spec = VALUENODE_SPECS.get(name)
+        if node_spec is None:
             raise SynfigError(
                 f"Unsupported ValueNode conversion type '{valuenode_type}'. "
                 f"Supported types: {', '.join(supported_conversions())}."
             )
+        if not node_spec.supports(value_type):
+            raise SynfigError(
+                f"The '{name}' ValueNode does not accept '{value_type}' parameters in "
+                f"Synfig (accepted: {', '.join(sorted(node_spec.value_types))})."
+            )
+        specs = node_spec.links
 
     element = etree.Element(name)
     element.set("type", value_type)
@@ -298,11 +393,11 @@ def build_valuenode_element(
     if value_element is not None and value_type_of(value_element) == value_type:
         seed = value_element
 
-    for spec in specs:
-        child = etree.SubElement(element, spec.name)
-        link_type = value_type if spec.type == "same" else spec.type
-        if spec.carries_value and seed is not None:
-            child.append(_seed_element(seed, spec, link_type))
+    for link in specs:
+        child = etree.SubElement(element, link.name)
+        link_type = value_type if link.type == "same" else link.type
+        if link.carries_value and seed is not None:
+            child.append(_seed_element(seed, link, link_type))
         else:
             child.append(_default_for(link_type, value_type))
 

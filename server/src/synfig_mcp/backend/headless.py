@@ -15,6 +15,7 @@ from synfig_mcp.backend.detect import is_studio_running
 from synfig_mcp.cli.runner import CliRunner
 from synfig_mcp.errors import DocumentNotFoundError, SynfigError
 from synfig_mcp.protocol.models import SynfigValue
+from synfig_mcp.render.targets import require_frame_target
 from synfig_mcp.security.sandbox import validate_path
 from synfig_mcp.sif.parser import SifDocument, SifLayer, parse_synfig_time
 from synfig_mcp.sif.writer import save_sif
@@ -857,6 +858,7 @@ class HeadlessBackend(BackendBase):
         if doc_id not in self._documents:
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
 
+        normalized_target = require_frame_target(target)
         safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
 
         doc = self._documents[doc_id]
@@ -874,7 +876,7 @@ class HeadlessBackend(BackendBase):
                 time=time,
                 width=render_w,
                 height=render_h,
-                target=target,
+                target=normalized_target,
             )
         finally:
             tmp_path.unlink(missing_ok=True)

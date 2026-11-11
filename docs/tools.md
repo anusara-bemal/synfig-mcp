@@ -1083,11 +1083,11 @@ Gotcha: Attempting to unexport a node that is still referenced by multiple activ
 
 *Profiles: all, core, review*
 
-Render a single frame of the animation to an image file (PNG, JPEG, etc.).
+Render a single frame of the animation to an image file (PNG, JPEG, BMP, GIF, PPM).
 
 Returns: Object with 'success': bool, 'output_path', 'time', and image dimensions.
 
-Gotcha: Targeting an invalid or unwritable directory path.
+Gotcha: Sequence encoders such as 'ffmpeg' need render_sequence, not render_frame.
 
 #### Parameters
 

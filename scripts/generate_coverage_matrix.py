@@ -33,6 +33,8 @@ sys.path.insert(0, str(SERVER_DIR / "src"))
 
 from synfig_mcp.cli.runner import CliRunner  # noqa: E402
 from synfig_mcp.schema.param_types import is_writable, load_param_types  # noqa: E402
+from synfig_mcp.render.targets import TargetKind, target_kind  # noqa: E402
+from synfig_mcp.sif.valuenodes import VALUENODE_SPECS  # noqa: E402
 
 
 async def main() -> None:
@@ -117,18 +119,35 @@ async def main() -> None:
         for vn in valuenode_names
     }
 
-    targets_data: dict[str, Any] = {
-        tgt: {
+    targets_data: dict[str, Any] = {}
+    for tgt in target_names:
+        kind = target_kind(tgt)
+        if kind is None:
+            targets_data[tgt] = {
+                "name": tgt,
+                "supported": False,
+                "kind": "unknown",
+                "writes_file": False,
+                "status": "unknown",
+                "unsupported_reason": "Target is not classified by the server",
+            }
+            continue
+        if kind is TargetKind.FRAME:
+            note = "Writes a single image file for a single frame"
+        elif kind is TargetKind.SEQUENCE:
+            note = "Encodes a sequence; needs a filename pattern such as frame_%04d.png"
+        elif kind is TargetKind.CONVERTER:
+            note = "Converts a rendered frame; needs the optional ImageMagick module"
+        else:
+            note = "Renders without writing an output file"
+        targets_data[tgt] = {
             "name": tgt,
-            "supported": True,
-            "writes_file": tgt not in ("null", "null-tile"),
-            "status": "supported",
-            "unsupported_reason": (
-                "Renders without writing an output file" if tgt in ("null", "null-tile") else None
-            ),
+            "supported": kind is TargetKind.FRAME,
+            "kind": kind.value,
+            "writes_file": kind in (TargetKind.FRAME, TargetKind.CONVERTER),
+            "status": "supported" if kind is TargetKind.FRAME else kind.value,
+            "unsupported_reason": None if kind is TargetKind.FRAME else note,
         }
-        for tgt in target_names
-    }
 
     summary = {
         "synfig_version": synfig_version,
@@ -159,7 +178,10 @@ async def main() -> None:
         },
         "targets": {
             "total": len(target_names),
-            "supported": len(target_names),
+            "supported": sum(1 for t in targets_data.values() if t["supported"]),
+            "sequence": sum(1 for t in targets_data.values() if t["kind"] == "sequence"),
+            "converter": sum(1 for t in targets_data.values() if t["kind"] == "converter"),
+            "no_output": sum(1 for t in targets_data.values() if t["kind"] == "none"),
             "writes_file": sum(1 for t in targets_data.values() if t["writes_file"]),
         },
         "renderers": renderer_names,
@@ -183,21 +205,9 @@ async def main() -> None:
 
 
 #: ValueNode types the headless backend can create through ``param_convert``.
-WRITABLE_VALUENODES: set[str] = {
-    "linear",
-    "add",
-    "subtract",
-    "scale",
-    "absolute",
-    "duplicate",
-    "step",
-    "range",
-    "sine",
-    "cosine",
-    "time_loop",
-    "timed_swap",
-    "composite",
-}
+#: The list is taken from the implementation so it can never drift away from
+#: what the server actually supports.
+WRITABLE_VALUENODES: set[str] = set(VALUENODE_SPECS) | {"composite"}
 
 #: Layers whose Synfig implementation is experimental or deprecated upstream.
 status_reasons: dict[str, str] = {
@@ -235,7 +245,7 @@ def _render_markdown(matrix: dict[str, Any]) -> str:
         f"| **ValueNodes** | {summary['valuenodes']['total']} | "
         f"{summary['valuenodes']['supported']} | **{summary['valuenodes']['supported_percent']}%** |",
         f"| **Render Targets** | {summary['targets']['total']} | "
-        f"{summary['targets']['supported']} | "
+        f"{summary['targets']['supported']} (single frame) | "
         f"**{round(100.0 * summary['targets']['supported'] / max(1, summary['targets']['total']), 1)}%** |",
         "",
         "---",

@@ -21,11 +21,30 @@ import pytest
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.cli.runner import CliRunner
 from synfig_mcp.errors import SynfigError
+from synfig_mcp.sif.valuenodes import VALUENODE_SPECS
 from synfig_mcp.validation import ValidationResult, find_synfig_binary, validate_document
 
 
 def _binary() -> Path | None:
     return find_synfig_binary()
+
+
+BINARY = _binary()
+
+#: ValueNode types the installed Synfig binary actually knows.
+REAL_VALUENODES: set[str] = set()
+
+
+@pytest.fixture(scope="module")
+def real_valuenodes() -> set[str]:
+    """The ValueNode names the installed Synfig binary reports."""
+    global REAL_VALUENODES
+    if not REAL_VALUENODES:
+        import asyncio
+
+        runner = CliRunner(BINARY)
+        REAL_VALUENODES = set(asyncio.run(runner.get_valuenodes()))
+    return REAL_VALUENODES
 
 
 def _numeric(value: Any) -> float:
@@ -344,6 +363,10 @@ async def test_param_unexport_produces_loadable_document(tmp_path: Path) -> None
         ("radius", {"type": "real", "value": 2.0}, "duplicate"),
         ("radius", {"type": "real", "value": 2.0}, "range"),
         ("radius", {"type": "real", "value": 2.0}, "step"),
+        ("radius", {"type": "real", "value": 2.0}, "sine"),
+        ("radius", {"type": "real", "value": 2.0}, "cos"),
+        ("radius", {"type": "real", "value": 2.0}, "timeloop"),
+        ("radius", {"type": "real", "value": 2.0}, "timed_swap"),
         ("origin", {"type": "vector", "x": 1.0, "y": 2.0}, "composite"),
     ],
 )
@@ -357,6 +380,129 @@ async def test_param_convert_produces_loadable_document(
 
     await backend.param_convert(
         doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, type=valuenode_type
+    )
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("layer_type", "param_name", "value"),
+    [
+        ("circle", "radius", {"type": "real", "value": 2.5}),
+        ("star", "points", {"type": "integer", "value": 6}),
+        ("circle", "invert", {"type": "bool", "value": True}),
+        ("text", "text", {"type": "string", "value": "Synfig"}),
+        ("star", "angle", {"type": "angle", "degrees": 45.0}),
+        ("circle", "color", {"type": "color", "r": 0.2, "g": 0.4, "b": 0.6, "a": 1.0}),
+        ("circle", "origin", {"type": "vector", "x": 1.0, "y": -1.0}),
+    ],
+)
+async def test_every_writable_value_type_round_trips(
+    tmp_path: Path, layer_type: str, param_name: str, value: dict[str, Any]
+) -> None:
+    """Every value type the server advertises as writable must reach the engine."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(doc_id=doc_id, layer_type=layer_type, params={})
+
+    result = await backend.param_set(
+        doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, value=value
+    )
+    assert result["after"] is not None
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_time_valued_parameters_round_trip(tmp_path: Path) -> None:
+    """Time valued parameters (for example a group time offset) must round-trip."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(doc_id=doc_id, layer_type="group", params={})
+
+    await backend.param_set(
+        doc_id=doc_id,
+        layer_id=layer["layer_id"],
+        param_name="time_offset",
+        value={"type": "time", "seconds": 0.5},
+    )
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_every_mutating_operation_produces_a_loadable_document(
+    tmp_path: Path,
+) -> None:
+    """Exercise the remaining mutating operations in one document.
+
+    Layer duplication, reordering, raising, lowering, removal, the timeline
+    cursor, waypoint removal, bulk animation, interpolation defaults and asset
+    import all have to leave a document the engine can still load.
+    """
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+
+    first = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+    second = await backend.layer_add(doc_id=doc_id, layer_type="rectangle", params={})
+
+    await backend.layer_duplicate(doc_id=doc_id, layer_id=first["layer_id"])
+    await backend.layer_reorder(doc_id=doc_id, layer_id=second["layer_id"], new_depth=3)
+    await backend.layer_raise(doc_id=doc_id, layer_id=second["layer_id"])
+    await backend.layer_lower(doc_id=doc_id, layer_id=second["layer_id"])
+
+    await backend.anim_time_set(doc_id=doc_id, time=0.75)
+    await backend.anim_waypoint_set(
+        doc_id=doc_id,
+        layer_id=first["layer_id"],
+        param_name="radius",
+        time=0.5,
+        value={"type": "real", "value": 2.0},
+    )
+    await backend.anim_waypoint_remove(
+        doc_id=doc_id, layer_id=first["layer_id"], param_name="radius", time=0.5
+    )
+    await backend.anim_animate_param(
+        doc_id=doc_id,
+        layer_id=first["layer_id"],
+        param_name="radius",
+        waypoints=[
+            {"time": 0.0, "value": {"type": "real", "value": 1.0}},
+            {"time": 1.0, "value": {"type": "real", "value": 3.0}},
+        ],
+    )
+    await backend.anim_interpolation_set(doc_id=doc_id, interpolation="linear")
+
+    await backend.layer_remove(doc_id=doc_id, layer_id=second["layer_id"])
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+@pytest.mark.parametrize("valuenode_type", sorted(VALUENODE_SPECS))
+async def test_every_supported_conversion_is_accepted_by_synfig(
+    tmp_path: Path, valuenode_type: str, real_valuenodes: set[str]
+) -> None:
+    """Every conversion the server advertises must survive a real engine round-trip.
+
+    This is the guard against advertising a ValueNode that Synfig does not know,
+    or does not accept for the parameter type - such a conversion produced a
+    document the engine refused to load.
+    """
+    assert valuenode_type in real_valuenodes, (
+        f"'{valuenode_type}' is advertised as a conversion but Synfig has no such ValueNode"
+    )
+
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(
+        doc_id=doc_id,
+        layer_type="circle",
+        params={"radius": {"type": "real", "value": 2.0}},
+    )
+
+    await backend.param_convert(
+        doc_id=doc_id,
+        layer_id=layer["layer_id"],
+        param_name="radius",
+        type=valuenode_type,
     )
 
     await assert_loadable(backend, doc_id, tmp_path)

@@ -1,7 +1,7 @@
 {
   "summary": {
     "synfig_version": "1.5.5",
-    "introspection_timestamp": "2026-11-11T10:43:28+00:00",
+    "introspection_timestamp": "2026-11-11T13:10:22+00:00",
     "layers": {
       "total": 55,
       "supported": 55,
@@ -15,13 +15,16 @@
     },
     "valuenodes": {
       "total": 69,
-      "supported": 11,
-      "supported_percent": 15.9
+      "supported": 13,
+      "supported_percent": 18.8
     },
     "targets": {
       "total": 13,
-      "supported": 13,
-      "writes_file": 11
+      "supported": 6,
+      "sequence": 4,
+      "converter": 1,
+      "no_output": 2,
+      "writes_file": 7
     },
     "renderers": [
       "safe",
@@ -5438,9 +5441,9 @@
     "cos": {
       "name": "cos",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "derivative": {
       "name": "derivative",
@@ -5725,9 +5728,9 @@
     "timeloop": {
       "name": "timeloop",
       "read": true,
-      "write": false,
-      "status": "read-only",
-      "unsupported_reason": "ValueNode type is listed by Synfig but cannot be created by the MCP"
+      "write": true,
+      "status": "supported",
+      "unsupported_reason": null
     },
     "timestring": {
       "name": "timestring",
@@ -5790,27 +5793,31 @@
     "bmp": {
       "name": "bmp",
       "supported": true,
+      "kind": "frame",
       "writes_file": true,
       "status": "supported",
       "unsupported_reason": null
     },
     "dv": {
       "name": "dv",
-      "supported": true,
-      "writes_file": true,
-      "status": "supported",
-      "unsupported_reason": null
+      "supported": false,
+      "kind": "sequence",
+      "writes_file": false,
+      "status": "sequence",
+      "unsupported_reason": "Encodes a sequence; needs a filename pattern such as frame_%04d.png"
     },
     "ffmpeg": {
       "name": "ffmpeg",
-      "supported": true,
-      "writes_file": true,
-      "status": "supported",
-      "unsupported_reason": null
+      "supported": false,
+      "kind": "sequence",
+      "writes_file": false,
+      "status": "sequence",
+      "unsupported_reason": "Encodes a sequence; needs a filename pattern such as frame_%04d.png"
     },
     "gif": {
       "name": "gif",
       "supported": true,
+      "kind": "frame",
       "writes_file": true,
       "status": "supported",
       "unsupported_reason": null
@@ -5818,55 +5825,63 @@
     "jpeg": {
       "name": "jpeg",
       "supported": true,
+      "kind": "frame",
       "writes_file": true,
       "status": "supported",
       "unsupported_reason": null
     },
     "libav": {
       "name": "libav",
-      "supported": true,
-      "writes_file": true,
-      "status": "supported",
-      "unsupported_reason": null
+      "supported": false,
+      "kind": "sequence",
+      "writes_file": false,
+      "status": "sequence",
+      "unsupported_reason": "Encodes a sequence; needs a filename pattern such as frame_%04d.png"
     },
     "magick++": {
       "name": "magick++",
-      "supported": true,
+      "supported": false,
+      "kind": "converter",
       "writes_file": true,
-      "status": "supported",
-      "unsupported_reason": null
+      "status": "converter",
+      "unsupported_reason": "Converts a rendered frame; needs the optional ImageMagick module"
     },
     "null": {
       "name": "null",
-      "supported": true,
+      "supported": false,
+      "kind": "none",
       "writes_file": false,
-      "status": "supported",
+      "status": "none",
       "unsupported_reason": "Renders without writing an output file"
     },
     "null-tile": {
       "name": "null-tile",
-      "supported": true,
+      "supported": false,
+      "kind": "none",
       "writes_file": false,
-      "status": "supported",
+      "status": "none",
       "unsupported_reason": "Renders without writing an output file"
     },
     "png": {
       "name": "png",
       "supported": true,
+      "kind": "frame",
       "writes_file": true,
       "status": "supported",
       "unsupported_reason": null
     },
     "png-spritesheet": {
       "name": "png-spritesheet",
-      "supported": true,
-      "writes_file": true,
-      "status": "supported",
-      "unsupported_reason": null
+      "supported": false,
+      "kind": "sequence",
+      "writes_file": false,
+      "status": "sequence",
+      "unsupported_reason": "Encodes a sequence; needs a filename pattern such as frame_%04d.png"
     },
     "ppm": {
       "name": "ppm",
       "supported": true,
+      "kind": "frame",
       "writes_file": true,
       "status": "supported",
       "unsupported_reason": null
@@ -5874,6 +5889,7 @@
     "yuv420p": {
       "name": "yuv420p",
       "supported": true,
+      "kind": "frame",
       "writes_file": true,
       "status": "supported",
       "unsupported_reason": null

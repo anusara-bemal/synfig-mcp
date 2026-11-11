@@ -15,6 +15,7 @@ from synfig_mcp.config import settings
 from synfig_mcp.errors import BridgeConnectionError, DocumentNotFoundError
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.models import SynfigValue
+from synfig_mcp.render.targets import require_frame_target
 from synfig_mcp.security.sandbox import validate_path
 from synfig_mcp.sif.valuenodes import normalize_interpolation
 
@@ -617,13 +618,14 @@ class LiveBackend(BackendBase):
         height: int | None = None,
         target: str = "png",
     ) -> bool:
+        normalized_target = require_frame_target(target)
         safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
         client = await self._ensure_client()
         p: dict[str, Any] = {
             "doc_id": doc_id,
             "output_path": str(safe_output),
             "time": time,
-            "target": target,
+            "target": normalized_target,
         }
         if width is not None:
             p["width"] = width

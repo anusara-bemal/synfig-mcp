@@ -43,13 +43,15 @@ by a test that fails without the fix.
 | 13 | Reach | Default profile hid ~60% of the tools | Default profile is now `all` (73 tools) | `test_every_registered_tool_has_a_profile` |
 | 14 | Layer identity | Every layer of a type got the same id (`Circle001`), making the first one unreachable | Unique descriptions per canvas | `test_layers_of_the_same_type_get_unique_ids` |
 | 15 | Value node linking | A parameter could not follow an exported value node | `param_link` implemented with the native `LayerParamConnect` action | `test_live_param_link_connects_a_parameter_to_an_exported_value_node` |
+| 16 | Value node accuracy | `param_convert` advertised three ValueNode names Synfig does not have (`cosine`, `time_loop`, `stepwise`) | Names, links and accepted value types taken from upstream; every conversion verified against the engine | `test_every_supported_conversion_is_accepted_by_synfig` |
+| 17 | Render target accuracy | All 13 output modules were claimed as supported | 6 write a single frame, 4 are sequence encoders, 1 is a converter, 2 write nothing - classified and verified | `test_render_targets.py` |
 
 ### Remaining gaps (documented, not implemented in this pass)
 
 | Gap | Impact | Next step |
 |---|---|---|
 | Complex parameters `wplist`, `dilist`, `bones`, `transformation`, `canvas` cannot be written | No weight-paint, bone rigging or transformation authoring through the MCP | Dedicated serialisers, verified by the validity gate |
-| 58 of 69 value nodes cannot be *created* (only read) | Limited procedural expression vocabulary | Extend `VALUENODE_LINK_SPECS` with the upstream link layouts |
+| 56 of 69 value nodes cannot be *created* (only read) | Limited procedural expression vocabulary | Extend `VALUENODE_SPECS` with the upstream link layouts |
 | Canvas create/rename/delete and per-canvas properties | `canvas.create` exists in the bridge but has no MCP tool | Expose the existing bridge method |
 | No `param_list` / `anim_waypoint_list` | Instance parameters and waypoints cannot be read back | Add read-only bridge methods |
 | Bone rigging (`rig.skeleton_create`, `rig.bone_add`) | Skeletons can be created as layers but bones cannot be authored | Probe `ValueDescCreateChildBone` with golden project files |
