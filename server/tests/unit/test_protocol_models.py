@@ -77,3 +77,43 @@ def test_spline_wire_format_validates() -> None:
     }
     value = adapter.validate_python(payload)
     assert value.type == "bline_point_list"
+
+
+def test_every_type_the_bridge_emits_is_known_to_the_model() -> None:
+    """The bridge must not emit a value type the Python models cannot parse.
+
+    A mismatch (for example ``bline_point`` instead of ``bline_point_list``)
+    makes the corresponding parameter unreadable for every MCP client, because
+    the response fails validation.
+    """
+    import re
+    from pathlib import Path
+
+    serializer = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "bridge"
+        / "src"
+        / "mcp_bridge"
+        / "types_serializer.cpp"
+    )
+    source = serializer.read_text(encoding="utf-8")
+    emitted = set(re.findall(r'j\["type"\]\s*=\s*"([a-z_]+)"', source))
+
+    known = {
+        "real",
+        "integer",
+        "bool",
+        "string",
+        "angle",
+        "time",
+        "color",
+        "vector",
+        "gradient",
+        "bline_point_list",
+        "canvas_ref",
+        "valuenode_link",
+        # "nil" marks a parameter without a value and is handled explicitly.
+        "nil",
+    }
+    unknown = emitted - known
+    assert not unknown, f"the bridge emits value types the model does not know: {sorted(unknown)}"

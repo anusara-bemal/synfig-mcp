@@ -78,14 +78,16 @@ nlohmann::json valuebase_to_json(const synfig::ValueBase& val) {
         j["cpoints"] = stops;
     } else if (type_name == "bline_point") {
         synfig::BLinePoint bp = val.get(synfig::BLinePoint());
-        j["type"] = "bline_point";
+        // The documented wire format (and the Python model) describe splines as
+        // a list of points, so a single point is sent as a one element list.
+        j["type"] = "bline_point_list";
 
         nlohmann::json bp_obj = nlohmann::json::object();
 
         nlohmann::json pt = nlohmann::json::object();
         pt["x"] = static_cast<double>(bp.get_vertex()[0]);
         pt["y"] = static_cast<double>(bp.get_vertex()[1]);
-        bp_obj["point"] = pt;
+        bp_obj["vertex"] = pt;
 
         bp_obj["width"] = static_cast<double>(bp.get_width());
         bp_obj["origin"] = static_cast<double>(bp.get_origin());
@@ -95,20 +97,22 @@ nlohmann::json valuebase_to_json(const synfig::ValueBase& val) {
         nlohmann::json t1 = nlohmann::json::object();
         t1["x"] = static_cast<double>(bp.get_tangent1()[0]);
         t1["y"] = static_cast<double>(bp.get_tangent1()[1]);
-        bp_obj["tangent1"] = t1;
+        bp_obj["t1"] = t1;
 
         nlohmann::json t2 = nlohmann::json::object();
         t2["x"] = static_cast<double>(bp.get_tangent2()[0]);
         t2["y"] = static_cast<double>(bp.get_tangent2()[1]);
-        bp_obj["tangent2"] = t2;
+        bp_obj["t2"] = t2;
 
-        j["value"] = bp_obj;
+        nlohmann::json points = nlohmann::json::array();
+        points.push_back(bp_obj);
+        j["points"] = points;
     } else if (type_name == "canvas") {
         synfig::Canvas::LooseHandle c = val.get(synfig::Canvas::LooseHandle());
-        j["type"] = "canvas";
-        nlohmann::json c_obj = nlohmann::json::object();
-        c_obj["canvas_id"] = c ? c->get_id() : "";
-        j["value"] = c_obj;
+        // The documented wire format calls this "canvas_ref" and carries the
+        // id at the top level.
+        j["type"] = "canvas_ref";
+        j["canvas_id"] = c ? c->get_id() : "";
     } else {
         j["type"] = type_name;
         j["value"] = val.get_string();

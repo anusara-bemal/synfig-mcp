@@ -131,6 +131,30 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_value_types_match_the_python_models(live_studio: BridgeClient) -> None:
+    """Every value type the bridge reports must match the documented wire format.
+
+    The bridge used to answer with ``bline_point`` and ``canvas`` while the
+    documented format (and the Python models) use ``bline_point_list`` and
+    ``canvas_ref``; such a value failed model validation for MCP clients.
+    """
+    group = await live_studio.call(
+        "layer.add", {"doc_id": "doc_0", "layer_type": "group", "description": "group"}
+    )
+
+    canvas_value = await live_studio.call(
+        "param.get",
+        {"doc_id": "doc_0", "layer_id": group["layer_id"], "param_name": "canvas"},
+    )
+    value = canvas_value.get("value", {}) if isinstance(canvas_value, dict) else {}
+    assert value.get("type") == "canvas_ref", (
+        f"the canvas reference does not use the documented format: {canvas_value}"
+    )
+    assert "canvas_id" in value, f"the canvas reference has no id: {canvas_value}"
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_gradient_parameters_round_trip(live_studio: BridgeClient) -> None:
     """Gradient parameters must be readable and writable through the bridge.
 

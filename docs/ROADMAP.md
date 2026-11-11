@@ -45,7 +45,7 @@ by a test that fails without the fix.
 | 15 | Value node linking | A parameter could not follow an exported value node | `param_link` implemented with the native `LayerParamConnect` action | `test_live_param_link_connects_a_parameter_to_an_exported_value_node` |
 | 16 | Value node accuracy | `param_convert` advertised three ValueNode names Synfig does not have (`cosine`, `time_loop`, `stepwise`) | Names, links and accepted value types taken from upstream; every conversion verified against the engine | `test_every_supported_conversion_is_accepted_by_synfig` |
 | 17 | Render target accuracy | All 13 output modules were claimed as supported | 6 write a single frame, 4 are sequence encoders, 1 is a converter, 2 write nothing - classified and verified | `test_render_targets.py` |
-| 18 | Wire format | The bridge answered gradients as `value` while the documented format and the model use `cpoints`, so every gradient parameter was unreadable in Studio | Bridge follows the documented format and accepts gradients on write | `test_live_gradient_parameters_round_trip` |
+| 18 | Wire format | The bridge answered gradients as `value`, spline points as `bline_point` and canvas references as `canvas`, while the documented format and the models use `cpoints`, `bline_point_list` and `canvas_ref` - those parameters were unreadable in Studio | Bridge follows the documented format, accepts gradients on write, and a test compares every emitted type with the models | `test_live_gradient_parameters_round_trip`, `test_every_type_the_bridge_emits_is_known_to_the_model` |
 
 ### Remaining gaps (documented, not implemented in this pass)
 

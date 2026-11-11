@@ -351,7 +351,13 @@ class LiveBackend(BackendBase):
             },
         )
         val = res.get("value")
-        return synfig_value_adapter.validate_python(val) if val else None
+        if not val:
+            return None
+        if isinstance(val, dict) and val.get("type") == "nil":
+            # The bridge reports an unset parameter as "nil"; there is no value
+            # to return in that case.
+            return None
+        return synfig_value_adapter.validate_python(val)
 
     async def param_set(
         self,
