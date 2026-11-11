@@ -5,7 +5,6 @@ Backend selection and auto-detection logic.
 import socket
 
 from synfig_mcp.backend.base import BackendBase
-from synfig_mcp.backend.detect import is_studio_running
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
 from synfig_mcp.config import settings
@@ -34,6 +33,10 @@ def get_backend(mode: str | None = None) -> BackendBase:
     invisible headless document. If Studio is detected but its bridge is
     unreachable, the live backend is kept so operations fail with guidance
     instead of reporting success on a document the user cannot see.
+
+    In auto mode the returned backend re-evaluates the choice on every call,
+    so a Studio that starts (or closes) after the MCP server is picked up
+    without a restart.
     """
     target_mode = mode or settings.backend_mode
 
@@ -45,26 +48,11 @@ def get_backend(mode: str | None = None) -> BackendBase:
         logger.info("Using forced HeadlessBackend")
         return HeadlessBackend()
 
-    # Auto mode: probe live bridge
-    if probe_live_bridge(
-        settings.bridge_host, settings.bridge_port, settings.bridge_connect_timeout_seconds
-    ):
-        logger.info(
-            "Live bridge detected, using LiveBackend",
-            host=settings.bridge_host,
-            port=settings.bridge_port,
-        )
-        return LiveBackend()
+    from synfig_mcp.backend.auto import AutoBackend
 
-    if is_studio_running():
-        logger.warning(
-            "Synfig Studio is running but the MCP bridge is unreachable; "
-            "keeping LiveBackend so operations fail loudly instead of creating "
-            "invisible headless documents",
-            host=settings.bridge_host,
-            port=settings.bridge_port,
-        )
-        return LiveBackend(studio_detected=True)
-
-    logger.info("Live bridge unreachable and no Studio process detected, using HeadlessBackend")
-    return HeadlessBackend()
+    logger.info(
+        "Using auto backend (live bridge is used as soon as it is reachable)",
+        host=settings.bridge_host,
+        port=settings.bridge_port,
+    )
+    return AutoBackend()

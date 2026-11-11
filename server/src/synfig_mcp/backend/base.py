@@ -354,7 +354,7 @@ class BackendBase(ABC):
         doc_id: str,
         layer_id: str,
         param_name: str,
-        time: float,
+        time: float | str,
         value: SynfigValue | Any,
         interpolation: str | None = None,
         interpolation_in: str | None = None,
@@ -365,7 +365,7 @@ class BackendBase(ABC):
 
     @abstractmethod
     async def anim_waypoint_remove(
-        self, doc_id: str, layer_id: str, param_name: str, time: float
+        self, doc_id: str, layer_id: str, param_name: str, time: float | str
     ) -> dict[str, Any]:
         """Remove a waypoint at a specific time."""
         ...
@@ -469,6 +469,8 @@ class BackendBase(ABC):
         fps: float | None = None,
         width: int | None = None,
         height: int | None = None,
+        progress_cb: Any = None,
+        cancel_token: Any = None,
     ) -> bool:
         """Render the animation to a video file (.mp4, .avi, or .gif)."""
         ...

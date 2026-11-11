@@ -593,7 +593,7 @@ class SifLayer:
     def set_waypoint(
         self,
         name: str,
-        time: float,
+        time: float | str,
         value: SynfigValue | dict[str, Any] | Any,
         interpolation: str = "linear",
         interpolation_in: str | None = None,
@@ -651,15 +651,16 @@ class SifLayer:
         val_el = synfig_value_to_xml(_coerce_value(value, current_type))
         target_wp.append(val_el)
 
-    def remove_waypoint(self, name: str, time: float) -> bool:
+    def remove_waypoint(self, name: str, time: float | str) -> bool:
         """Remove a waypoint at a specific time."""
+        target_time = parse_synfig_time(time) if isinstance(time, str) else float(time)
         for param in self.element.findall("param"):
             if param.get("name") == name:
                 animated_el = param.find("animated")
                 if animated_el is not None:
                     for wp in animated_el.findall("waypoint"):
                         t_wp = parse_synfig_time(wp.get("time", "0s"))
-                        if abs(t_wp - time) < 1e-4:
+                        if abs(t_wp - target_time) < 1e-4:
                             animated_el.remove(wp)
                             return True
         return False

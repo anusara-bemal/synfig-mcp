@@ -7,44 +7,55 @@ from typing import Any
 import pytest
 
 from synfig_mcp.backend import select
+from synfig_mcp.backend.auto import AutoBackend
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
 
 
-def _patch(monkeypatch: pytest.MonkeyPatch, *, bridge: bool, studio: bool) -> None:
-    monkeypatch.setattr(select, "probe_live_bridge", lambda *_, **__: bridge)
-    monkeypatch.setattr(select, "is_studio_running", lambda *_, **__: studio)
+def _patch_auto(monkeypatch: pytest.MonkeyPatch, *, bridge: bool, studio: bool) -> None:
+    monkeypatch.setattr("synfig_mcp.backend.auto.probe_live_bridge", lambda *_, **__: bridge)
+    monkeypatch.setattr("synfig_mcp.backend.auto.is_studio_running", lambda *_, **__: studio)
 
 
-def test_auto_uses_live_when_bridge_is_open(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch(monkeypatch, bridge=True, studio=True)
+def test_auto_returns_the_dynamic_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Auto mode hands out a backend that follows Studio instead of a fixed one."""
+    _patch_auto(monkeypatch, bridge=True, studio=True)
+    assert isinstance(select.get_backend("auto"), AutoBackend)
+
+
+@pytest.mark.asyncio
+async def test_auto_uses_live_when_bridge_is_open(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_auto(monkeypatch, bridge=True, studio=True)
     backend = select.get_backend("auto")
-    assert isinstance(backend, LiveBackend)
+    assert isinstance(backend, AutoBackend)
+    assert backend.name == "live"
 
 
-def test_auto_stays_live_when_studio_is_open_but_bridge_is_down(
+@pytest.mark.asyncio
+async def test_auto_stays_live_when_studio_is_open_but_bridge_is_down(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _patch(monkeypatch, bridge=False, studio=True)
+    _patch_auto(monkeypatch, bridge=False, studio=True)
     backend = select.get_backend("auto")
-    assert isinstance(backend, LiveBackend)
-    assert backend.studio_detected is True
+    assert isinstance(backend, AutoBackend)
+    assert backend.name == "live", "an open Studio must not be hidden behind headless documents"
 
 
-def test_auto_uses_headless_only_when_no_studio_is_running(
+@pytest.mark.asyncio
+async def test_auto_uses_headless_only_when_no_studio_is_running(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _patch(monkeypatch, bridge=False, studio=False)
-    assert isinstance(select.get_backend("auto"), HeadlessBackend)
+    _patch_auto(monkeypatch, bridge=False, studio=False)
+    backend = select.get_backend("auto")
+    assert isinstance(backend, AutoBackend)
+    assert backend.name == "headless"
 
 
-def test_forced_headless_is_respected(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch(monkeypatch, bridge=True, studio=True)
+def test_forced_headless_is_respected() -> None:
     assert isinstance(select.get_backend("headless"), HeadlessBackend)
 
 
-def test_forced_live_is_respected(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch(monkeypatch, bridge=False, studio=False)
+def test_forced_live_is_respected() -> None:
     assert isinstance(select.get_backend("live"), LiveBackend)
 
 

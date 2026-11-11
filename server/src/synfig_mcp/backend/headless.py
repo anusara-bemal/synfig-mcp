@@ -666,7 +666,7 @@ class HeadlessBackend(BackendBase):
         doc_id: str,
         layer_id: str,
         param_name: str,
-        time: float,
+        time: float | str,
         value: SynfigValue | Any,
         interpolation: str | None = None,
         interpolation_in: str | None = None,
@@ -711,7 +711,7 @@ class HeadlessBackend(BackendBase):
         }
 
     async def anim_waypoint_remove(
-        self, doc_id: str, layer_id: str, param_name: str, time: float
+        self, doc_id: str, layer_id: str, param_name: str, time: float | str
     ) -> dict[str, Any]:
         """Remove a waypoint at a specific time."""
         if doc_id not in self._documents:
@@ -1093,6 +1093,8 @@ class HeadlessBackend(BackendBase):
         fps: float | None = None,
         width: int | None = None,
         height: int | None = None,
+        progress_cb: Any = None,  # noqa: ARG002 - forwarded by the pipeline
+        cancel_token: Any = None,  # noqa: ARG002 - forwarded by the pipeline
     ) -> bool:
         safe_output = validate_path(
             output_path,

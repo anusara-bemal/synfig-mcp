@@ -617,7 +617,7 @@ class LiveBackend(BackendBase):
         doc_id: str,
         layer_id: str,
         param_name: str,
-        time: float,
+        time: float | str,
         value: SynfigValue | Any,
         interpolation: str | None = None,
         interpolation_in: str | None = None,
@@ -642,7 +642,7 @@ class LiveBackend(BackendBase):
         return dict(res)
 
     async def anim_waypoint_remove(
-        self, doc_id: str, layer_id: str, param_name: str, time: float
+        self, doc_id: str, layer_id: str, param_name: str, time: float | str
     ) -> dict[str, Any]:
         client = await self._ensure_client()
         res = await client.call(
@@ -803,6 +803,8 @@ class LiveBackend(BackendBase):
         fps: float | None = None,
         width: int | None = None,
         height: int | None = None,
+        progress_cb: Any = None,  # noqa: ARG002 - forwarded by the pipeline
+        cancel_token: Any = None,  # noqa: ARG002 - forwarded by the pipeline
     ) -> bool:
         safe_output = validate_path(
             output_path,
