@@ -588,10 +588,23 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 etl::handle<studio::Instance> inst = *it;
                 if (!inst || !inst->get_canvas()) continue;
 
+                synfig::Canvas::Handle canvas = inst->get_canvas();
+                synfig::RendDesc desc = canvas->rend_desc();
+                double fps = static_cast<double>(desc.get_frame_rate());
+                double start_t = static_cast<double>(desc.get_time_start());
+                double end_t = static_cast<double>(desc.get_time_end());
+
                 nlohmann::json doc_item;
                 doc_item["doc_id"] = "doc_" + std::to_string(idx);
-                doc_item["name"] = inst->get_canvas()->get_name();
+                doc_item["id"] = "doc_" + std::to_string(idx);
+                doc_item["name"] = canvas->get_name();
                 doc_item["file_path"] = inst->get_file_name().empty() ? nullptr : nlohmann::json(inst->get_file_name());
+                doc_item["width"] = desc.get_w();
+                doc_item["height"] = desc.get_h();
+                doc_item["fps"] = fps;
+                doc_item["start_time"] = start_t;
+                doc_item["end_time"] = end_t;
+                doc_item["duration_frames"] = static_cast<int>((end_t - start_t) * fps);
                 doc_list.push_back(doc_item);
             }
 

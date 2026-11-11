@@ -176,6 +176,17 @@ A green report means: the Studio is found, the bridge is reachable (or the
 headless fallback is active), the workspace is writable, the CLI and ffmpeg
 are present, and the token file has owner-only permissions.
 
+For a full end-to-end check - the MCP server started as a client would start
+it, speaking the protocol over stdio and driving the running Studio:
+
+```bash
+python scripts/smoke_live.py
+```
+
+It builds a scene, animates it, exports and links a value node, renders a
+frame, runs the visual review and undoes the last action. Exit code 0 means
+everything worked.
+
 ---
 
 ## Licensing

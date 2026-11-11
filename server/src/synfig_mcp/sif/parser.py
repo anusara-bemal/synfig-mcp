@@ -1304,11 +1304,34 @@ class SifDocument:
         return [SifLayer(e, canvas) for e in reversed(xml_layers)]
 
     def get_layer(self, layer_id_or_desc: str, canvas_path: str = "") -> SifLayer | None:
-        """Find a layer by desc or type."""
+        """Find a layer by desc or type.
+
+        Without a canvas path the whole document is searched, including the
+        layers inside groups, so a layer keeps its identity when it is grouped.
+        """
         for layer in self.get_layers(canvas_path):
             if layer.desc == layer_id_or_desc or layer.type == layer_id_or_desc:
                 return layer
-        return None
+        if canvas_path:
+            return None
+
+        def _search(canvas_elem: etree._Element) -> SifLayer | None:
+            for elem in canvas_elem:
+                if not is_element_tag(elem, "layer"):
+                    continue
+                desc = elem.get("desc", elem.get("type", ""))
+                if desc == layer_id_or_desc or elem.get("type") == layer_id_or_desc:
+                    return SifLayer(elem, canvas_elem)
+                for param in elem.findall("param"):
+                    if param.get("name") == "canvas":
+                        sub = param.find("canvas")
+                        if sub is not None:
+                            found = _search(sub)
+                            if found is not None:
+                                return found
+            return None
+
+        return _search(self.root)
 
     @staticmethod
     def _unique_layer_desc(canvas: etree._Element, layer_type: str) -> str:

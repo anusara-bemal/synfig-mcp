@@ -463,6 +463,13 @@ uv run poe check        # format, lint, mypy, unit + contract
 uv run poe live         # against a real patched Synfig Studio
 ```
 
+Verify your own installation end to end (starts the MCP server as a client
+would, speaks the protocol over stdio and drives the running Studio):
+
+```bash
+python scripts/smoke_live.py
+```
+
 ---
 
 ## Troubleshooting
