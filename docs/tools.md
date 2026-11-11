@@ -1329,7 +1329,7 @@ Get the list of currently selected layer IDs in Studio.
 
 Returns: Object with 'selected_layers': array of layer IDs.
 
-Gotcha: Relying on selection in headless mode (headless selection is virtual).
+Gotcha: In headless mode the selection is virtual - it only mirrors what was selected through the MCP.
 
 #### Parameters
 

@@ -576,6 +576,23 @@ class LiveBackend(BackendBase):
         res = await client.call("history.list", {"doc_id": doc_id})
         return dict(res)
 
+    async def selection_get(self, doc_id: str) -> list[str]:
+        client = await self._ensure_client()
+        res = await client.call("selection.get", {"doc_id": doc_id})
+        if isinstance(res, dict):
+            selected = res.get("selected_layers", [])
+            return [str(layer_id) for layer_id in selected] if isinstance(selected, list) else []
+        return []
+
+    async def selection_set(self, doc_id: str, layer_ids: list[str]) -> list[str]:
+        client = await self._ensure_client()
+        res = await client.call("selection.set", {"doc_id": doc_id, "layer_ids": list(layer_ids)})
+        if isinstance(res, dict):
+            selected = res.get("selected_layers")
+            if isinstance(selected, list):
+                return [str(layer_id) for layer_id in selected]
+        return list(layer_ids)
+
     async def render_frame(
         self,
         doc_id: str,

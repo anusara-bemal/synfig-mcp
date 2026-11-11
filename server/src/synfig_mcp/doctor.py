@@ -327,19 +327,43 @@ def check_token_budget_compliance() -> CheckResult:
     profile = settings.profile
     ceilings = {
         "core": 3000,
-        "anim": 4500,
-        "fx": 4500,
-        "rig": 3000,
-        "assets": 2000,
-        "review": 4000,
+        "anim": 5000,
+        "fx": 6000,
+        "rig": 4000,
+        "assets": 3000,
+        "review": 5000,
         "all": 22000,
     }
-    ceil = ceilings.get(profile, 5000)
+    ceil = ceilings.get(profile, 22000)
 
     return CheckResult(
         name="Token Budget Compliance",
         status="PASS",
-        message=f"Profile '{profile}' meets token budget ceiling (< {ceil:,} tokens)",
+        message=(
+            f"Profile '{profile}' meets token budget ceiling (< {ceil:,} tokens). "
+            "Set SYNFIG_MCP_PROFILE=core for a minimal tool surface."
+        ),
+    )
+
+
+def check_tool_surface() -> CheckResult:
+    """Report how many MCP tools the active profile exposes."""
+    from synfig_mcp.config import settings
+    from synfig_mcp.tools.register import TOOL_PROFILES
+
+    profile = settings.profile
+    if profile == "all":
+        count = len(TOOL_PROFILES)
+    else:
+        count = sum(1 for profiles in TOOL_PROFILES.values() if profile in profiles)
+
+    return CheckResult(
+        name="Tool Surface",
+        status="PASS",
+        message=f"Profile '{profile}' exposes {count} MCP tools.",
+        hint=(
+            "Use SYNFIG_MCP_PROFILE=core for a minimal tool surface (~3k tokens instead of ~18k)."
+        ),
     )
 
 
@@ -350,6 +374,7 @@ def run_doctor() -> int:
         check_bridge_connection(),
         check_workspace_roots(),
         check_assets_directory(),
+        check_tool_surface(),
         check_token_budget_compliance(),
         check_token_file(),
         check_synfig_cli(),

@@ -199,6 +199,21 @@ async def test_unknown_layer_type_is_rejected_in_both_backends(mcp_app: Any) -> 
 
 
 @pytest.mark.asyncio
+async def test_selection_round_trips_in_both_backends(mcp_app: Any) -> None:
+    """Setting the selection must be readable back through the same tool."""
+    async with Client(mcp_app) as mcp:
+        doc_id = await _new_document(mcp)
+        await mcp.call_tool("layer_add", {"doc_id": doc_id, "layer_type": "circle", "params": {}})
+        set_result = await mcp.call_tool(
+            "selection_set", {"doc_id": doc_id, "layer_ids": ["Circle001"]}
+        )
+        assert "Circle001" in _text(set_result)
+
+        get_result = await mcp.call_tool("selection_get", {"doc_id": doc_id})
+        assert "Circle001" in _text(get_result)
+
+
+@pytest.mark.asyncio
 async def test_schema_tools_report_the_installed_synfig(mcp_app: Any) -> None:
     async with Client(mcp_app) as mcp:
         layers = await mcp.call_tool("schema_list_layers", {})

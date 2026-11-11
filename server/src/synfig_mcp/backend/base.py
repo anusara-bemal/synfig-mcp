@@ -346,6 +346,20 @@ class BackendBase(ABC):
         ...
 
     # -----------------------------------------------------------------------
+    # Selection
+    # -----------------------------------------------------------------------
+
+    @abstractmethod
+    async def selection_get(self, doc_id: str) -> list[str]:
+        """Return the ids of the currently selected layers."""
+        ...
+
+    @abstractmethod
+    async def selection_set(self, doc_id: str, layer_ids: list[str]) -> list[str]:
+        """Set the layer selection and return the ids that are now selected."""
+        ...
+
+    # -----------------------------------------------------------------------
     # Rendering Operations
     # -----------------------------------------------------------------------
 

@@ -32,6 +32,7 @@ class HeadlessBackend(BackendBase):
         self._redo_stacks: dict[str, list[bytes]] = {}
         self._current_time: dict[str, float] = {}
         self._dirty: dict[str, bool] = {}
+        self._selections: dict[str, list[str]] = {}
         self._pipeline: Any = None
 
     @property
@@ -790,6 +791,27 @@ class HeadlessBackend(BackendBase):
             "undo_count": len(self._undo_stacks.get(doc_id, [])),
             "redo_count": len(self._redo_stacks.get(doc_id, [])),
         }
+
+    # -----------------------------------------------------------------------
+    # Selection
+    # -----------------------------------------------------------------------
+
+    async def selection_get(self, doc_id: str) -> list[str]:
+        """Return the virtual selection of the headless engine.
+
+        The headless engine has no GUI, so the selection is tracked in memory
+        and only mirrors what a caller selected through the MCP.
+        """
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        return list(self._selections.get(doc_id, []))
+
+    async def selection_set(self, doc_id: str, layer_ids: list[str]) -> list[str]:
+        """Set the virtual selection of the headless engine."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        self._selections[doc_id] = list(layer_ids)
+        return list(layer_ids)
 
     # -----------------------------------------------------------------------
     # Rendering Operations

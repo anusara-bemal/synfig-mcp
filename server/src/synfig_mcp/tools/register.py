@@ -962,16 +962,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     async def selection_get(doc_id: str = "doc_0") -> dict[str, Any]:
         """Get the list of currently selected layer IDs in Studio.
         Returns: Object with 'selected_layers': array of layer IDs.
-        Gotcha: Relying on selection in headless mode (headless selection is virtual).
+        Gotcha: In headless mode the selection is virtual - it only mirrors what was selected through the MCP.
         """
-        if hasattr(backend, "_ensure_client"):
-            with contextlib.suppress(Exception):
-                client = await backend._ensure_client()
-                res = await client.call("selection.get", {"doc_id": doc_id})
-                res_dict = dict(res)
-                res_dict["_security_notice"] = SECURITY_NOTICE
-                return res_dict
-        return {"selected_layers": [], "_security_notice": SECURITY_NOTICE}
+        selected = await backend.selection_get(doc_id)
+        return {"selected_layers": selected, "_security_notice": SECURITY_NOTICE}
 
     @tool_for("selection_set", annotations=IDEMPOTENT)
     async def selection_set(doc_id: str, layer_ids: list[str]) -> dict[str, Any]:
@@ -979,12 +973,8 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Returns: Object with 'selected_layers': array of newly selected layer IDs.
         Gotcha: Passing non-existent layer IDs.
         """
-        if hasattr(backend, "_ensure_client"):
-            with contextlib.suppress(Exception):
-                client = await backend._ensure_client()
-                res = await client.call("selection.set", {"doc_id": doc_id, "layer_ids": layer_ids})
-                return dict(res)
-        return {"selected_layers": layer_ids}
+        selected = await backend.selection_set(doc_id, layer_ids)
+        return {"selected_layers": selected}
 
     # -----------------------------------------------------------------------
     # Cut-out Characters & Storyboards (Phase A4)

@@ -26,12 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spline authoring**: `param_set` can now write `bline` spline points as a valid `<bline>` element.
 - **Parameter value coercion**: plain JSON values are coerced into the type the parameter expects (`[x, y]` becomes a vector, a number becomes an angle/time/integer when required).
 - **Documentation freshness gate**: `server/tests/unit/test_tool_docs.py` fails when `docs/tools.md` does not match the registered tool surface.
+- **Backend parity gate**: `server/tests/contract/test_backend_parity.py` runs the same operations against the headless engine and the bridge and compares the results; the fake bridge now mirrors the native bridge (same diff action names, same rejection of unknown layer types).
+- **Tool surface report**: `synfig-mcp doctor` reports how many MCP tools the active profile exposes.
+- **Protocol documentation gate**: `server/tests/unit/test_protocol_docs.py` checks `docs/protocol.md` against the C++ dispatcher, so a method that is documented but not implemented (or the other way round) fails the build. `param.link`, `rig.skeleton_create`, `rig.bone_add` and `rig.bone_bind` are now correctly marked as not implemented instead of "Verified".
 
 ### Changed
 - **All tools enabled by default**: the default profile is now `all` (73 tools) so a freshly installed server exposes the complete Synfig feature set. `SYNFIG_MCP_PROFILE=core|anim|fx|rig|assets|review` remains available for token-constrained clients.
 - **Truthful coverage matrix**: `docs/COVERAGE.md` is generated from measured capability instead of hardcoded claims. It now reports 55/55 layer types, 440/455 writable parameters, 13/13 render targets and - instead of the previously claimed 100% - the 11 value nodes the MCP can actually create.
 - **Regenerated tool reference**: `docs/tools.md` documents all 73 tools (was 47) and is generated from the live registry.
-- **Corrected documentation**: README, `docs/api.md` and `docs/TOKEN_BUDGET.md` state the real tool counts, token budgets and the new default profile.
+- **Corrected documentation**: README, `docs/api.md` and `docs/TOKEN_BUDGET.md` state the real tool counts, token budgets and the new default profile. The built-in guides (`synfig_help`) now show the parameter value format the server actually accepts - the previous examples used a nested spelling that silently produced zero values.
 
 ## [0.8.0-rc2] - 2026-11-09
 
