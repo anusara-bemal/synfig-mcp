@@ -131,6 +131,24 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_scene_tree_has_the_documented_shape(live_studio: BridgeClient) -> None:
+    """The live scene tree must expose the same keys as the headless engine."""
+    await live_studio.call(
+        "layer.add", {"doc_id": "doc_0", "layer_type": "circle", "description": "circle"}
+    )
+    tree = await live_studio.call("scene.tree", {"doc_id": "doc_0"})
+
+    for key in ("doc_id", "canvas_path", "name", "width", "height", "fps", "duration_frames"):
+        assert key in tree, f"the live scene tree has no '{key}': {sorted(tree)}"
+
+    layers = tree.get("layers", [])
+    assert layers, "the live scene tree has no layers"
+    for key in ("id", "desc", "description", "type", "active", "depth", "params", "children"):
+        assert key in layers[0], f"a live layer entry has no '{key}': {sorted(layers[0])}"
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_value_types_match_the_python_models(live_studio: BridgeClient) -> None:
     """Every value type the bridge reports must match the documented wire format.
 

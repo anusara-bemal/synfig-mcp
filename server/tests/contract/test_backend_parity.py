@@ -249,6 +249,30 @@ async def test_param_export_and_link_round_trip_in_both_backends(mcp_app: Any) -
 
 
 @pytest.mark.asyncio
+async def test_scene_tree_has_the_same_shape_in_both_backends(mcp_app: Any) -> None:
+    """The scene tree must expose the same keys in both backends.
+
+    The live bridge used to answer with a bare list of layers while the
+    headless engine reported the canvas metadata as well, and the layer entries
+    used different keys - a client written against one backend broke on the
+    other.
+    """
+    async with Client(mcp_app) as mcp:
+        doc_id = await _new_document(mcp)
+        await mcp.call_tool("layer_add", {"doc_id": doc_id, "layer_type": "circle", "params": {}})
+        result = await mcp.call_tool("scene_tree", {"doc_id": doc_id})
+        payload = json.loads(_text(result))
+
+    for key in ("doc_id", "canvas_path", "name", "width", "height", "fps", "duration_frames"):
+        assert key in payload, f"the scene tree has no '{key}'"
+
+    layers = payload.get("layers", [])
+    assert layers, "the scene tree has no layers"
+    for key in ("id", "desc", "description", "type", "active", "depth", "params", "children"):
+        assert key in layers[0], f"a layer entry has no '{key}'"
+
+
+@pytest.mark.asyncio
 async def test_schema_tools_report_the_installed_synfig(mcp_app: Any) -> None:
     async with Client(mcp_app) as mcp:
         layers = await mcp.call_tool("schema_list_layers", {})

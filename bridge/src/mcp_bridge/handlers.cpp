@@ -130,6 +130,16 @@ static synfig::Layer::Handle find_layer_in_canvas(synfig::Canvas::Handle canvas,
     return nullptr;
 }
 
+static nlohmann::json build_layer_params(synfig::Layer::Handle layer) {
+    nlohmann::json params = nlohmann::json::object();
+    if (!layer) return params;
+    for (const auto& item : layer->get_param_list()) {
+        if (!item.second.is_valid()) continue;
+        params[item.first] = valuebase_to_json(item.second);
+    }
+    return params;
+}
+
 static nlohmann::json build_layer_tree(synfig::Canvas::Handle canvas) {
     nlohmann::json layers = nlohmann::json::array();
     if (!canvas) return layers;
@@ -139,11 +149,16 @@ static nlohmann::json build_layer_tree(synfig::Canvas::Handle canvas) {
         if (!layer) continue;
 
         nlohmann::json l;
-        l["id"] = layer->get_guid().get_string();
-        l["desc"] = layer->get_description();
+        const synfig::String description = layer->get_description();
+        // The id is the description when the layer has one, so the same value
+        // can be used to address the layer in every backend.
+        l["id"] = description.empty() ? layer->get_guid().get_string() : description;
+        l["desc"] = description;
+        l["description"] = description;
         l["type"] = layer->get_name();
         l["active"] = layer->active();
         l["depth"] = layer->get_depth();
+        l["params"] = build_layer_params(layer);
 
         etl::handle<synfig::Layer_PasteCanvas> paste =
             etl::handle<synfig::Layer_PasteCanvas>::cast_dynamic(layer);
@@ -931,8 +946,25 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 return r;
             }
 
-            nlohmann::json tree = build_layer_tree(inst->get_canvas());
-            r["result"] = {{"doc_id", doc_id}, {"layers", tree}};
+            synfig::Canvas::Handle canvas = inst->get_canvas();
+            synfig::RendDesc desc = canvas->rend_desc();
+            double fps = static_cast<double>(desc.get_frame_rate());
+            double start_t = static_cast<double>(desc.get_time_start());
+            double end_t = static_cast<double>(desc.get_time_end());
+
+            nlohmann::json tree = build_layer_tree(canvas);
+            // The same metadata the headless engine reports, so the tool
+            // response has the same shape in both backends.
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"canvas_path", "/"},
+                {"name", canvas->get_name()},
+                {"width", desc.get_w()},
+                {"height", desc.get_h()},
+                {"fps", fps},
+                {"duration_frames", static_cast<int>((end_t - start_t) * fps)},
+                {"layers", tree}
+            };
             return r;
         });
     }

@@ -392,20 +392,30 @@ class FakeBridgeServer:
                 "result": {
                     "doc_id": params.get("doc_id", "doc_0"),
                     "canvas_path": params.get("canvas_path", "/"),
+                    "name": "Synfig Animation 1",
+                    "width": 1920,
+                    "height": 1080,
+                    "fps": 24.0,
+                    "duration_frames": 120,
                     "layers": [
                         {
                             "id": "Circle001",
-                            "type": "circle",
                             "desc": "Circle001",
+                            "description": "Circle001",
+                            "type": "circle",
                             "active": True,
                             "depth": 0,
                             "params": {
                                 "radius": {"type": "real", "value": 1.5},
                                 "color": {
                                     "type": "color",
-                                    "value": {"r": 0.2, "g": 0.6, "b": 1.0, "a": 1.0},
+                                    "r": 0.2,
+                                    "g": 0.6,
+                                    "b": 1.0,
+                                    "a": 1.0,
                                 },
                             },
+                            "children": [],
                         }
                     ],
                 },

@@ -1371,8 +1371,9 @@ class SifDocument:
 
                 node: dict[str, Any] = {
                     "id": l_desc,
-                    "type": l_type,
+                    "desc": l_desc,
                     "description": l_desc,
+                    "type": l_type,
                     "active": l_active,
                     "depth": sif_l.depth,
                     "params": sif_l.get_params(),
@@ -1380,6 +1381,8 @@ class SifDocument:
                 sub = sif_l.get_subcanvas()
                 if sub is not None:
                     node["children"] = _build_nodes(sub)
+                else:
+                    node["children"] = []
                 nodes.append(node)
             return nodes
 
