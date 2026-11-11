@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate layer ids**: every new layer of the same type received the same description (`Circle001`, `Circle002`, ... per type), so the first layer of a type became unreachable for every subsequent operation. Generated descriptions are now unique per canvas.
 
 ### Added
+- **Bone authoring (`rig_bone_add`)**: creates root and child bones with Synfig's own `ValueNodeStaticListInsert` / `ValueDescCreateChildBone` actions - verified live, and the resulting skeleton still loads in the engine.
 - **Canvas management**: `canvas_create`, `canvas_rename`, `canvas_delete` and `canvas_set_properties` expose Synfig's sub-canvases (resolution, frame rate, time range, background colour) in both backends.
 - **Read-back tools**: `param_list` reports every parameter of a layer with its current value, `anim_waypoint_list` reports the waypoints of an animated parameter.
 - **Sound import**: `import_asset` accepts audio files (.wav, .ogg, .mp3, .flac, .au) and creates a Synfig `sound` layer; image formats keep using the `import` layer.

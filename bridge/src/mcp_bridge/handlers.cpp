@@ -36,6 +36,9 @@
 #include <synfig/target.h>
 #include <synfig/targetparam.h>
 #include <synfig/valuenodes/valuenode_animated.h>
+#include <synfig/valuenodes/valuenode_bone.h>
+#include <synfig/valuenodes/valuenode_staticlist.h>
+#include <synfig/bone.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/waypoint.h>
 #include <synfigapp/main.h>
@@ -1678,6 +1681,150 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 {"layer_id", layer_id},
                 {"param_name", param_name},
                 {"waypoints", nlohmann::json::array()}
+            };
+            return r;
+#endif
+        });
+    }
+
+    if (method == "rig.bone_add") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", params.value("skeleton_layer", ""));
+        double bone_time = params.value("time", 0.0);
+        double origin_x = params.value("origin_x", 0.0);
+        double origin_y = params.value("origin_y", 0.0);
+        double bone_angle = params.value("angle", 0.0);
+        double bone_width = params.value("width", 1.0);
+        double tip_width = params.value("tipwidth", 1.0);
+        int parent_index = params.value("parent_index", -1);
+
+        return run_on_main_thread([&, doc_id, layer_id, bone_time, origin_x, origin_y, bone_angle,
+                                   bone_width, tip_width, parent_index]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: rig.bone_add");
+
+            // The bones of a skeleton layer live in a static list value node.
+            synfigapp::ValueDesc list_desc(layer, "bones");
+            synfig::ValueNode_StaticList::Handle list_node =
+                synfig::ValueNode_StaticList::Handle::cast_dynamic(list_desc.get_value_node());
+            if (!list_node) {
+                grouper.cancel();
+                r["error"] = {{"code", 2003}, {"message", "The layer has no bone list - use a skeleton or skeleton_deformation layer"}};
+                return r;
+            }
+
+            synfig::Bone bone;
+            bone.set_origin(synfig::Point(origin_x, origin_y));
+            bone.set_width(static_cast<float>(bone_width));
+            bone.set_tipwidth(static_cast<float>(tip_width));
+            bone.set_angle(synfig::Angle::deg(bone_angle));
+            bone.set_scalelx(synfig::Real(1.0));
+
+            synfigapp::Action::Handle action;
+            synfig::ValueNode_Bone::Handle bone_node;
+
+            if (parent_index < 0) {
+                // Root bone: inserted into the bone list itself.
+                bone.set_parent(synfig::ValueNode_Bone_Root::create(synfig::Bone()));
+                bone_node = synfig::ValueNode_Bone::create(bone, inst->get_canvas());
+
+                action = synfigapp::Action::create("ValueNodeStaticListInsert");
+                if (!action) {
+                    grouper.cancel();
+                    r["error"] = {{"code", -32000}, {"message", "Failed to create ValueNodeStaticListInsert action"}};
+                    return r;
+                }
+                action->set_param("canvas", inst->get_canvas());
+                action->set_param("canvas_interface", ci);
+                action->set_param("time", synfig::Time(bone_time));
+                action->set_param("item", synfig::ValueNode::Handle::cast_dynamic(bone_node));
+                action->set_param("value_desc", synfigapp::ValueDesc(list_node, 0, list_desc));
+            } else {
+                // Child bone: created below an existing bone.
+                if (parent_index >= static_cast<int>(list_node->list.size())) {
+                    grouper.cancel();
+                    r["error"] = {{"code", 2004}, {"message", "Parent bone index out of range"}};
+                    return r;
+                }
+                synfig::ValueNode_Bone::Handle parent_bone =
+                    synfig::ValueNode_Bone::Handle::cast_dynamic(list_node->list[parent_index]);
+                if (!parent_bone) {
+                    grouper.cancel();
+                    r["error"] = {{"code", 2004}, {"message", "The parent index does not point at a bone"}};
+                    return r;
+                }
+                synfigapp::ValueDesc parent_desc(list_node, parent_index, list_desc);
+                synfigapp::ValueDesc child_desc(
+                    parent_bone,
+                    parent_bone->get_link_index_from_name("origin"),
+                    parent_desc);
+
+                action = synfigapp::Action::create("ValueDescCreateChildBone");
+                if (!action) {
+                    grouper.cancel();
+                    r["error"] = {{"code", -32000}, {"message", "Failed to create ValueDescCreateChildBone action"}};
+                    return r;
+                }
+                action->set_param("canvas", inst->get_canvas());
+                action->set_param("canvas_interface", ci);
+                action->set_param("value_desc", child_desc);
+                action->set_param("time", synfig::Time(bone_time));
+                action->set_param("origin", synfig::ValueBase(synfig::Point(origin_x, origin_y)));
+                action->set_param("scalelx", synfig::ValueBase(synfig::Real(1.0)));
+                action->set_param("angle", synfig::ValueBase(synfig::Angle::deg(bone_angle)));
+                action->set_param("parent", true);
+                action->set_param("width", synfig::ValueBase(synfig::Real(bone_width)));
+                action->set_param("tipwidth", synfig::ValueBase(synfig::Real(tip_width)));
+                action->set_param("highlight", false);
+                action->set_param("prev_active_bone_node", synfig::ValueNode::Handle());
+            }
+
+            if (!action->is_ready()) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "The bone action is not ready - is the layer a skeleton?"}};
+                return r;
+            }
+
+            if (!inst->perform_action(action)) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "The bone action failed"}};
+                return r;
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"time", bone_time},
+                {"origin", nlohmann::json::array({origin_x, origin_y})},
+                {"angle", bone_angle},
+                {"width", bone_width},
+                {"tipwidth", tip_width},
+                {"parent_index", parent_index},
+                {"diff", make_diff("rig.bone_add", {}, {layer_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"diff", make_diff("rig.bone_add", {}, {layer_id}, {})}
             };
             return r;
 #endif

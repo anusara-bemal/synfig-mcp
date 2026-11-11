@@ -11,7 +11,7 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 80 · **Profile:** `all` enabled by default
+**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 81 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 
@@ -316,7 +316,7 @@ flowchart TD
 
 ## Tool profiles
 
-All 80 tools are exposed by default. Narrow the surface when the client has a tight context budget:
+All 81 tools are exposed by default. Narrow the surface when the client has a tight context budget:
 
 | Profile | Tools | ≈ tokens (cl100k) | Focus |
 |---|---:|---:|---|
@@ -324,7 +324,7 @@ All 80 tools are exposed by default. Narrow the surface when the client has a ti
 | `core` | 13 | ~2,980 | Scene build/export, inspection, undo/redo, single-frame render |
 | `anim` | 21 | ~5,000 | Keyframes, timeline, waypoints, interpolation |
 | `fx` | 25 | ~6,000 | Layer hierarchy, effect recipes, style presets |
-| `rig` | 22 | ~4,400 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
+| `rig` | 23 | ~4,500 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
 | `assets` | 12 | ~2,800 | Licensed asset search, hardened downloads, attribution |
 | `review` | 18 | ~5,200 | Frame/sequence/compare review, objective metrics, jobs |
 

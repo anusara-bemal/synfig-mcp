@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 80 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 81 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,6 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
+- [Other](#other) (1 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -24,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 80 tools.**
+**Total: 81 tools.**
 
 ## Animation & Keyframes
 
@@ -1050,6 +1051,34 @@ Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'publ
 | `title` | `string` | No | - |
 | `creator` | `string` | No | - |
 | `license_code` | `string` | No | - |
+
+---
+
+## Other
+
+### `rig_bone_add`
+
+*Profiles: all, rig*
+
+Add a bone to a skeleton layer (Synfig's cut-out rigging primitive).
+
+Returns: Object describing the created bone and a diff summary.
+
+Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it cannot create bones.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_id` | `string` | No | - |
+| `time` | `number` | No | - |
+| `origin_x` | `number` | No | - |
+| `origin_y` | `number` | No | - |
+| `angle` | `number` | No | - |
+| `width` | `number` | No | - |
+| `tip_width` | `number` | No | - |
+| `parent_index` | `integer` | No | - |
 
 ---
 

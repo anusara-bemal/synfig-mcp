@@ -527,6 +527,34 @@ class LiveBackend(BackendBase):
         res = await client.call("canvas.set_properties", payload)
         return dict(res)
 
+    async def bone_add(
+        self,
+        doc_id: str,
+        layer_id: str,
+        time: float = 0.0,
+        origin: tuple[float, float] = (0.0, 0.0),
+        angle: float = 0.0,
+        width: float = 1.0,
+        tip_width: float = 1.0,
+        parent_index: int = -1,
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "rig.bone_add",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "time": time,
+                "origin_x": origin[0],
+                "origin_y": origin[1],
+                "angle": angle,
+                "width": width,
+                "tipwidth": tip_width,
+                "parent_index": parent_index,
+            },
+        )
+        return dict(res)
+
     async def anim_time_get(self, doc_id: str) -> float:
         client = await self._ensure_client()
         res = await client.call("anim.time_get", {"doc_id": doc_id})

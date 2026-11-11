@@ -986,6 +986,28 @@ class HeadlessBackend(BackendBase):
             },
         }
 
+    async def bone_add(
+        self,
+        doc_id: str,  # noqa: ARG002 - part of the backend contract
+        layer_id: str,  # noqa: ARG002 - part of the backend contract
+        time: float = 0.0,  # noqa: ARG002 - part of the backend contract
+        origin: tuple[float, float] = (0.0, 0.0),  # noqa: ARG002 - backend contract
+        angle: float = 0.0,  # noqa: ARG002 - part of the backend contract
+        width: float = 1.0,  # noqa: ARG002 - part of the backend contract
+        tip_width: float = 1.0,  # noqa: ARG002 - part of the backend contract
+        parent_index: int = -1,  # noqa: ARG002 - part of the backend contract
+    ) -> dict[str, Any]:
+        """Add a child bone to a skeleton layer.
+
+        Bone hierarchies are Synfig value nodes that only Synfig Studio can
+        create, so this operation needs the live backend.  The headless engine
+        reports that clearly instead of writing an invalid skeleton.
+        """
+        raise SynfigError(
+            "Bone authoring requires Synfig Studio (the live backend). "
+            "Start the patched Studio, enable 'Tools -> MCP Bridge' and retry."
+        )
+
     # -----------------------------------------------------------------------
     # Rendering Operations
     # -----------------------------------------------------------------------

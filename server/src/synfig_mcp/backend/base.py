@@ -295,6 +295,21 @@ class BackendBase(ABC):
         """Update the resolution, frame rate, time range or background of a canvas."""
         ...
 
+    @abstractmethod
+    async def bone_add(
+        self,
+        doc_id: str,
+        layer_id: str,
+        time: float = 0.0,
+        origin: tuple[float, float] = (0.0, 0.0),
+        angle: float = 0.0,
+        width: float = 1.0,
+        tip_width: float = 1.0,
+        parent_index: int = -1,
+    ) -> dict[str, Any]:
+        """Add a child bone to a skeleton layer."""
+        ...
+
     # -----------------------------------------------------------------------
     # Animation & Keyframe Operations
     # -----------------------------------------------------------------------

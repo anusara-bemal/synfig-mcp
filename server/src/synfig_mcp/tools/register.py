@@ -121,6 +121,7 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "selection_set": {"rig", "all"},
     # Cut-out Characters & Storyboards (Phase A4)
     "character_rig_from_parts": {"rig", "all"},
+    "rig_bone_add": {"rig", "all"},
     "character_pose_apply": {"rig", "all"},
     "character_motion_apply": {"rig", "all"},
     "storyboard_from_script": {"rig", "all"},
@@ -1104,6 +1105,33 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     # -----------------------------------------------------------------------
     # Cut-out Characters & Storyboards (Phase A4)
     # -----------------------------------------------------------------------
+
+    @tool_for("rig_bone_add", annotations=MUTATING)
+    async def rig_bone_add(
+        doc_id: str = "doc_0",
+        layer_id: str = "",
+        time: float = 0.0,
+        origin_x: float = 0.0,
+        origin_y: float = 0.0,
+        angle: float = 0.0,
+        width: float = 1.0,
+        tip_width: float = 1.0,
+        parent_index: int = -1,
+    ) -> dict[str, Any]:
+        """Add a bone to a skeleton layer (Synfig's cut-out rigging primitive).
+        Returns: Object describing the created bone and a diff summary.
+        Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it cannot create bones.
+        """
+        return await backend.bone_add(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            time=time,
+            origin=(origin_x, origin_y),
+            angle=angle,
+            width=width,
+            tip_width=tip_width,
+            parent_index=parent_index,
+        )
 
     @tool_for("character_rig_from_parts", annotations=MUTATING)
     async def character_rig_from_parts(

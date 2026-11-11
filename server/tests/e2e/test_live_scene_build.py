@@ -131,6 +131,42 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_bone_authoring(live_studio: BridgeClient, tmp_path: Path) -> None:
+    """A bone must be created in Studio and the document must stay loadable."""
+    from synfig_mcp.validation import find_synfig_binary, validate_document
+
+    skeleton = await live_studio.call(
+        "layer.add", {"doc_id": "doc_0", "layer_type": "skeleton", "description": "rig"}
+    )
+    skeleton_id = skeleton["layer_id"]
+
+    bone = await live_studio.call(
+        "rig.bone_add",
+        {
+            "doc_id": "doc_0",
+            "layer_id": skeleton_id,
+            "time": 0.0,
+            "origin_x": 0.0,
+            "origin_y": 0.0,
+            "angle": 0.0,
+            "width": 1.0,
+            "tipwidth": 0.5,
+            "parent_index": -1,
+        },
+    )
+    assert bone.get("layer_id") == skeleton_id, f"the bone was not created: {bone}"
+
+    binary = find_synfig_binary()
+    if binary is not None:
+        target = tmp_path / "skeleton.sif"
+        await live_studio.call("doc.save", {"doc_id": "doc_0", "file_path": str(target)})
+        assert target.is_file(), "the document was not saved"
+        result = await validate_document(target, binary=binary)
+        assert result.valid, "\n".join(result.errors)
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_canvas_management_and_listing(live_studio: BridgeClient) -> None:
     """Canvas management, parameter listing and waypoint listing must work live."""
     created = await live_studio.call("canvas.create", {"doc_id": "doc_0", "id": "shot1"})
