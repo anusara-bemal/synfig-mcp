@@ -249,6 +249,23 @@ async def test_param_export_and_link_round_trip_in_both_backends(mcp_app: Any) -
 
 
 @pytest.mark.asyncio
+async def test_history_and_canvas_lists_keep_their_contract(mcp_app: Any) -> None:
+    """`history_list` and `canvas_list` must answer the same way in both backends."""
+    async with Client(mcp_app) as mcp:
+        doc_id = await _new_document(mcp)
+
+        history = json.loads(_text(await mcp.call_tool("history_list", {"doc_id": doc_id})))
+        assert "undo_count" in history
+        assert "redo_count" in history
+
+        canvases = json.loads(_text(await mcp.call_tool("canvas_list", {"doc_id": doc_id})))
+        assert "canvases" in canvases
+        assert canvases["canvases"], "no canvas path was reported"
+        for path in canvases["canvases"]:
+            assert isinstance(path, str), f"a canvas entry is not a path: {path!r}"
+
+
+@pytest.mark.asyncio
 async def test_scene_tree_has_the_same_shape_in_both_backends(mcp_app: Any) -> None:
     """The scene tree must expose the same keys in both backends.
 

@@ -355,7 +355,17 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Gotcha: Assuming only the root canvas exists when layers are inside nested groups.
         """
         paths = await backend.canvas_list(doc_id=doc_id)
-        return {"canvases": paths}
+        normalized: list[str] = []
+        for item in paths or []:
+            if isinstance(item, str):
+                normalized.append(item)
+            elif isinstance(item, dict):
+                path = item.get("path") or item.get("canvas_path")
+                if not path:
+                    name = str(item.get("name") or "")
+                    path = f"/{name}" if name else "/"
+                normalized.append(str(path))
+        return {"canvases": normalized}
 
     # -----------------------------------------------------------------------
     # Declarative Scene Build & Inspection (Phase A1)
@@ -1097,6 +1107,17 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         """
         res = await backend.history_list(doc_id=doc_id)
         res_dict = dict(res)
+        # The bridge reports the stack contents, the headless engine the counts;
+        # the tool always answers with both so the contract does not depend on
+        # the active backend.
+        undo_count = res_dict.get("undo_count")
+        if undo_count is None:
+            undo_count = len(res_dict.get("undo_stack") or [])
+        redo_count = res_dict.get("redo_count")
+        if redo_count is None:
+            redo_count = len(res_dict.get("redo_stack") or [])
+        res_dict["undo_count"] = undo_count
+        res_dict["redo_count"] = redo_count
         res_dict["_security_notice"] = SECURITY_NOTICE
         return res_dict
 

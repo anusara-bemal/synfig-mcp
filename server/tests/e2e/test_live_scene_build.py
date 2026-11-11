@@ -131,6 +131,22 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_history_and_canvas_lists_keep_their_contract(
+    live_studio: BridgeClient,
+) -> None:
+    """The live bridge must report the same keys as the headless engine."""
+    history = await live_studio.call("history.list", {"doc_id": "doc_0"})
+    assert "undo_count" in history or "undo_stack" in history
+
+    canvases = await live_studio.call("canvas.list", {"doc_id": "doc_0"})
+    entries = canvases if isinstance(canvases, list) else canvases.get("canvases", [])
+    assert entries, "the bridge reported no canvas"
+    for entry in entries:
+        assert "path" in entry, f"a canvas entry has no path: {entry}"
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_scene_tree_has_the_documented_shape(live_studio: BridgeClient) -> None:
     """The live scene tree must expose the same keys as the headless engine."""
     await live_studio.call(

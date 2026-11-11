@@ -878,14 +878,16 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             nlohmann::json canvases = nlohmann::json::array();
             canvases.push_back({
                 {"canvas_id", inst->get_canvas()->get_id()},
-                {"name", inst->get_canvas()->get_name()}
+                {"name", inst->get_canvas()->get_name()},
+                {"path", "/"}
             });
 
             for (auto it = inst->get_canvas()->children().begin(); it != inst->get_canvas()->children().end(); ++it) {
                 if (*it) {
                     canvases.push_back({
                         {"canvas_id", (*it)->get_id()},
-                        {"name", (*it)->get_name()}
+                        {"name", (*it)->get_name()},
+                        {"path", "/" + (*it)->get_name()}
                     });
                 }
             }
