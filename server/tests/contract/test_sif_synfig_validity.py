@@ -8,6 +8,10 @@ the actual ``synfig`` binary to load and render it.  A Synfig error (for
 example ``Unexpected element <valuenode>``) fails the test, which is exactly
 the class of defect that silently corrupted documents before.
 
+The cases are grouped into as few documents as possible: every document is
+validated with one Synfig invocation, which keeps the gate fast enough for
+CI while covering the same ground.
+
 The whole module is skipped when no Synfig binary is available.
 """
 
@@ -52,8 +56,6 @@ def _numeric(value: Any) -> float:
     assert hasattr(value, "value"), f"not a numeric value: {value}"
     return float(value.value)
 
-
-BINARY = _binary()
 
 pytestmark = pytest.mark.skipif(
     BINARY is None, reason="Synfig CLI binary not available for document validation"
@@ -140,26 +142,29 @@ async def test_created_layers_use_the_introspected_layer_version(tmp_path: Path)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("param_name", "value"),
-    [
-        ("radius", {"type": "real", "value": 3.5}),
-        ("color", {"type": "color", "r": 0.1, "g": 0.2, "b": 0.3, "a": 1.0}),
-        ("origin", {"type": "vector", "x": 1.0, "y": 2.0}),
-        ("feather", {"type": "real", "value": 0.5}),
-        ("invert", {"type": "bool", "value": True}),
-    ],
-)
-async def test_parameter_values_produce_loadable_documents(
-    tmp_path: Path, param_name: str, value: dict[str, Any]
-) -> None:
+async def test_parameter_values_produce_loadable_documents(tmp_path: Path) -> None:
+    """Every writable value type must reach the engine unchanged."""
     backend = HeadlessBackend(runner=CliRunner(BINARY))
     doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
 
-    await backend.param_set(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, value=value
-    )
+    cases: list[tuple[str, str, dict[str, Any]]] = [
+        ("circle", "radius", {"type": "real", "value": 3.5}),
+        ("circle", "color", {"type": "color", "r": 0.1, "g": 0.2, "b": 0.3, "a": 1.0}),
+        ("circle", "origin", {"type": "vector", "x": 0.0, "y": 0.0}),
+        ("circle", "feather", {"type": "real", "value": 0.5}),
+        ("circle", "invert", {"type": "bool", "value": True}),
+        ("star", "points", {"type": "integer", "value": 6}),
+        ("text", "text", {"type": "string", "value": "Synfig"}),
+        ("star", "angle", {"type": "angle", "degrees": 45.0}),
+        ("group", "time_offset", {"type": "time", "seconds": 0.5}),
+    ]
+
+    for layer_type, param_name, value in cases:
+        layer = await backend.layer_add(doc_id=doc_id, layer_type=layer_type, params={})
+        result = await backend.param_set(
+            doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, value=value
+        )
+        assert result["after"] is not None, f"{layer_type}.{param_name} was not written"
 
     await assert_loadable(backend, doc_id, tmp_path)
 
@@ -179,33 +184,29 @@ async def test_param_set_rejects_unsupported_value_types() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    ("value", "expected_x", "expected_y"),
-    [
-        ({"type": "vector", "x": 1.5, "y": -2.5}, 1.5, -2.5),
-        ({"type": "vector", "value": {"x": 1.5, "y": -2.5}}, 1.5, -2.5),
-        ([1.5, -2.5], 1.5, -2.5),
-    ],
-)
-async def test_param_set_accepts_every_documented_vector_spelling(
-    tmp_path: Path, value: Any, expected_x: float, expected_y: float
-) -> None:
+async def test_param_set_accepts_every_documented_vector_spelling(tmp_path: Path) -> None:
     """The vector spellings used in the guides must all reach the document."""
     backend = HeadlessBackend(runner=CliRunner(BINARY))
     doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
 
-    await backend.param_set(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name="origin", value=value
-    )
+    spellings: list[Any] = [
+        {"type": "vector", "x": 1.5, "y": -2.5},
+        {"type": "vector", "value": {"x": 1.5, "y": -2.5}},
+        [1.5, -2.5],
+    ]
 
-    read_back = await backend.param_get(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name="origin"
-    )
-    assert read_back is not None
-    assert read_back.type == "vector"
-    assert abs(read_back.x - expected_x) < 1e-6
-    assert abs(read_back.y - expected_y) < 1e-6
+    for spelling in spellings:
+        layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+        await backend.param_set(
+            doc_id=doc_id, layer_id=layer["layer_id"], param_name="origin", value=spelling
+        )
+        read_back = await backend.param_get(
+            doc_id=doc_id, layer_id=layer["layer_id"], param_name="origin"
+        )
+        assert read_back is not None
+        assert read_back.type == "vector"
+        assert abs(read_back.x - 1.5) < 1e-6, f"the spelling {spelling!r} was not applied"
+        assert abs(read_back.y - -2.5) < 1e-6, f"the spelling {spelling!r} was not applied"
 
     await assert_loadable(backend, doc_id, tmp_path)
 
@@ -237,6 +238,75 @@ async def test_layers_of_the_same_type_get_unique_ids(tmp_path: Path) -> None:
     assert first_value is not None and second_value is not None
     assert abs(_numeric(first_value) - 4.0) < 1e-6
     assert abs(_numeric(second_value) - 1.0) < 1e-6, "the change leaked into the second layer"
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_param_set_writes_a_valid_spline(tmp_path: Path) -> None:
+    """Writing spline points must produce a document the engine accepts."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(doc_id=doc_id, layer_type="outline", params={})
+
+    await backend.param_set(
+        doc_id=doc_id,
+        layer_id=layer["layer_id"],
+        param_name="bline",
+        value={
+            "type": "bline_point_list",
+            "points": [
+                {
+                    "vertex": (-1.0, 0.0),
+                    "t1": (0.0, 0.0),
+                    "t2": (0.0, 0.0),
+                    "width": 1.0,
+                    "origin": 0.5,
+                },
+                {
+                    "vertex": (1.0, 0.0),
+                    "t1": (0.0, 0.0),
+                    "t2": (0.0, 0.0),
+                    "width": 1.0,
+                    "origin": 0.5,
+                },
+            ],
+        },
+    )
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Value nodes
+# ---------------------------------------------------------------------------
+
+
+async def test_param_export_produces_loadable_document(tmp_path: Path) -> None:
+    """Exporting a parameter must yield a document Synfig can load and resolve."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(
+        doc_id=doc_id, layer_type="circle", params={"radius": {"type": "real", "value": 2.0}}
+    )
+
+    await backend.param_export(
+        doc_id=doc_id, layer_id=layer["layer_id"], param_name="radius", name="myRadius"
+    )
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_param_unexport_produces_loadable_document(tmp_path: Path) -> None:
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(
+        doc_id=doc_id, layer_type="circle", params={"radius": {"type": "real", "value": 2.0}}
+    )
+
+    await backend.param_export(
+        doc_id=doc_id, layer_id=layer["layer_id"], param_name="radius", name="myRadius"
+    )
+    await backend.param_unexport(doc_id=doc_id, name="myRadius")
 
     await assert_loadable(backend, doc_id, tmp_path)
 
@@ -288,197 +358,8 @@ async def test_param_link_rejects_an_unknown_value_node() -> None:
         )
 
 
-async def test_param_set_writes_a_valid_spline(tmp_path: Path) -> None:
-    """Writing spline points must produce a document the engine accepts."""
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type="outline", params={})
-
-    await backend.param_set(
-        doc_id=doc_id,
-        layer_id=layer["layer_id"],
-        param_name="bline",
-        value={
-            "type": "bline_point_list",
-            "points": [
-                {
-                    "vertex": (-1.0, 0.0),
-                    "t1": (0.0, 0.0),
-                    "t2": (0.0, 0.0),
-                    "width": 1.0,
-                    "origin": 0.5,
-                },
-                {
-                    "vertex": (1.0, 0.0),
-                    "t1": (0.0, 0.0),
-                    "t2": (0.0, 0.0),
-                    "width": 1.0,
-                    "origin": 0.5,
-                },
-            ],
-        },
-    )
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-async def test_param_export_produces_loadable_document(tmp_path: Path) -> None:
-    """Exporting a parameter must yield a document Synfig can load and resolve."""
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(
-        doc_id=doc_id, layer_type="circle", params={"radius": {"type": "real", "value": 2.0}}
-    )
-
-    await backend.param_export(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name="radius", name="myRadius"
-    )
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-async def test_param_unexport_produces_loadable_document(tmp_path: Path) -> None:
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(
-        doc_id=doc_id, layer_type="circle", params={"radius": {"type": "real", "value": 2.0}}
-    )
-
-    await backend.param_export(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name="radius", name="myRadius"
-    )
-    await backend.param_unexport(doc_id=doc_id, name="myRadius")
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-@pytest.mark.parametrize(
-    ("param_name", "value", "valuenode_type"),
-    [
-        ("radius", {"type": "real", "value": 2.0}, "linear"),
-        ("radius", {"type": "real", "value": 2.0}, "add"),
-        ("radius", {"type": "real", "value": 2.0}, "subtract"),
-        ("radius", {"type": "real", "value": 2.0}, "scale"),
-        ("radius", {"type": "real", "value": 2.0}, "absolute"),
-        ("radius", {"type": "real", "value": 2.0}, "duplicate"),
-        ("radius", {"type": "real", "value": 2.0}, "range"),
-        ("radius", {"type": "real", "value": 2.0}, "step"),
-        ("radius", {"type": "real", "value": 2.0}, "sine"),
-        ("radius", {"type": "real", "value": 2.0}, "cos"),
-        ("radius", {"type": "real", "value": 2.0}, "timeloop"),
-        ("radius", {"type": "real", "value": 2.0}, "timed_swap"),
-        ("origin", {"type": "vector", "x": 1.0, "y": 2.0}, "composite"),
-    ],
-)
-async def test_param_convert_produces_loadable_document(
-    tmp_path: Path, param_name: str, value: dict[str, Any], valuenode_type: str
-) -> None:
-    """Converting a parameter to a ValueNode must produce Synfig-valid XML."""
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={"radius": value})
-
-    await backend.param_convert(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, type=valuenode_type
-    )
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-@pytest.mark.parametrize(
-    ("layer_type", "param_name", "value"),
-    [
-        ("circle", "radius", {"type": "real", "value": 2.5}),
-        ("star", "points", {"type": "integer", "value": 6}),
-        ("circle", "invert", {"type": "bool", "value": True}),
-        ("text", "text", {"type": "string", "value": "Synfig"}),
-        ("star", "angle", {"type": "angle", "degrees": 45.0}),
-        ("circle", "color", {"type": "color", "r": 0.2, "g": 0.4, "b": 0.6, "a": 1.0}),
-        ("circle", "origin", {"type": "vector", "x": 1.0, "y": -1.0}),
-    ],
-)
-async def test_every_writable_value_type_round_trips(
-    tmp_path: Path, layer_type: str, param_name: str, value: dict[str, Any]
-) -> None:
-    """Every value type the server advertises as writable must reach the engine."""
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type=layer_type, params={})
-
-    result = await backend.param_set(
-        doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, value=value
-    )
-    assert result["after"] is not None
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-async def test_time_valued_parameters_round_trip(tmp_path: Path) -> None:
-    """Time valued parameters (for example a group time offset) must round-trip."""
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type="group", params={})
-
-    await backend.param_set(
-        doc_id=doc_id,
-        layer_id=layer["layer_id"],
-        param_name="time_offset",
-        value={"type": "time", "seconds": 0.5},
-    )
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-async def test_every_mutating_operation_produces_a_loadable_document(
-    tmp_path: Path,
-) -> None:
-    """Exercise the remaining mutating operations in one document.
-
-    Layer duplication, reordering, raising, lowering, removal, the timeline
-    cursor, waypoint removal, bulk animation, interpolation defaults and asset
-    import all have to leave a document the engine can still load.
-    """
-    backend = HeadlessBackend(runner=CliRunner(BINARY))
-    doc_id = await _new_doc(backend)
-
-    first = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
-    second = await backend.layer_add(doc_id=doc_id, layer_type="rectangle", params={})
-
-    await backend.layer_duplicate(doc_id=doc_id, layer_id=first["layer_id"])
-    await backend.layer_reorder(doc_id=doc_id, layer_id=second["layer_id"], new_depth=3)
-    await backend.layer_raise(doc_id=doc_id, layer_id=second["layer_id"])
-    await backend.layer_lower(doc_id=doc_id, layer_id=second["layer_id"])
-
-    await backend.anim_time_set(doc_id=doc_id, time=0.75)
-    await backend.anim_waypoint_set(
-        doc_id=doc_id,
-        layer_id=first["layer_id"],
-        param_name="radius",
-        time=0.5,
-        value={"type": "real", "value": 2.0},
-    )
-    await backend.anim_waypoint_remove(
-        doc_id=doc_id, layer_id=first["layer_id"], param_name="radius", time=0.5
-    )
-    await backend.anim_animate_param(
-        doc_id=doc_id,
-        layer_id=first["layer_id"],
-        param_name="radius",
-        waypoints=[
-            {"time": 0.0, "value": {"type": "real", "value": 1.0}},
-            {"time": 1.0, "value": {"type": "real", "value": 3.0}},
-        ],
-    )
-    await backend.anim_interpolation_set(doc_id=doc_id, interpolation="linear")
-
-    await backend.layer_remove(doc_id=doc_id, layer_id=second["layer_id"])
-
-    await assert_loadable(backend, doc_id, tmp_path)
-
-
-@pytest.mark.parametrize("valuenode_type", sorted(VALUENODE_SPECS))
 async def test_every_supported_conversion_is_accepted_by_synfig(
-    tmp_path: Path, valuenode_type: str, real_valuenodes: set[str]
+    tmp_path: Path, real_valuenodes: set[str]
 ) -> None:
     """Every conversion the server advertises must survive a real engine round-trip.
 
@@ -486,23 +367,36 @@ async def test_every_supported_conversion_is_accepted_by_synfig(
     or does not accept for the parameter type - such a conversion produced a
     document the engine refused to load.
     """
-    assert valuenode_type in real_valuenodes, (
-        f"'{valuenode_type}' is advertised as a conversion but Synfig has no such ValueNode"
-    )
-
     backend = HeadlessBackend(runner=CliRunner(BINARY))
     doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(
+
+    for valuenode_type in sorted(VALUENODE_SPECS):
+        assert valuenode_type in real_valuenodes, (
+            f"'{valuenode_type}' is advertised as a conversion but Synfig has no such ValueNode"
+        )
+        layer = await backend.layer_add(
+            doc_id=doc_id,
+            layer_type="circle",
+            params={"radius": {"type": "real", "value": 2.0}},
+        )
+        await backend.param_convert(
+            doc_id=doc_id,
+            layer_id=layer["layer_id"],
+            param_name="radius",
+            type=valuenode_type,
+        )
+
+    # The composite node works on vector and color parameters.
+    composite = await backend.layer_add(
         doc_id=doc_id,
         layer_type="circle",
-        params={"radius": {"type": "real", "value": 2.0}},
+        params={"origin": {"type": "vector", "x": 1.0, "y": 2.0}},
     )
-
     await backend.param_convert(
         doc_id=doc_id,
-        layer_id=layer["layer_id"],
-        param_name="radius",
-        type=valuenode_type,
+        layer_id=composite["layer_id"],
+        param_name="origin",
+        type="composite",
     )
 
     await assert_loadable(backend, doc_id, tmp_path)
@@ -528,25 +422,22 @@ async def test_param_convert_rejects_unsupported_valuenode() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "interpolation", ["linear", "constant", "halt", "clamped", "auto", "manual"]
-)
-async def test_waypoint_interpolations_produce_loadable_documents(
-    tmp_path: Path, interpolation: str
-) -> None:
+async def test_waypoint_interpolations_produce_loadable_documents(tmp_path: Path) -> None:
+    """Every interpolation mode the engine knows must produce a loadable document."""
     backend = HeadlessBackend(runner=CliRunner(BINARY))
     doc_id = await _new_doc(backend)
-    layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
 
-    await backend.anim_waypoint_set(
-        doc_id=doc_id,
-        layer_id=layer["layer_id"],
-        param_name="radius",
-        time=0.0,
-        value={"type": "real", "value": 1.0},
-        interpolation_in=interpolation,
-        interpolation_out=interpolation,
-    )
+    for interpolation in ("linear", "constant", "halt", "clamped", "auto", "manual"):
+        layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+        await backend.anim_waypoint_set(
+            doc_id=doc_id,
+            layer_id=layer["layer_id"],
+            param_name="radius",
+            time=0.0,
+            value={"type": "real", "value": 1.0},
+            interpolation_in=interpolation,
+            interpolation_out=interpolation,
+        )
 
     await assert_loadable(backend, doc_id, tmp_path)
 
@@ -593,6 +484,53 @@ async def test_group_and_ungroup_produce_loadable_documents(tmp_path: Path) -> N
     await assert_loadable(backend, doc_id, tmp_path)
 
     await backend.layer_ungroup(doc_id=doc_id, layer_id=group["group_id"])
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_every_mutating_operation_produces_a_loadable_document(
+    tmp_path: Path,
+) -> None:
+    """Exercise the remaining mutating operations in one document.
+
+    Layer duplication, reordering, raising, lowering, removal, the timeline
+    cursor, waypoint removal, bulk animation and interpolation defaults all have
+    to leave a document the engine can still load.
+    """
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+
+    first = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+    second = await backend.layer_add(doc_id=doc_id, layer_type="rectangle", params={})
+
+    await backend.layer_duplicate(doc_id=doc_id, layer_id=first["layer_id"])
+    await backend.layer_reorder(doc_id=doc_id, layer_id=second["layer_id"], new_depth=3)
+    await backend.layer_raise(doc_id=doc_id, layer_id=second["layer_id"])
+    await backend.layer_lower(doc_id=doc_id, layer_id=second["layer_id"])
+
+    await backend.anim_time_set(doc_id=doc_id, time=0.75)
+    await backend.anim_waypoint_set(
+        doc_id=doc_id,
+        layer_id=first["layer_id"],
+        param_name="radius",
+        time=0.5,
+        value={"type": "real", "value": 2.0},
+    )
+    await backend.anim_waypoint_remove(
+        doc_id=doc_id, layer_id=first["layer_id"], param_name="radius", time=0.5
+    )
+    await backend.anim_animate_param(
+        doc_id=doc_id,
+        layer_id=first["layer_id"],
+        param_name="radius",
+        waypoints=[
+            {"time": 0.0, "value": {"type": "real", "value": 1.0}},
+            {"time": 1.0, "value": {"type": "real", "value": 3.0}},
+        ],
+    )
+    await backend.anim_interpolation_set(doc_id=doc_id, interpolation="linear")
+
+    await backend.layer_remove(doc_id=doc_id, layer_id=second["layer_id"])
+
     await assert_loadable(backend, doc_id, tmp_path)
 
 

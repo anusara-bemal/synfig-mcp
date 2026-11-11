@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool surface report**: `synfig-mcp doctor` reports how many MCP tools the active profile exposes.
 - **Protocol documentation gate**: `server/tests/unit/test_protocol_docs.py` checks `docs/protocol.md` against the C++ dispatcher, so a method that is documented but not implemented (or the other way round) fails the build. `param.link`, `rig.skeleton_create`, `rig.bone_add` and `rig.bone_bind` are now correctly marked as not implemented instead of "Verified".
 
+### Performance
+- **First layer took 18 seconds**: every `layer_add` re-introspected the layer catalogue, which spawns one `synfig --layer-info` process per layer type (55 processes). The catalogue is now cached in memory and on disk, so the first layer of a session is instant after the first introspection.
+
 ### Changed
 - **All tools enabled by default**: the default profile is now `all` (73 tools) so a freshly installed server exposes the complete Synfig feature set. `SYNFIG_MCP_PROFILE=core|anim|fx|rig|assets|review` remains available for token-constrained clients.
 - **Truthful coverage matrix**: `docs/COVERAGE.md` is generated from measured capability instead of hardcoded claims. It now reports 55/55 layer types, 440/455 writable parameters, 13/13 render targets and - instead of the previously claimed 100% - the 11 value nodes the MCP can actually create.
@@ -58,6 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Repository hygiene**: Dependabot updates, issue forms, pull request template, code of conduct, editor config, and corrected MCP registry metadata.
 - **User-facing README**: badges, platform requirements, quick start, client configuration for Claude Desktop/Claude Code/Cursor/VS Code, Docker usage, configuration reference, security model, and troubleshooting.
 
+### Performance
+- **First layer took 18 seconds**: every `layer_add` re-introspected the layer catalogue, which spawns one `synfig --layer-info` process per layer type (55 processes). The catalogue is now cached in memory and on disk, so the first layer of a session is instant after the first introspection.
+
 ### Changed
 - **Version**: bumped to `0.8.0-rc2` across the Python package, bridge build stamp, release tooling, and registry manifest.
 - **CI hardening**: locked dependency syncs, explicit workflow permissions, concurrency groups, and job timeouts.
@@ -77,6 +83,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Comprehensive Documentation**: Complete guides for project scope & IP policy (`docs/scope.md`), system architecture (`docs/architecture.md`), MCP tools API reference (`docs/api.md`), effects recipes & styles (`docs/recipes.md`), and licensed asset pipeline (`docs/assets.md`).
 - **Performance Benchmarks**: Sub-6ms latency benchmarks across all 10 core mutating and inspection operations (`scripts/benchmark_latency.py`).
 
+### Performance
+- **First layer took 18 seconds**: every `layer_add` re-introspected the layer catalogue, which spawns one `synfig --layer-info` process per layer type (55 processes). The catalogue is now cached in memory and on disk, so the first layer of a session is instant after the first introspection.
+
 ### Changed
 - **Server Version**: Bumped to `0.8.0rc1` (`v0.8.0-rc1`).
 - **Doctor Command**: Added checks for asset pipeline directory and tool profile token budget compliance.
@@ -92,6 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Clean Runner Smoke Test**: Standalone automated smoke test (`bridge/scripts/clean_runner_smoke.py`) verifying app launch, DLL resolution, bridge auth, `doc.new`, `layer.add`, and `render.frame` without MSYS2/build dependencies on Windows and Linux runners.
 - **MSYS2 Source Manifest**: Complete manifest (`bridge/MSYS2_SOURCE_MANIFEST.md`) detailing pinned versions, upstream source URLs, and MSYS2 PKGBUILD build recipes for all 49 bundled packages.
 - **Shipped Release Verification Test**: Added `server/tests/e2e/test_shipped_release.py` to verify shipped binary releases against GitHub release assets.
+
+### Performance
+- **First layer took 18 seconds**: every `layer_add` re-introspected the layer catalogue, which spawns one `synfig --layer-info` process per layer type (55 processes). The catalogue is now cached in memory and on disk, so the first layer of a session is instant after the first introspection.
 
 ### Changed
 - **Default Workspace Root**: Scoped exclusively to `~/Documents/SynfigMCP`. Working directory (`cwd`) completely removed from default allowed roots to prevent leaking arbitrary directories.

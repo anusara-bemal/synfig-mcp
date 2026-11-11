@@ -3,6 +3,7 @@ Subprocess runner for synfig CLI introspection and rendering.
 """
 
 import asyncio
+import json
 import shutil
 from pathlib import Path
 
@@ -13,26 +14,77 @@ from synfig_mcp.schema.registry import LayerParamInfo, LayerTypeInfo
 class CliRunner:
     """Invokes synfig CLI for introspection and rendering."""
 
+    #: Layer catalogues are shared between runner instances (and cached on
+    #: disk), because introspecting them spawns one subprocess per layer type.
+    _catalog_cache: dict[str, dict[str, LayerTypeInfo]] = {}
+
     def __init__(self, binary_path: Path | None = None) -> None:
         self.binary_path = binary_path or self._discover_binary()
         self._layer_catalog: dict[str, LayerTypeInfo] | None = None
         self._layer_names: list[str] | None = None
+
+    def _catalog_cache_key(self) -> str:
+        """Cache key of the layer catalogue for the current binary."""
+        path = self.binary_path
+        if path is None:
+            return "none"
+        try:
+            stat = path.stat()
+            return f"{path.resolve()}:{stat.st_mtime_ns}:{stat.st_size}"
+        except OSError:
+            return str(path)
+
+    def _catalog_disk_path(self) -> Path:
+        import hashlib
+
+        digest = hashlib.sha256(self._catalog_cache_key().encode("utf-8")).hexdigest()[:16]
+        return Path.home() / ".synfig" / "mcp_cache" / f"layer_catalog_{digest}.json"
 
     async def get_layer_catalog(self) -> dict[str, LayerTypeInfo]:
         """Return (and cache) the full layer catalog of the Synfig binary.
 
         Each entry carries the layer version and the list of parameters the
         engine knows about, which the writer needs to emit valid documents.
+        The catalogue is cached in memory and on disk, because introspecting it
+        spawns one subprocess per layer type.
         """
         if self._layer_catalog is not None:
             return self._layer_catalog
 
-        catalog: dict[str, LayerTypeInfo] = {}
-        for name in await self.get_layers():
-            info = await self.get_layer_info(name)
-            catalog[name] = info or LayerTypeInfo(name=name)
+        key = self._catalog_cache_key()
+        catalog = CliRunner._catalog_cache.get(key)
+        if catalog is None:
+            catalog = self._load_catalog_from_disk()
+        if catalog is None:
+            catalog = {}
+            for name in await self.get_layers():
+                info = await self.get_layer_info(name)
+                catalog[name] = info or LayerTypeInfo(name=name)
+            self._save_catalog_to_disk(catalog)
+        CliRunner._catalog_cache[key] = catalog
         self._layer_catalog = catalog
         return catalog
+
+    def _load_catalog_from_disk(self) -> dict[str, LayerTypeInfo] | None:
+        """Load a previously introspected catalogue from the disk cache."""
+        path = self._catalog_disk_path()
+        if not path.is_file():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return {name: LayerTypeInfo.model_validate(info) for name, info in data.items()}
+        except Exception:
+            return None
+
+    def _save_catalog_to_disk(self, catalog: dict[str, LayerTypeInfo]) -> None:
+        """Store the introspected catalogue for the next process."""
+        path = self._catalog_disk_path()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {name: info.model_dump() for name, info in catalog.items()}
+            path.write_text(json.dumps(payload), encoding="utf-8")
+        except Exception:
+            pass
 
     async def get_layer_version(self, layer_name: str) -> str | None:
         """Return the version string of a layer type (e.g. ``0.2``)."""

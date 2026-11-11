@@ -2000,9 +2000,12 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             }
 
             nlohmann::json kfs = nlohmann::json::array();
+            const double fps = static_cast<double>(inst->get_canvas()->rend_desc().get_frame_rate());
             for (const auto& kf : inst->get_canvas()->keyframe_list()) {
                 nlohmann::json kf_obj;
                 kf_obj["time"] = static_cast<double>(kf.get_time());
+                // The same time spelling the headless engine reports.
+                kf_obj["time_string"] = kf.get_time().get_string(fps);
                 kf_obj["description"] = kf.get_description();
                 kf_obj["active"] = kf.active();
                 kfs.push_back(kf_obj);
