@@ -527,10 +527,24 @@ class SifLayer:
         """Get typed value for a parameter."""
         for param in self.element.findall("param"):
             if param.get("name") == name:
+                link_id = param.get("use")
+                if link_id:
+                    return self._resolve_exported_value(link_id)
                 for child in param:
                     val = xml_to_synfig_value(child)
                     if val is not None:
                         return val
+        return None
+
+    def _resolve_exported_value(self, link_id: str) -> SynfigValue | None:
+        """Resolve a ``<param use="id"/>`` reference to the exported value."""
+        root = self.element.getroottree().getroot()
+        defs = root.find("defs")
+        if defs is None:
+            return None
+        for child in defs:
+            if child.get("id") == link_id:
+                return xml_to_synfig_value(child)
         return None
 
     def set_param(self, name: str, value: SynfigValue | dict[str, Any] | Any) -> None:
@@ -632,6 +646,9 @@ class SifLayer:
         """Get parameter value evaluated at timeline position."""
         for param in self.element.findall("param"):
             if param.get("name") == name:
+                link_id = param.get("use")
+                if link_id:
+                    return self._resolve_exported_value(link_id)
                 animated_el = param.find("animated")
                 if animated_el is not None:
                     wps: list[tuple[float, etree._Element]] = []
@@ -753,6 +770,38 @@ class SifLayer:
         else:
             canvas_root.append(defs)
         return defs
+
+    def link_param(self, name: str, link_id: str) -> None:
+        """Link a parameter to an exported value node.
+
+        Synfig references an exported value node with ``<param use="id"/>``,
+        which makes the parameter follow the exported value (or animation).
+
+        Raises:
+            SynfigError: when the parameter does not exist or the value node
+                has not been exported.
+        """
+        defs = self.element.getroottree().getroot().find("defs")
+        exported = None
+        if defs is not None:
+            for child in defs:
+                if child.get("id") == link_id:
+                    exported = child
+                    break
+        if exported is None:
+            raise SynfigError(
+                f"Value node '{link_id}' has not been exported. "
+                "Use param_export to export it first."
+            )
+
+        for param in self.element.findall("param"):
+            if param.get("name") != name:
+                continue
+            for child in list(param):
+                param.remove(child)
+            param.set("use", link_id)
+            return
+        raise SynfigError(f"Parameter '{name}' not found on layer.")
 
     def get_params(self) -> dict[str, Any]:
         """Return dictionary of all defined parameters on this layer."""
@@ -1098,6 +1147,22 @@ class SifDocument:
                 return layer
         return None
 
+    @staticmethod
+    def _unique_layer_desc(canvas: etree._Element, layer_type: str) -> str:
+        """Generate a unique description for a new layer.
+
+        Layers are addressed by their description, so two layers of the same
+        type must not share one - otherwise the first one becomes unreachable.
+        """
+        existing = {
+            elem.get("desc", "") for elem in canvas.iter("layer") if isinstance(elem.tag, str)
+        }
+        base = layer_type.capitalize()
+        index = 1
+        while f"{base}{index:03d}" in existing:
+            index += 1
+        return f"{base}{index:03d}"
+
     def add_layer(
         self,
         layer_type: str,
@@ -1113,7 +1178,7 @@ class SifDocument:
         elem.set("type", layer_type)
         elem.set("active", "true")
         elem.set("version", version or "0.1")
-        elem.set("desc", desc or f"{layer_type.capitalize()}001")
+        elem.set("desc", desc or self._unique_layer_desc(canvas, layer_type))
 
         # Set default parameters according to layer type
         layer = SifLayer(elem, canvas)

@@ -214,6 +214,41 @@ async def test_selection_round_trips_in_both_backends(mcp_app: Any) -> None:
 
 
 @pytest.mark.asyncio
+async def test_param_export_and_link_round_trip_in_both_backends(mcp_app: Any) -> None:
+    """Exporting a value node and linking a parameter to it must work everywhere."""
+    async with Client(mcp_app) as mcp:
+        doc_id = await _new_document(mcp)
+        await mcp.call_tool(
+            "layer_add",
+            {"doc_id": doc_id, "layer_type": "circle", "params": {}},
+        )
+        layer_id = "Circle001"
+
+        exported = await mcp.call_tool(
+            "param_export",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": "radius",
+                "name": "sharedRadius",
+            },
+        )
+        assert "sharedRadius" in _text(exported)
+
+        linked = await mcp.call_tool(
+            "param_link",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": "radius",
+                "link_id": "sharedRadius",
+            },
+        )
+        assert "sharedRadius" in _text(linked)
+        assert "param.link" in _text(linked)
+
+
+@pytest.mark.asyncio
 async def test_schema_tools_report_the_installed_synfig(mcp_app: Any) -> None:
     async with Client(mcp_app) as mcp:
         layers = await mcp.call_tool("schema_list_layers", {})

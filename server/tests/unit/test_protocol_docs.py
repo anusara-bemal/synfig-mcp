@@ -92,7 +92,7 @@ def test_bridge_methods_are_documented() -> None:
     assert not undocumented, f"Implemented but not documented: {undocumented}"
 
 
-@pytest.mark.parametrize("method", ["param.link", "rig.skeleton_create", "rig.bone_add"])
+@pytest.mark.parametrize("method", ["rig.skeleton_create", "rig.bone_add", "rig.bone_bind"])
 def test_planned_methods_are_marked_as_not_implemented(method: str) -> None:
     """Methods that do not exist yet must not be advertised as verified."""
     documented = _documented_methods()

@@ -244,6 +244,13 @@ class BackendBase(ABC):
         """Unexport a previously exported ValueNode."""
         ...
 
+    @abstractmethod
+    async def param_link(
+        self, doc_id: str, layer_id: str, param_name: str, link_id: str
+    ) -> dict[str, Any]:
+        """Link a parameter to an exported ValueNode."""
+        ...
+
     # -----------------------------------------------------------------------
     # Animation & Keyframe Operations
     # -----------------------------------------------------------------------

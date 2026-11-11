@@ -415,6 +415,21 @@ class LiveBackend(BackendBase):
         )
         return dict(res)
 
+    async def param_link(
+        self, doc_id: str, layer_id: str, param_name: str, link_id: str
+    ) -> dict[str, Any]:
+        client = await self._ensure_client()
+        res = await client.call(
+            "param.link",
+            {
+                "doc_id": doc_id,
+                "layer_id": layer_id,
+                "param_name": param_name,
+                "link_id": link_id,
+            },
+        )
+        return dict(res)
+
     async def anim_time_get(self, doc_id: str) -> float:
         client = await self._ensure_client()
         res = await client.call("anim.time_get", {"doc_id": doc_id})

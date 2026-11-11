@@ -41,6 +41,8 @@ by a test that fails without the fix.
 | 11 | Introspection | Parameter types were guessed by a name heuristic | Types introspected from the patched Studio (454 params) | `scripts/introspect_param_types.py` |
 | 12 | Documentation | `docs/tools.md` documented 47 of 73 tools; coverage matrix claimed 100% value node support | Both generated from measured data | `test_tool_docs.py`, `test_coverage_matrix.py` |
 | 13 | Reach | Default profile hid ~60% of the tools | Default profile is now `all` (73 tools) | `test_every_registered_tool_has_a_profile` |
+| 14 | Layer identity | Every layer of a type got the same id (`Circle001`), making the first one unreachable | Unique descriptions per canvas | `test_layers_of_the_same_type_get_unique_ids` |
+| 15 | Value node linking | A parameter could not follow an exported value node | `param_link` implemented with the native `LayerParamConnect` action | `test_live_param_link_connects_a_parameter_to_an_exported_value_node` |
 
 ### Remaining gaps (documented, not implemented in this pass)
 
@@ -48,9 +50,9 @@ by a test that fails without the fix.
 |---|---|---|
 | Complex parameters `wplist`, `dilist`, `bones`, `transformation`, `canvas` cannot be written | No weight-paint, bone rigging or transformation authoring through the MCP | Dedicated serialisers, verified by the validity gate |
 | 58 of 69 value nodes cannot be *created* (only read) | Limited procedural expression vocabulary | Extend `VALUENODE_LINK_SPECS` with the upstream link layouts |
-| No `param_link` tool | A parameter cannot be linked to an exported value node (wheel rotation = car translation) | Implement the `ValueDescConnect` action in the bridge |
 | Canvas create/rename/delete and per-canvas properties | `canvas.create` exists in the bridge but has no MCP tool | Expose the existing bridge method |
 | No `param_list` / `anim_waypoint_list` | Instance parameters and waypoints cannot be read back | Add read-only bridge methods |
+| Bone rigging (`rig.skeleton_create`, `rig.bone_add`) | Skeletons can be created as layers but bones cannot be authored | Probe `ValueDescCreateChildBone` with golden project files |
 
 ---
 

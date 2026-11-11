@@ -28,6 +28,12 @@ def _binary() -> Path | None:
     return find_synfig_binary()
 
 
+def _numeric(value: Any) -> float:
+    """Return the numeric payload of a typed Synfig value."""
+    assert hasattr(value, "value"), f"not a numeric value: {value}"
+    return float(value.value)
+
+
 BINARY = _binary()
 
 pytestmark = pytest.mark.skipif(
@@ -183,6 +189,84 @@ async def test_param_set_accepts_every_documented_vector_spelling(
     assert abs(read_back.y - expected_y) < 1e-6
 
     await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_layers_of_the_same_type_get_unique_ids(tmp_path: Path) -> None:
+    """Two layers of the same type must be addressable independently."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+
+    first = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+    second = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+    assert first["layer_id"] != second["layer_id"], (
+        f"layers of the same type share an id: {first['layer_id']}"
+    )
+
+    await backend.param_set(
+        doc_id=doc_id,
+        layer_id=first["layer_id"],
+        param_name="radius",
+        value={"type": "real", "value": 4.0},
+    )
+
+    first_value = await backend.param_get(
+        doc_id=doc_id, layer_id=first["layer_id"], param_name="radius"
+    )
+    second_value = await backend.param_get(
+        doc_id=doc_id, layer_id=second["layer_id"], param_name="radius"
+    )
+    assert first_value is not None and second_value is not None
+    assert abs(_numeric(first_value) - 4.0) < 1e-6
+    assert abs(_numeric(second_value) - 1.0) < 1e-6, "the change leaked into the second layer"
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_param_link_connects_a_parameter_to_an_exported_value_node(
+    tmp_path: Path,
+) -> None:
+    """A linked parameter must resolve to the exported value in the engine."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    source = await backend.layer_add(
+        doc_id=doc_id, layer_type="circle", params={"radius": {"type": "real", "value": 2.0}}
+    )
+    follower = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+
+    await backend.param_export(
+        doc_id=doc_id, layer_id=source["layer_id"], param_name="radius", name="sharedRadius"
+    )
+    await backend.param_link(
+        doc_id=doc_id,
+        layer_id=follower["layer_id"],
+        param_name="radius",
+        link_id="sharedRadius",
+    )
+
+    linked = await backend.param_get(
+        doc_id=doc_id, layer_id=follower["layer_id"], param_name="radius"
+    )
+    assert linked is not None
+    assert abs(_numeric(linked) - 2.0) < 1e-6, (
+        f"the linked parameter does not follow the exported value: {linked}"
+    )
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+
+async def test_param_link_rejects_an_unknown_value_node() -> None:
+    """Linking to a value node that was never exported must fail loudly."""
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    doc_id = await _new_doc(backend)
+    layer = await backend.layer_add(doc_id=doc_id, layer_type="circle", params={})
+
+    with pytest.raises(SynfigError):
+        await backend.param_link(
+            doc_id=doc_id,
+            layer_id=layer["layer_id"],
+            param_name="radius",
+            link_id="neverExported",
+        )
 
 
 async def test_param_set_writes_a_valid_spline(tmp_path: Path) -> None:

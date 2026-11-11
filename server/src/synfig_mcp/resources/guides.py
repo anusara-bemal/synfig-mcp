@@ -30,7 +30,7 @@ Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
   (< 3,000 tokens).
 - `anim`: Waypoint and keyframe animation tools, time controls, interpolation modes.
 - `fx`: Layer filters, composites, parameter conversions, and recipes.
-- `rig`: Cut-out character assembly, bone skeletons, valuenode exports.
+- `rig`: Cut-out character assembly, bone skeletons, valuenode exports and linking.
 - `assets`: Search and import openly licensed artwork (Openverse, Wikimedia).
 - `review`: Frame critiques, SSIM diff heatmaps, contact sheets, safety metrics.
 """,

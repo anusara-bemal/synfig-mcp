@@ -769,6 +769,65 @@ class FakeBridgeServer:
                 },
             }
 
+        if method == "param.link":
+            link_id = params.get("link_id", params.get("name", ""))
+            if not link_id:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32602, "message": "Missing value node id"},
+                }
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", ""),
+                    "param_name": params.get("param_name", ""),
+                    "link_id": link_id,
+                    "diff": {
+                        "action": "param.link",
+                        "created": [],
+                        "modified": [params.get("layer_id", "")],
+                        "deleted": [],
+                    },
+                },
+            }
+
+        if method == "param.export":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", ""),
+                    "param_name": params.get("param_name", ""),
+                    "name": params.get("name", ""),
+                    "diff": {
+                        "action": "param.export",
+                        "created": [params.get("name", "")],
+                        "modified": [params.get("layer_id", "")],
+                        "deleted": [],
+                    },
+                },
+            }
+
+        if method == "param.unexport":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "name": params.get("name", ""),
+                    "diff": {
+                        "action": "param.unexport",
+                        "created": [],
+                        "modified": [],
+                        "deleted": [params.get("name", "")],
+                    },
+                },
+            }
+
         # Default fallback
         return {
             "jsonrpc": "2.0",

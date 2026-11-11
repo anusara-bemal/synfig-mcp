@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 73 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 74 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Parameters & ValueNodes](#parameters-valuenodes) (5 tools)
+- [Parameters & ValueNodes](#parameters-valuenodes) (6 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
 - [Selection](#selection) (2 tools)
@@ -24,7 +24,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 73 tools.**
+**Total: 74 tools.**
 
 ## Animation & Keyframes
 
@@ -1034,6 +1034,27 @@ Gotcha: Exporting under a name that already exists in the document library.
 | `layer_id` | `string` | Yes | - |
 | `param_name` | `string` | Yes | - |
 | `name` | `string` | Yes | - |
+
+---
+
+### `param_link`
+
+*Profiles: all, anim, fx, rig*
+
+Link a parameter to an exported ValueNode so it follows the shared value.
+
+Returns: Object containing 'layer_id', 'param_name', 'link_id' and a diff summary.
+
+Gotcha: The value node must be exported first with param_export(); linking an unknown id fails.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | Yes | - |
+| `layer_id` | `string` | Yes | - |
+| `param_name` | `string` | Yes | - |
+| `link_id` | `string` | Yes | - |
 
 ---
 

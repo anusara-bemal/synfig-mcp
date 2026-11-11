@@ -1641,6 +1641,91 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    if (method == "param.link") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        std::string param_name = params.value("param_name", "");
+        std::string link_id = params.value("link_id", params.value("name", ""));
+
+        return run_on_main_thread([&, doc_id, layer_id, param_name, link_id]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+#ifndef MCP_BRIDGE_STANDALONE
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            if (link_id.empty()) {
+                r["error"] = {{"code", -32602}, {"message", "Missing value node id"}};
+                return r;
+            }
+
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+
+            if (!layer->get_param(param_name).is_valid()) {
+                r["error"] = {{"code", 2003}, {"message", "Parameter not found: " + param_name}};
+                return r;
+            }
+
+            synfig::ValueNode::Handle value_node = inst->get_canvas()->find_value_node(link_id, true);
+            if (!value_node) {
+                r["error"] = {{"code", 2004}, {"message", "Value node not found: " + link_id}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: param.link");
+
+            synfigapp::Action::Handle action = synfigapp::Action::create("LayerParamConnect");
+            if (!action) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "Failed to create LayerParamConnect action"}};
+                return r;
+            }
+
+            action->set_param("canvas", inst->get_canvas());
+            action->set_param("canvas_interface", ci);
+            action->set_param("layer", layer);
+            action->set_param("param", param_name);
+            action->set_param("value_node", value_node);
+
+            if (!inst->perform_action(action)) {
+                grouper.cancel();
+                r["error"] = {{"code", -32000}, {"message", "LayerParamConnect failed for parameter: " + param_name}};
+                return r;
+            }
+
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"link_id", link_id},
+                {"diff", make_diff("param.link", {}, {layer_id}, {})}
+            };
+            return r;
+#else
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"param_name", param_name},
+                {"link_id", link_id},
+                {"diff", make_diff("param.link", {}, {layer_id}, {})}
+            };
+            return r;
+#endif
+        });
+    }
+
     if (method == "param.unexport") {
         std::string doc_id = params.value("doc_id", "doc_0");
         std::string export_name = params.value("name", "");

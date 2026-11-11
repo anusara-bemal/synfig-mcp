@@ -99,6 +99,7 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "param_convert": {"fx", "all"},
     "param_export": {"rig", "all"},
     "param_unexport": {"rig", "all"},
+    "param_link": {"rig", "fx", "anim", "all"},
     # Animation & Keyframes
     "anim_time_get": {"anim", "all"},
     "anim_time_set": {"anim", "all"},
@@ -784,6 +785,24 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             layer_id=layer_id,
             param_name=param_name,
             name=name,
+        )
+
+    @tool_for("param_link", annotations=MUTATING)
+    async def param_link(
+        doc_id: str,
+        layer_id: str,
+        param_name: str,
+        link_id: str,
+    ) -> dict[str, Any]:
+        """Link a parameter to an exported ValueNode so it follows the shared value.
+        Returns: Object containing 'layer_id', 'param_name', 'link_id' and a diff summary.
+        Gotcha: The value node must be exported first with param_export(); linking an unknown id fails.
+        """
+        return await backend.param_link(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            param_name=param_name,
+            link_id=link_id,
         )
 
     @tool_for("param_unexport", annotations=MUTATING)

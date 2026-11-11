@@ -6,25 +6,25 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 73 tools, 67,501 bytes, **18,218 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 74 tools, 68,500 bytes, **18,486 tokens** (`cl100k_base`).
 - **Minimal Profile (`core`)**: 13 tools, 11,229 bytes, **2,974 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **18,218 tokens** to **2,974 tokens**.
+> from **18,486 tokens** to **2,974 tokens**.
 
 ### Profile Allocations & Measured Counts
 
 | Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
 |---|---|---|---|---|
 | `core` | 13 | **2,974** | 2,980 | ✅ Pass (< 3000) |
-| `anim` | 19 | **4,620** | 4,625 | ❌ Exceeds (4500) |
-| `fx` | 24 | **5,635** | 5,642 | ❌ Exceeds (4500) |
-| `rig` | 17 | **3,782** | 3,790 | ❌ Exceeds (3000) |
+| `anim` | 20 | **4,885** | 4,890 | ❌ Exceeds (4500) |
+| `fx` | 25 | **5,900** | 5,907 | ❌ Exceeds (4500) |
+| `rig` | 18 | **4,050** | 4,058 | ❌ Exceeds (3000) |
 | `assets` | 12 | **2,678** | 2,683 | ❌ Exceeds (2000) |
 | `review` | 18 | **4,894** | 4,904 | ❌ Exceeds (4000) |
-| `all` | 73 | **18,218** | 18,237 | ❌ Exceeds (16000) |
+| `all` | 74 | **18,486** | 18,505 | ❌ Exceeds (16000) |
 
 ---
 
@@ -34,7 +34,7 @@ Measured against real server output in headless mode:
 
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
-| `health_check()` | 298 | **96** | 97 | < 200 |
+| `health_check()` | 569 | **156** | 158 | < 312 |
 | `doc_new(160x120)` | 193 | **84** | 84 | < 200 |
 | `doc_list()` | 389 | **122** | 122 | < 244 |
 | `layer_add(circle)` | 251 | **85** | 85 | < 200 |
@@ -46,7 +46,7 @@ Measured against real server output in headless mode:
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 138 | **55** | 56 | < 200 |
+| `render_frame(160x120)` | 138 | **53** | 53 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
 | `schema_get_layer(circle)` | 1683 | **454** | 453 | < 908 |
 

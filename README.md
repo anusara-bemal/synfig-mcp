@@ -23,7 +23,7 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 |---|---|
 | **Live editing** | Drives a running, patched Synfig Studio through an authenticated local bridge. Every mutation is an undoable Studio action. |
 | **Headless fallback** | Works without a GUI through a lossless `.sif` / `.sifz` / `.sfg` engine and the `synfig` CLI. Ideal for CI, containers, and render farms. |
-| **Small context footprint** | Tool profiles keep definitions between ~3.0k and ~18.2k tokens; the complete 73-tool surface ships enabled by default and can be narrowed per client. |
+| **Small context footprint** | Tool profiles keep definitions between ~3.0k and ~18.5k tokens; the complete 73-tool surface ships enabled by default and can be narrowed per client. |
 | **Visual feedback loop** | Renders frames and returns base64 previews plus objective metrics: SSIM, palette, safe areas, clipping, strobe/photosensitivity, diff heatmaps. |
 | **Hardened by default** | Token-authenticated bridge, loopback-only binding, sandboxed file access, SSRF-resistant asset downloads, and SVG sanitization. |
 | **Reproducible releases** | Cross-platform Studio bundles, a GPL source bundle, Python wheel/sdist, SHA-256 checksums, and a signed-in-CI GHCR container. |
@@ -228,11 +228,11 @@ Headless mode never needs a GUI. It is fully lossless for SIF documents and dele
 
 ## Tool profiles
 
-All 73 tools are exposed by default. Set `SYNFIG_MCP_PROFILE` to expose only the tools a workflow needs.
+All 74 tools are exposed by default. Set `SYNFIG_MCP_PROFILE` to expose only the tools a workflow needs.
 
 | Profile | Tools | Approx. tokens (cl100k) | Focus |
 |---|---:|---:|---|
-| `all` (default) | 73 | ~18,200 | Complete Synfig surface: documents, layers, parameters, animation, FX, rigging, review, assets |
+| `all` (default) | 74 | ~18,500 | Complete Synfig surface: documents, layers, parameters, animation, FX, rigging, review, assets |
 | `core` | 13 | ~2,970 | Scene build/export, inspection, undo/redo, single-frame render |
 | `anim` | 19 | ~4,600 | Keyframes, timeline, waypoints, interpolation |
 | `fx` | 24 | ~5,600 | Layer hierarchy, effects recipes, style presets |

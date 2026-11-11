@@ -125,7 +125,7 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `layer.ungroup` | `doc_id`, `group_layer_id` | `Action::LayerExtract::create()` | Verified |
 | `param.get` | `doc_id`, `layer_id`, `param_name` | `layer->get_param(param_name)` | Verified |
 | `param.set` | `doc_id`, `layer_id`, `param_name`, `value` | `Action::LayerParamSet::create()` or `canvas_interface->change_value()` | Verified |
-| `param.link` | `doc_id`, `layer_id`, `param_name`, `link_id`| `Action::ValueDescLink::create()` | **Not implemented** (planned) |
+| `param.link` | `doc_id`, `layer_id`, `param_name`, `link_id`| `Action::LayerParamConnect::create()` | Verified |
 | `param.convert` | `doc_id`, `layer_id`, `param_name`, `type` | `synfigapp::Action::ValueDescConvert::create()` | Verified |
 | `param.export` | `doc_id`, `layer_id`, `param_name`, `name` | `synfigapp::Action::ValueDescExport::create()` | Verified |
 | `param.unexport` | `doc_id`, `name` | `synfigapp::Action::ValueNodeRemove::create()` | Verified |

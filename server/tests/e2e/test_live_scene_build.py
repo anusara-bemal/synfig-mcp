@@ -131,6 +131,78 @@ async def test_live_scene_build_is_a_single_undo_step(live_studio: BridgeClient)
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
+async def test_live_param_link_connects_a_parameter_to_an_exported_value_node(
+    live_studio: BridgeClient,
+) -> None:
+    """A parameter must be able to follow an exported value node in Studio."""
+    source = await live_studio.call(
+        "layer.add",
+        {"doc_id": "doc_0", "layer_type": "circle", "description": "source"},
+    )
+    follower = await live_studio.call(
+        "layer.add",
+        {"doc_id": "doc_0", "layer_type": "circle", "description": "follower"},
+    )
+    source_id = source["layer_id"]
+    follower_id = follower["layer_id"]
+
+    await live_studio.call(
+        "param.set",
+        {
+            "doc_id": "doc_0",
+            "layer_id": source_id,
+            "param_name": "radius",
+            "value": {"type": "real", "value": 2.0},
+        },
+    )
+    await live_studio.call(
+        "param.export",
+        {"doc_id": "doc_0", "layer_id": source_id, "param_name": "radius", "name": "sharedRadius"},
+    )
+    await live_studio.call(
+        "param.link",
+        {
+            "doc_id": "doc_0",
+            "layer_id": follower_id,
+            "param_name": "radius",
+            "link_id": "sharedRadius",
+        },
+    )
+
+    value = await live_studio.call(
+        "param.get",
+        {"doc_id": "doc_0", "layer_id": follower_id, "param_name": "radius"},
+    )
+    linked = value.get("value", {}) if isinstance(value, dict) else {}
+    assert abs(float(linked.get("value", 0.0)) - 2.0) < 0.01, (
+        f"the linked parameter does not follow the exported value: {value}"
+    )
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
+async def test_live_param_link_rejects_an_unknown_value_node(
+    live_studio: BridgeClient,
+) -> None:
+    """Linking to a value node that does not exist must fail."""
+    layer = await live_studio.call(
+        "layer.add",
+        {"doc_id": "doc_0", "layer_type": "circle", "description": "lonely"},
+    )
+    with pytest.raises(SynfigError):
+        await live_studio.call(
+            "param.link",
+            {
+                "doc_id": "doc_0",
+                "layer_id": layer["layer_id"],
+                "param_name": "radius",
+                "link_id": "neverExported",
+            },
+        )
+
+
+@pytest.mark.real_studio
+@pytest.mark.asyncio
 async def test_live_layer_add_rejects_invalid_parameter_values(
     live_studio: BridgeClient,
 ) -> None:

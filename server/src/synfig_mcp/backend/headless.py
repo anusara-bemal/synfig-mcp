@@ -555,6 +555,33 @@ class HeadlessBackend(BackendBase):
             },
         }
 
+    async def param_link(
+        self, doc_id: str, layer_id: str, param_name: str, link_id: str
+    ) -> dict[str, Any]:
+        """Link a parameter to an exported ValueNode."""
+        if doc_id not in self._documents:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+
+        doc = self._documents[doc_id]
+        layer = doc.get_layer(layer_id)
+        if layer is None:
+            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        self._save_undo_state(doc_id)
+        layer.link_param(param_name, link_id)
+        return {
+            "doc_id": doc_id,
+            "layer_id": layer_id,
+            "param_name": param_name,
+            "link_id": link_id,
+            "diff": {
+                "action": "param.link",
+                "created": [],
+                "modified": [f"{layer_id}:{param_name}"],
+                "deleted": [],
+            },
+        }
+
     # -----------------------------------------------------------------------
     # Animation & Keyframe Operations
     # -----------------------------------------------------------------------
