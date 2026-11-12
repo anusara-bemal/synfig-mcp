@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="100%" height="auto" style="max-width:1000px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <defs>
+    <filter id="card-shadow" x="-4%" y="-4%" width="108%" height="108%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.06"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#1e73be"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#28a745"/>
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1000" height="520" fill="#f8fafc" rx="8" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Left: MCP Clients -->
+  <g transform="translate(30, 40)">
+    <rect width="200" height="440" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" filter="url(#card-shadow)"/>
+    <rect width="200" height="38" rx="6" fill="#1e73be"/>
+    <text x="100" y="24" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">MCP CLIENTS</text>
+    
+    <!-- Client boxes -->
+    <rect x="15" y="55" width="170" height="65" rx="4" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="100" y="80" fill="#1e293b" font-size="13" font-weight="600" text-anchor="middle">Claude Desktop</text>
+    <text x="100" y="100" fill="#64748b" font-size="11" text-anchor="middle">stdio / JSON-RPC</text>
+
+    <rect x="15" y="130" width="170" height="65" rx="4" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="100" y="155" fill="#1e293b" font-size="13" font-weight="600" text-anchor="middle">Cursor / VS Code</text>
+    <text x="100" y="175" fill="#64748b" font-size="11" text-anchor="middle">MCP Extension</text>
+
+    <rect x="15" y="205" width="170" height="65" rx="4" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="100" y="230" fill="#1e293b" font-size="13" font-weight="600" text-anchor="middle">Claude Code (CLI)</text>
+    <text x="100" y="250" fill="#64748b" font-size="11" text-anchor="middle">stdio transport</text>
+
+    <rect x="15" y="280" width="170" height="65" rx="4" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="100" y="305" fill="#1e293b" font-size="13" font-weight="600" text-anchor="middle">Custom Agents</text>
+    <text x="100" y="325" fill="#64748b" font-size="11" text-anchor="middle">Streamable HTTP / SSE</text>
+
+    <rect x="15" y="360" width="170" height="65" rx="4" fill="#e8f3fc" stroke="#1e73be" stroke-width="1"/>
+    <text x="100" y="388" fill="#1e73be" font-size="12" font-weight="700" text-anchor="middle">Model Context Protocol</text>
+    <text x="100" y="408" fill="#1e73be" font-size="10" text-anchor="middle">Specification 2024-11-05</text>
+  </g>
+
+  <!-- Middle: synfig-mcp Core Server -->
+  <g transform="translate(270, 40)">
+    <rect width="360" height="440" rx="6" fill="#ffffff" stroke="#1e73be" stroke-width="2" filter="url(#card-shadow)"/>
+    <rect width="360" height="38" rx="6" fill="#1e73be"/>
+    <text x="180" y="24" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">SYNFIG MCP SERVER (Python · MIT)</text>
+    
+    <!-- 81 Tools Grid -->
+    <rect x="20" y="55" width="320" height="85" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="35" y="77" fill="#0f172a" font-size="13" font-weight="700">81 Typed MCP Tools</text>
+    <text x="35" y="97" fill="#475569" font-size="11">Profiles: all · core · anim · fx · rig · assets · review</text>
+    <text x="35" y="117" fill="#64748b" font-size="11">Schema reflection, dynamic validation &amp; token optimization</text>
+
+    <!-- Subsystems -->
+    <g transform="translate(20, 150)">
+      <rect width="150" height="60" rx="4" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="75" y="26" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Render Pipeline</text>
+      <text x="75" y="44" fill="#64748b" font-size="10" text-anchor="middle">PNG · APNG · GIF · MP4</text>
+    </g>
+    <g transform="translate(190, 150)">
+      <rect width="150" height="60" rx="4" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="75" y="26" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Visual Review QA</text>
+      <text x="75" y="44" fill="#64748b" font-size="10" text-anchor="middle">SSIM · Palette · Strobe</text>
+    </g>
+    <g transform="translate(20, 220)">
+      <rect width="150" height="60" rx="4" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="75" y="26" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Security Sandbox</text>
+      <text x="75" y="44" fill="#64748b" font-size="10" text-anchor="middle">Workspace &amp; SSRF Shield</text>
+    </g>
+    <g transform="translate(190, 220)">
+      <rect width="150" height="60" rx="4" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="75" y="26" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Token Budgeting</text>
+      <text x="75" y="44" fill="#64748b" font-size="10" text-anchor="middle">Hierarchical summaries</text>
+    </g>
+
+    <!-- Backend Router -->
+    <rect x="20" y="295" width="320" height="120" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+    <text x="180" y="320" fill="#1d4ed8" font-size="12" font-weight="700" text-anchor="middle">BACKEND ROUTER (Auto-Selection)</text>
+    
+    <rect x="35" y="335" width="135" height="65" rx="4" fill="#ffffff" stroke="#93c5fd"/>
+    <text x="102" y="357" fill="#1e40af" font-size="11" font-weight="700" text-anchor="middle">LiveBackend</text>
+    <text x="102" y="375" fill="#475569" font-size="10" text-anchor="middle">Loopback TCP Socket</text>
+    <text x="102" y="390" fill="#2563eb" font-size="9" text-anchor="middle">127.0.0.1:19998 (token)</text>
+
+    <rect x="190" y="335" width="135" height="65" rx="4" fill="#ffffff" stroke="#93c5fd"/>
+    <text x="257" y="357" fill="#1e40af" font-size="11" font-weight="700" text-anchor="middle">HeadlessBackend</text>
+    <text x="257" y="375" fill="#475569" font-size="10" text-anchor="middle">Lossless SIF DOM</text>
+    <text x="257" y="390" fill="#2563eb" font-size="9" text-anchor="middle">synfig CLI / Cobra engine</text>
+  </g>
+
+  <!-- Right: Synfig Studio & CLI -->
+  <g transform="translate(670, 40)">
+    <!-- Top Right: Synfig Studio (GUI) -->
+    <rect width="300" height="235" rx="6" fill="#ffffff" stroke="#334155" stroke-width="1.5" filter="url(#card-shadow)"/>
+    <rect width="300" height="38" rx="6" fill="#334155"/>
+    <text x="150" y="24" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">SYNFIG STUDIO 1.5.5 (GPL-3.0)</text>
+
+    <rect x="15" y="50" width="270" height="50" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="150" y="72" fill="#0f172a" font-size="12" font-weight="600" text-anchor="middle">mcp_bridge Module (C++)</text>
+    <text x="150" y="88" fill="#64748b" font-size="10" text-anchor="middle">Token Auth · GTK Idle Dispatcher</text>
+
+    <rect x="15" y="110" width="270" height="50" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="150" y="132" fill="#0f172a" font-size="12" font-weight="600" text-anchor="middle">synfigapp Actions (Undo/Redo)</text>
+    <text x="150" y="148" fill="#64748b" font-size="10" text-anchor="middle">PassiveGrouper: 1 atomic undo step</text>
+
+    <rect x="15" y="170" width="270" height="50" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="150" y="192" fill="#166534" font-size="12" font-weight="700" text-anchor="middle">Live Interactive GTK Canvas</text>
+    <text x="150" y="208" fill="#15803d" font-size="10" text-anchor="middle">Real-time artist visual synchronization</text>
+
+    <!-- Bottom Right: Headless CLI Engine -->
+    <g transform="translate(0, 255)">
+      <rect width="300" height="185" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="1.5" filter="url(#card-shadow)"/>
+      <rect width="300" height="34" rx="6" fill="#64748b"/>
+      <text x="150" y="22" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">SYNFIG CLI / COBRA ENGINE</text>
+
+      <rect x="15" y="48" width="270" height="55" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+      <text x="150" y="70" fill="#0f172a" font-size="12" font-weight="600" text-anchor="middle">Headless Renderer (synfig CLI)</text>
+      <text x="150" y="88" fill="#64748b" font-size="10" text-anchor="middle">High-throughput multithreaded rendering</text>
+
+      <rect x="15" y="113" width="270" height="55" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+      <text x="150" y="135" fill="#166534" font-size="12" font-weight="700" text-anchor="middle">Frame Buffers &amp; Video Streams</text>
+      <text x="150" y="153" fill="#15803d" font-size="10" text-anchor="middle">Lossless PNGs · GIF · WebP · MP4</text>
+    </g>
+  </g>
+
+  <!-- Connective Arrows -->
+  <!-- Client to Server -->
+  <line x1="230" y1="260" x2="265" y2="260" stroke="#1e73be" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- LiveBackend to Studio -->
+  <path d="M 440 370 L 640 370 L 640 160 L 665 160" fill="none" stroke="#1e73be" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- HeadlessBackend to CLI -->
+  <path d="M 595 370 L 640 370 L 640 365 L 665 365" fill="none" stroke="#1e73be" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>
