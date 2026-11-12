@@ -44,6 +44,7 @@ TARGET_CAPABILITIES: dict[str, TargetKind] = {
     "libav": TargetKind.SEQUENCE,
     "dv": TargetKind.SEQUENCE,
     "magick++": TargetKind.CONVERTER,
+    "imagemagick": TargetKind.CONVERTER,
     "null": TargetKind.NONE,
     "null-tile": TargetKind.NONE,
 }
