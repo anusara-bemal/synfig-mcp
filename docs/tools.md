@@ -258,13 +258,13 @@ Gotcha: Assuming only the root canvas exists when layers are inside nested group
 
 *Profiles: all, core*
 
-Apply a declarative scene build spec (layers, params, waypoints, groups) atomically as one undo step.
+Apply declarative scene build spec.
 
-Note: Every layer in `spec.layers` requires a non-empty `id` string (e.g. `{"id": "bg_layer", "type": "import"}`). Image and sound file paths are verified on the host and automatically mapped if `SYNFIG_MCP_PATH_MAPPING` is configured.
+Spec: {doc_id, layers: [{id, type, params}], groups}. Layer 'id' required. Image paths host-resolved or via SYNFIG_MCP_PATH_MAPPING.
 
-Returns: Compact diff {action: 'scene.build', created: [...], modified: [...]}.
+Returns: Diff {action: 'scene.build', created: [...], modified: [...]}.
 
-Gotcha: spec.doc_id defaults to the currently selected document; never call doc_new/doc_open first - implement in the open document.
+Gotcha: Defaults to active document; do not call doc_new/doc_open first.
 
 #### Parameters
 
