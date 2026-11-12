@@ -15,6 +15,8 @@ from synfig_mcp.backend.base import BackendBase
 from synfig_mcp.backend.select import get_backend
 from synfig_mcp.config import ProfileType
 from synfig_mcp.logging import configure_logging, get_logger
+from synfig_mcp.prompts import register_all_prompts
+from synfig_mcp.resources import register_all_resources
 from synfig_mcp.tools import register_all_tools
 
 configure_logging()
@@ -27,8 +29,17 @@ def create_server(
 ) -> MCPServer:
     """Create and configure the MCPServer instance with tools filtered by profile."""
     active_backend = backend or get_backend()
-    mcp_app = MCPServer("synfig-mcp")
+    mcp_app = MCPServer(
+        "synfig-mcp",
+        instructions=(
+            "Synfig Studio automation. Inspect the current document before editing, prefer "
+            "one-call scene_build over sequential calls, and verify visual results with "
+            "render_frame. See the synfig://index resource for guides and scene templates."
+        ),
+    )
     register_all_tools(mcp_app, active_backend, profile=profile)
+    register_all_prompts(mcp_app)
+    register_all_resources(mcp_app)
     return mcp_app
 
 

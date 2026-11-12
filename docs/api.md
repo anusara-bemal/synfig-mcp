@@ -2,7 +2,7 @@
 
 `synfig-mcp` exposes tools grouped into functional **profiles** configured via the `SYNFIG_MCP_PROFILE` environment variable (default: `all`).
 
-The default profile exposes the **complete** Synfig feature set (all 81 tools) so a freshly installed server can create, animate, render and review animations without further configuration. The narrower profiles exist for clients with a tight context budget.
+The default profile exposes the **complete** Synfig feature set (all 89 tools) so a freshly installed server can create, animate, render and review animations without further configuration. The narrower profiles exist for clients with a tight context budget.
 
 ---
 
@@ -10,12 +10,12 @@ The default profile exposes the **complete** Synfig feature set (all 81 tools) s
 
 | Profile | Target Tokens (cl100k) | Tools Count | Primary Purpose |
 |---|---|---|---|
-| `all` (default) | < 22,000 (~20,500 actual) | 81 | Unrestricted full access to every tool: documents, layers, parameters, animation, rendering, review, assets. |
+| `all` (default) | < 22,000 (~23,400 actual) | 89 | Unrestricted full access to every tool: documents, layers, parameters, animation, rendering, review, assets. |
 | `core` | < 3,000 (~2,990 actual) | 13 | Scene setup, declarative build, inspection, undo/redo, single-frame render. |
 | `anim` | < 5,100 | 21 | Timeline navigation, keyframe manipulation, parameter animation, waypoints. |
 | `fx` | < 6,100 | 25 | Layer tree modifications, effects recipes, style presets, parameters. |
-| `rig` | < 4,700 | 23 | Bone hierarchies, cut-out character rigging, pose application, storyboards. |
-| `assets` | < 3,000 | 12 | Licensed asset search, previews, hardened downloads, local imports. |
+| `rig` | < 4,700 | 27 | Bone hierarchies, cut-out character rigging, pose application, storyboards. |
+| `assets` | < 3,000 | 16 | Licensed asset search, previews, hardened downloads, local imports. |
 | `review` | < 5,300 | 18 | Visual critique, objective quality metrics, sequence review, diff heatmaps. |
 
 ---
@@ -104,7 +104,7 @@ Closed-loop visual critique, objective image analytics, and rendering pipelines.
 ---
 
 ### Profile: `all` (Default Profile)
-Includes every tool of every profile above - all 81 tools: documents, canvases, scene building, layers, parameters and value nodes, animation and keyframes, selection, history, effects recipes, style presets, character rigging, storyboards, licensed assets, rendering (frame, sequence, video, contact sheet, async jobs), visual review and low-level schema inspection:
+Includes every tool of every profile above - all 89 tools: documents, canvases, scene building, layers, parameters and value nodes, animation and keyframes, selection, history, effects recipes, style presets, character rigging, storyboards, licensed assets, rendering (frame, sequence, video, contact sheet, async jobs), visual review and low-level schema inspection:
 - `schema_list_layers()` / `schema_get_layer(layer_type)`
 - `schema_list_valuenodes()`
 - `schema_list_renderers()`
