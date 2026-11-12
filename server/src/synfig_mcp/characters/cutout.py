@@ -475,7 +475,12 @@ def compile_character(spec: CutoutCharacter, frame: CanvasFrame) -> CompiledRig:
 
         in_place = spec.layout == "in_place"
         if in_place and part.bbox is None:
-            raise SpecError(f"Layout 'in_place' needs a 'bbox' on every part; '{name}' has none.")
+            if part.attach is not None or default is not None or parent is None:
+                part.bbox = {"x": 0, "y": 0, "width": sizes[name][0], "height": sizes[name][1]}
+            else:
+                raise SpecError(
+                    f"Layout 'in_place' requires 'bbox' or 'attach' on part '{name}'."
+                )
         if parent is None:
             top_left[name] = (
                 (float(part.bbox["x"]), float(part.bbox["y"]))

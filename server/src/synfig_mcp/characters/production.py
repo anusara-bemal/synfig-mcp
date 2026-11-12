@@ -374,10 +374,15 @@ class SceneAutoBuilder:
                 spec.width, spec.height, -4.0 * aspect, 4.0, 4.0 * aspect, -4.0, spec.coords
             )
         else:
-            info = await self.backend.doc_new(width=spec.width, height=spec.height, fps=spec.fps)
-            doc_id = info.id
-            created_doc = True
-            frame = await self.rigging.canvas_frame(doc_id, coords=spec.coords)
+            docs = await self.backend.doc_list()
+            if docs:
+                doc_id = docs[0].id
+                frame = await self.rigging.canvas_frame(doc_id, coords=spec.coords)
+            else:
+                info = await self.backend.doc_new(width=spec.width, height=spec.height, fps=spec.fps)
+                doc_id = info.id
+                created_doc = True
+                frame = await self.rigging.canvas_frame(doc_id, coords=spec.coords)
 
         try:
             build, rigs, report = self.compile(spec, frame)
