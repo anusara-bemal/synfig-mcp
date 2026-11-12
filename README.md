@@ -12,7 +12,7 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Website:** [anusara-bemal.github.io/synfig-mcp](https://anusara-bemal.github.io/synfig-mcp/) · **Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
+**Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 
