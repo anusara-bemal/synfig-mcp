@@ -20,7 +20,7 @@ warn()  { printf "%b\n" "${YELLOW}!${NC} $*"; }
 fail()  { printf "%b\n" "${RED}✘${NC} $*" >&2; exit 1; }
 
 printf "%b\n" "${BLUE}synfig-mcp installer${NC}"
-printf "%b\n" "   author: Anusara Bemal · license: MIT (server) / GPL-3.0 (bridge)"
+printf "%b\n" "   author: ABM · license: MIT (server) / GPL-3.0 (bridge)"
 printf "\n"
 
 # --- prerequisites -----------------------------------------------------------

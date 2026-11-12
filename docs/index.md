@@ -48,6 +48,6 @@ graph LR
 - [Issues](https://github.com/anusara-bemal/synfig-mcp/issues)
 - [Security policy](https://github.com/anusara-bemal/synfig-mcp/blob/v1.0.0/SECURITY.md)
 
-**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge).
+**Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge).
 
 Synfig MCP is an independent integration and is not affiliated with the Synfig project.
