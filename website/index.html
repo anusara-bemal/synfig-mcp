@@ -1,0 +1,1062 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Synfig MCP — Model Context Protocol Server for Synfig Studio</title>
+  <meta name="description" content="Production-grade Model Context Protocol server for Synfig Studio. Automate live vector canvases, bone rigging, and headless rendering with Claude, Cursor, and any MCP client. 100% Free and Unlimited.">
+  <meta name="author" content="Anusara Bemal">
+  <meta property="og:title" content="Synfig MCP — MCP Server for Synfig Studio">
+  <meta property="og:description" content="Connect Claude, Cursor, and any MCP client directly to Synfig Studio. 81 typed tools. 100% Free.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://anusara-bemal.github.io/synfig-mcp/">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       Navigation Bar
+       ======================================================================== -->
+  <header id="site-header">
+    <div class="container header-inner">
+      <a href="#" class="brand">
+        <img src="assets/synfig-mcp-logo.svg" alt="Synfig MCP Logo" class="brand-icon">
+        <span class="brand-title">
+          Synfig MCP
+          <span class="badge-tag">v1.0.0</span>
+        </span>
+      </a>
+
+      <!-- Desktop Links -->
+      <ul class="nav-links">
+        <li><a href="#why-mcp" class="nav-link">Why MCP</a></li>
+        <li><a href="#capabilities" class="nav-link">Features</a></li>
+        <li><a href="#install" class="nav-link">Setup</a></li>
+        <li><a href="#tools" class="nav-link">Tools (81)</a></li>
+        <li><a href="#security" class="nav-link">Security</a></li>
+        <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/" target="_blank" class="nav-link">Docs ↗</a></li>
+      </ul>
+
+      <!-- CTA + Hamburger -->
+      <div class="header-cta-group">
+        <a href="https://github.com/anusara-bemal/synfig-mcp" target="_blank" class="btn btn-secondary btn-sm">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          GitHub
+        </a>
+        <a href="#install" class="btn btn-primary btn-sm">Get Started</a>
+        <button id="mobile-menu-toggle" class="mobile-toggle" aria-label="Toggle menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Dropdown -->
+    <div id="mobile-nav-panel" class="mobile-nav-panel">
+      <ul>
+        <li><a href="#why-mcp">Why MCP</a></li>
+        <li><a href="#capabilities">Features</a></li>
+        <li><a href="#install">Setup Wizard</a></li>
+        <li><a href="#tools">Tools API (81)</a></li>
+        <li><a href="#security">Security &amp; Legal</a></li>
+        <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/" target="_blank">Documentation ↗</a></li>
+        <li><a href="https://github.com/anusara-bemal/synfig-mcp" target="_blank">GitHub Repository ↗</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       Hero Section
+       ======================================================================== -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-pill-badge">
+        <span class="hero-pill-indicator"></span>
+        <span>100% Free &amp; Open Source &mdash; Zero Subscriptions &mdash; Unlimited Renders</span>
+      </div>
+
+      <h1 class="hero-title">
+        The Model Context Protocol Server<br>for <span class="hero-title-accent">Synfig Studio</span>
+      </h1>
+
+      <p class="hero-description">
+        Connect Claude, Cursor, and any MCP-compatible AI agent directly to Synfig Studio. Automate live vector canvases, bone skeleton hierarchies, and headless render pipelines &mdash; with zero limits, forever.
+      </p>
+
+      <div class="hero-actions">
+        <a href="#install" class="btn btn-primary btn-lg">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="8 17 12 21 16 17"></polyline>
+            <line x1="12" y1="12" x2="12" y2="21"></line>
+            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
+          </svg>
+          Setup Wizard
+        </a>
+        <div class="install-quick-pill">
+          <span>pip install synfig-mcp</span>
+          <button class="copy-code-btn" data-copy-text="pip install synfig-mcp" aria-label="Copy install command">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <a href="https://github.com/anusara-bemal/synfig-mcp" target="_blank" class="btn btn-secondary btn-lg">
+          View on GitHub ↗
+        </a>
+      </div>
+
+      <div class="hero-clients">
+        <span class="clients-label">Works with:</span>
+        <span class="client-tag">Claude Desktop</span>
+        <span class="client-tag">Cursor IDE</span>
+        <span class="client-tag">Claude Code</span>
+        <span class="client-tag">VS Code / Cline</span>
+        <span class="client-tag">Docker</span>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="hero-stats-strip">
+        <div class="stat-item">
+          <span class="stat-number">81</span>
+          <span class="stat-label">MCP Tools</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-number">7</span>
+          <span class="stat-label">Tool Profiles</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-number">3</span>
+          <span class="stat-label">Platform Support</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-number">$0</span>
+          <span class="stat-label">Forever Free</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Product UI Showcase — Studio Window Mockup
+       ======================================================================== -->
+  <section class="showcase-section">
+    <div class="container">
+      <div class="studio-window-frame">
+        <div class="window-topbar">
+          <div class="window-controls">
+            <div class="window-dot dot-red"></div>
+            <div class="window-dot dot-yellow"></div>
+            <div class="window-dot dot-green"></div>
+          </div>
+          <span class="window-label">character_rig_scene.sifz &mdash; Synfig Studio 1.5.5</span>
+          <span class="window-status-pill">&#9679; MCP Connected (127.0.0.1:19998)</span>
+        </div>
+
+        <div class="studio-grid">
+          <!-- Left: Layers panel -->
+          <div class="panel-left">
+            <div class="panel-heading">Layer Hierarchy</div>
+            <ul class="layer-tree-list">
+              <li class="layer-tree-item active">&#129968; Character_Skeleton</li>
+              <li class="layer-tree-item indent-1">&#11042; Torso_Group</li>
+              <li class="layer-tree-item indent-2">&#8767; Torso_Spline_Outline</li>
+              <li class="layer-tree-item indent-2">&#9632; Torso_Fill</li>
+              <li class="layer-tree-item indent-1">&#11042; Arm_Right_Group</li>
+              <li class="layer-tree-item indent-1">&#11042; Arm_Left_Group</li>
+              <li class="layer-tree-item indent-1">&#11042; Leg_Group</li>
+              <li class="layer-tree-item">&#9788; Background_Sky_Gradient</li>
+            </ul>
+          </div>
+
+          <!-- Center: Canvas artwork -->
+          <div class="panel-canvas">
+            <div class="canvas-art-box">
+              <svg viewBox="0 0 440 248" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
+                <defs>
+                  <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#0f172a"/>
+                    <stop offset="100%" stop-color="#0c2a4a"/>
+                  </linearGradient>
+                </defs>
+                <rect width="440" height="248" fill="url(#skyGrad)"/>
+                <!-- Grid lines -->
+                <line x1="0" y1="124" x2="440" y2="124" stroke="#1e293b" stroke-width="1" stroke-dasharray="3,3"/>
+                <line x1="220" y1="0" x2="220" y2="248" stroke="#1e293b" stroke-width="1" stroke-dasharray="3,3"/>
+                <!-- Character body -->
+                <g transform="translate(220, 118)">
+                  <circle cx="0" cy="-40" r="22" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+                  <!-- Eyes -->
+                  <circle cx="-7" cy="-42" r="3" fill="#ffffff"/>
+                  <circle cx="7" cy="-42" r="3" fill="#ffffff"/>
+                  <circle cx="-6" cy="-41" r="1.5" fill="#0f172a"/>
+                  <circle cx="8" cy="-41" r="1.5" fill="#0f172a"/>
+                  <!-- Body -->
+                  <path d="M -15 -16 L 15 -16 L 18 32 L -18 32 Z" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+                  <!-- Arms -->
+                  <line x1="-15" y1="-10" x2="-40" y2="14" stroke="#38bdf8" stroke-width="6" stroke-linecap="round"/>
+                  <line x1="15" y1="-10" x2="42" y2="-2" stroke="#38bdf8" stroke-width="6" stroke-linecap="round"/>
+                  <!-- Legs -->
+                  <line x1="-9" y1="32" x2="-16" y2="76" stroke="#075985" stroke-width="6" stroke-linecap="round"/>
+                  <line x1="9" y1="32" x2="16" y2="76" stroke="#075985" stroke-width="6" stroke-linecap="round"/>
+                  <!-- Bone rig overlay (green) -->
+                  <circle cx="0" cy="22" r="3.5" fill="#10b981"/>
+                  <line x1="0" y1="22" x2="0" y2="-16" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2"/>
+                  <circle cx="0" cy="-16" r="3.5" fill="#f59e0b"/>
+                  <line x1="0" y1="-16" x2="0" y2="-40" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2"/>
+                  <circle cx="0" cy="-40" r="3" fill="#10b981"/>
+                  <!-- Arm rig -->
+                  <line x1="15" y1="-10" x2="42" y2="-2" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2"/>
+                  <circle cx="42" cy="-2" r="3.5" fill="#38bdf8"/>
+                  <line x1="-15" y1="-10" x2="-40" y2="14" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2"/>
+                  <circle cx="-40" cy="14" r="3.5" fill="#38bdf8"/>
+                </g>
+              </svg>
+              <div class="canvas-hud">
+                <span>00:00:01:12 (36f)</span>
+                <span>1920&times;1080 &middot; 24fps</span>
+                <span>Zoom: 100%</span>
+              </div>
+            </div>
+            <div class="canvas-timeline-bar">
+              <div class="timeline-track">
+                <div class="timeline-marker" style="left:0%">0f</div>
+                <div class="timeline-marker" style="left:25%">12f</div>
+                <div class="timeline-marker" style="left:50%">24f</div>
+                <div class="timeline-marker" style="left:75%">36f</div>
+                <div class="timeline-marker" style="left:100%">48f</div>
+                <div class="timeline-playhead" style="left:37.5%"></div>
+                <!-- Waypoint diamonds -->
+                <div class="waypoint-diamond" style="left:0%"></div>
+                <div class="waypoint-diamond accent" style="left:25%"></div>
+                <div class="waypoint-diamond" style="left:50%"></div>
+                <div class="waypoint-diamond accent" style="left:75%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: MCP action stream terminal -->
+          <div class="panel-right">
+            <div class="terminal-header">
+              <span>MCP Tool Stream</span>
+              <span class="terminal-badge">stdio</span>
+            </div>
+            <div class="terminal-stream-body">
+              <div class="stream-entry">
+                <div class="stream-line"><span class="time">[18:48:02]</span> <span class="cmd">&gt; tools/call: scene_build</span></div>
+                <div class="stream-line indent">spec: 12 vector layers, 1 skeleton</div>
+                <div class="stream-line"><span class="res">&lt; GTK PassiveGrouper: 1 undo step</span></div>
+              </div>
+              <div class="stream-entry">
+                <div class="stream-line"><span class="time">[18:48:04]</span> <span class="cmd">&gt; tools/call: anim_waypoint_set</span></div>
+                <div class="stream-line indent">Arm_R angle=45&deg; time=00:00:01:12</div>
+                <div class="stream-line"><span class="res">&lt; Waypoint interpolated (TCB clamped)</span></div>
+              </div>
+              <div class="stream-entry">
+                <div class="stream-line"><span class="time">[18:48:06]</span> <span class="cmd">&gt; tools/call: render_frame</span></div>
+                <div class="stream-line indent">time=00:00:01:12 size=1920x1080</div>
+                <div class="stream-line"><span class="res">&lt; Rendered in 38ms (SSIM 0.9984)</span></div>
+              </div>
+              <div class="stream-entry">
+                <div class="stream-line"><span class="time">[18:48:08]</span> <span class="cmd">&gt; tools/call: review_safe_areas</span></div>
+                <div class="stream-line"><span class="res">&lt; Title safe OK &middot; Action safe OK</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Free & Unlimited Promise Section
+       ======================================================================== -->
+  <section id="free" class="free-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label emerald-label">Pricing Model</span>
+        <h2 class="section-heading">Free. Forever. No Asterisks.</h2>
+        <p class="section-subheading">
+          Synfig MCP is open-source software. There are no subscriptions, no usage tiers, no API bills, and no creative limits. Run it on your machine, your server, or your CI pipeline.
+        </p>
+      </div>
+
+      <div class="free-cards-grid">
+        <div class="free-card">
+          <div class="free-card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+          </div>
+          <h3>$0 &middot; Free Forever</h3>
+          <p>MIT-licensed Python server. GPL-3.0 C++ bridge. No paid plans. No free tier with limits. The full product, free.</p>
+          <span class="free-card-tag">MIT License</span>
+        </div>
+
+        <div class="free-card">
+          <div class="free-card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 7 13.5 15.5 8.5 10.5 1 17"></polyline>
+              <polyline points="17 7 23 7 23 13"></polyline>
+            </svg>
+          </div>
+          <h3>Unlimited Renders</h3>
+          <p>Render as many frames, sequences, and videos as your hardware can handle. No quota, no throttle, no watermarks.</p>
+          <span class="free-card-tag">Local Compute</span>
+        </div>
+
+        <div class="free-card">
+          <div class="free-card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <h3>Unlimited Canvas Scale</h3>
+          <p>Unlimited layers, bones, waypoints, and timeline length. No restrictions on project complexity or scene size.</p>
+          <span class="free-card-tag">No Limits</span>
+        </div>
+
+        <div class="free-card">
+          <div class="free-card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h3>100% Private &amp; Local</h3>
+          <p>Your animation data never leaves your machine. All MCP calls run over localhost. No cloud, no telemetry, no analytics.</p>
+          <span class="free-card-tag">Offline-First</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Why MCP? — Explanation + AI Simulation
+       ======================================================================== -->
+  <section id="why-mcp" class="why-mcp-section">
+    <div class="container">
+      <div class="why-mcp-grid">
+        <!-- Left: explanation -->
+        <div class="why-mcp-content">
+          <span class="section-label">The MCP Advantage</span>
+          <h2 class="section-heading">Why MCP, Not Video AI?</h2>
+          <p class="section-subheading">
+            Video diffusion models produce non-editable pixel sequences. Synfig MCP gives your AI agent <em>structured control</em> over real, editable vector artwork.
+          </p>
+
+          <ul class="why-mcp-list">
+            <li>
+              <span class="list-check">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong>Fully editable output</strong> &mdash; every layer, spline, and bone is live and modifiable after generation
+              </div>
+            </li>
+            <li>
+              <span class="list-check">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong>Deterministic, typed tools</strong> &mdash; not probabilistic generation; exact parameter values, exact results
+              </div>
+            </li>
+            <li>
+              <span class="list-check">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong>Lossless SIF DOM</strong> &mdash; native XML format preserves all mathematical precision, no compression artifacts
+              </div>
+            </li>
+            <li>
+              <span class="list-check">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong>GTK main-thread dispatch</strong> &mdash; changes appear live on the artist's canvas, fully undo-able with Ctrl+Z
+              </div>
+            </li>
+            <li>
+              <span class="list-check">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong>Closed visual QA loop</strong> &mdash; built-in SSIM, palette audit, safe areas, and strobe detection tools
+              </div>
+            </li>
+            <li>
+              <span class="list-check">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong>Works headless in CI</strong> &mdash; no display server required; full automation in Docker or cloud pipelines
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Right: live AI simulation -->
+        <div class="why-mcp-sim">
+          <div class="sim-card">
+            <div class="sim-header">
+              <span class="sim-title">Live MCP Session</span>
+              <span class="sim-status-dot"></span>
+            </div>
+
+            <div class="sim-prompt-box">
+              <div class="sim-label">AI Prompt</div>
+              <div id="sim-prompt-text" class="sim-prompt-text">&ldquo;Create an animated bouncing rubber ball with squash and stretch over 24 frames, render a preview.&rdquo;</div>
+            </div>
+
+            <div class="sim-exec-box">
+              <div class="sim-label">MCP Execution</div>
+              <pre id="sim-exec-log" class="sim-exec-log">&gt; tools/call: scene_build(spec={ layers: ["Circle_Ball", "Shadow_Oval"] })
+&lt; GTK PassiveGrouper: committed 2 vector layers
+&gt; tools/call: anim_waypoint_set(layer="Circle_Ball", param="scale", time="00:00:00:12", val=[1.3, 0.7])
+&lt; GTK main thread: TCB tangent eased
+&gt; tools/call: render_frame(time="00:00:00:12")
+&lt; Frame rendered in 38ms (SSIM 0.9982 &middot; Safe area OK)</pre>
+            </div>
+
+            <div class="sim-footer">
+              <span class="sim-cycling-badge">Auto-cycling scenarios every 5s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Bento Grid: Core Capabilities
+       ======================================================================== -->
+  <section id="capabilities" class="bento-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Architecture &amp; Features</span>
+        <h2 class="section-heading">Engineered for Production Animation</h2>
+        <p class="section-subheading">
+          A production-grade bridge between AI agents and Synfig Studio's native C++ internals &mdash; not a wrapper, not a plugin, a first-class MCP server.
+        </p>
+      </div>
+
+      <div class="bento-grid">
+        <!-- Card 1 (wide) -->
+        <div class="bento-card col-span-2">
+          <div class="bento-card-inner">
+            <div class="bento-icon-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            </div>
+            <h3>Live GTK Canvas Dispatch</h3>
+            <p>
+              Edits made by AI agents are dispatched directly onto Synfig Studio's GTK event loop via <code>synfigapp::PassiveGrouper</code>. Mutations appear instantly on the artist's screen, participate fully in the undo/redo stack (<code>Ctrl+Z</code>), and coexist safely with manual mouse interactions.
+            </p>
+          </div>
+          <div class="bento-footer-row">
+            <span class="bento-tag">Zero-Cost Undo</span>
+            <span class="bento-tag">Thread-Safe</span>
+            <span class="bento-tag">Real-Time</span>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bento-card">
+          <div class="bento-card-inner">
+            <div class="bento-icon-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <h3>Headless SIF DOM</h3>
+            <p>Operates without a GUI by reading and writing <code>.sif</code>, <code>.sifz</code>, and <code>.sfg</code> XML natively. Ideal for CI pipelines and cloud render farms.</p>
+          </div>
+          <div class="bento-footer-row">
+            <span class="bento-tag">Cobra Render Engine</span>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bento-card">
+          <div class="bento-card-inner">
+            <div class="bento-icon-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h3>81 Typed MCP Tools</h3>
+            <p>Complete API surface across 7 tuned profiles &mdash; <code>core</code>, <code>anim</code>, <code>fx</code>, <code>rig</code>, <code>assets</code>, <code>review</code>, <code>all</code> &mdash; optimizing AI context budgets.</p>
+          </div>
+          <div class="bento-footer-row">
+            <span class="bento-tag">7 Profiles</span>
+          </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="bento-card">
+          <div class="bento-card-inner">
+            <div class="bento-icon-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </div>
+            <h3>Visual QA Loop</h3>
+            <p>Closes the feedback loop: render frames, measure SSIM, audit color palettes, check broadcast safe areas, and detect photosensitive strobe risks.</p>
+          </div>
+          <div class="bento-footer-row">
+            <span class="bento-tag">Objective Metrics</span>
+          </div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="bento-card">
+          <div class="bento-card-inner">
+            <div class="bento-icon-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="6" cy="6" r="3"></circle>
+                <circle cx="18" cy="18" r="3"></circle>
+                <line x1="8.5" y1="8.5" x2="15.5" y2="15.5"></line>
+              </svg>
+            </div>
+            <h3>Character Bone Rigging</h3>
+            <p>Automated skeleton construction, hierarchical bone linking, cutout SVG/PNG binding, and one-call pose presets &mdash; idle, walk, run, jump, punch.</p>
+          </div>
+          <div class="bento-footer-row">
+            <span class="bento-tag">Inverse Kinematics</span>
+          </div>
+        </div>
+
+        <!-- Card 6 (wide) -->
+        <div class="bento-card col-span-2">
+          <div class="bento-card-inner">
+            <div class="bento-icon-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+            </div>
+            <h3>Effects Recipes &amp; Asset Pipeline</h3>
+            <p>
+              14 built-in production effects recipes (anime speedlines, halftone, glow, lens flare, motion blur) applied in a single atomic undo step. Asset search pulls CC0/MIT-licensed vectors and audio from curated repositories with SSRF-protected download hardening.
+            </p>
+          </div>
+          <div class="bento-footer-row">
+            <span class="bento-tag">14 Recipes</span>
+            <span class="bento-tag">CC0 Assets</span>
+            <span class="bento-tag">SSRF Protected</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Architecture Diagram Section
+       ======================================================================== -->
+  <section id="architecture" class="arch-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">System Design</span>
+        <h2 class="section-heading">How Synfig MCP Works</h2>
+        <p class="section-subheading">
+          A three-layer bridge: a standard MCP Python server, a native C++ GTK dispatch bridge, and Synfig Studio's lossless SIF document model.
+        </p>
+      </div>
+
+      <div class="arch-diagram-wrapper">
+        <img src="assets/architecture.svg" alt="Synfig MCP Architecture Diagram" class="arch-diagram-img">
+      </div>
+
+      <div class="arch-pillars">
+        <div class="arch-pillar">
+          <div class="arch-pillar-num">01</div>
+          <h4>Standard MCP Protocol</h4>
+          <p>JSON-RPC 2.0 over stdio. Compatible with any MCP client &mdash; Claude, Cursor, Cline, or custom integrations. Tool schemas are introspectable at runtime.</p>
+        </div>
+        <div class="arch-pillar">
+          <div class="arch-pillar-num">02</div>
+          <h4>GTK Thread Dispatch</h4>
+          <p>All canvas mutations are safely marshalled onto Synfig Studio's GTK main thread using <code>PassiveGrouper</code> transactions. Zero race conditions, full undo history participation.</p>
+        </div>
+        <div class="arch-pillar">
+          <div class="arch-pillar-num">03</div>
+          <h4>Lossless SIF DOM</h4>
+          <p>Native <code>.sif</code> / <code>.sifz</code> XML serialization preserves all spline mathematics with full floating-point precision. No compression, no information loss, no proprietary lock-in.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       User-Friendly Step-by-Step Installation Wizard
+       ======================================================================== -->
+  <section id="install" class="wizard-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Quickstart</span>
+        <h2 class="section-heading">Interactive Setup Wizard</h2>
+        <p class="section-subheading">
+          Get Synfig MCP connected to your AI client in three steps. Select your OS to see the exact commands.
+        </p>
+      </div>
+
+      <div class="wizard-card">
+        <!-- 3-Step header -->
+        <div class="wizard-step-header">
+          <div class="wizard-step-tab">
+            <span class="step-num-badge">1</span>
+            <div class="step-meta">
+              <h4>Choose OS</h4>
+              <span>Windows, Linux, macOS</span>
+            </div>
+          </div>
+          <div class="wizard-step-tab">
+            <span class="step-num-badge">2</span>
+            <div class="step-meta">
+              <h4>Install Server</h4>
+              <span>Python PyPI or Bundle</span>
+            </div>
+          </div>
+          <div class="wizard-step-tab">
+            <span class="step-num-badge">3</span>
+            <div class="step-meta">
+              <h4>Connect Client</h4>
+              <span>Claude, Cursor, CLI, VSCode</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-body">
+          <!-- OS Switcher -->
+          <div class="os-selector-group">
+            <button class="os-btn active" data-os="windows">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+              </svg>
+              Windows
+            </button>
+            <button class="os-btn" data-os="linux">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.009-.06l.003-.026c.019.063.023.141.015.204-.01.072-.046.137-.093.185a.26.26 0 01-.196.083c-.125 0-.199-.07-.245-.131l-.003-.005c0-.003-.004-.005-.004-.005l.003.009c.027.1.088.182.09.264.003.126-.074.185-.18.185h-.006c-.189 0-.387-.094-.493-.185-.184-.169-.184-.32-.031-.405l.004-.002c.106-.05.238-.07.4-.013.101.034.18.097.192.147l.015.057c.015.086-.075.158-.168.183-.102.027-.201-.039-.223-.141l-.033-.151c-.044.047-.095.088-.146.129-.017.014-.028.033-.05.044-.066.038-.121.098-.171.158a.37.37 0 00-.072.283.372.372 0 00.173.311c.052.038.11.065.17.082.065.019.133.033.198.033-.017.009-.043.013-.067.013h-.001c-.08.003-.16-.003-.243-.013-.163-.02-.322-.058-.467-.112-.145-.054-.277-.121-.396-.201a1.22 1.22 0 01-.285-.293c-.06-.093-.1-.197-.106-.307a.676.676 0 01.07-.351c.072-.143.187-.25.322-.306l.004-.001c.148-.06.312-.074.471-.038.112.025.213.074.303.137.093.063.172.14.237.228.067.09.113.192.136.302.023.112.019.233-.014.344a.724.724 0 01-.199.337c-.09.082-.197.142-.313.167-.119.025-.244.016-.361-.03a.63.63 0 01-.262-.187.608.608 0 01-.143-.297c-.022-.119-.011-.245.033-.361.047-.116.124-.214.221-.281a.564.564 0 01.325-.093c.057 0 .113.007.168.022.055.016.107.042.154.077.047.034.088.078.12.129.034.054.057.115.065.18.011.063.007.13-.013.19-.019.06-.056.11-.104.147-.047.037-.104.058-.163.058a.34.34 0 01-.116-.022.312.312 0 01-.094-.058l.003.003a.335.335 0 01-.07-.112l-.003-.012a.371.371 0 01-.018-.165c.003-.058.023-.112.056-.157.034-.045.079-.08.134-.099.054-.018.112-.021.168-.007a.329.329 0 01.141.072c.04.035.07.082.085.133.015.052.013.108-.006.159a.252.252 0 01-.085.117.228.228 0 01-.129.045h-.012a.223.223 0 01-.104-.026.207.207 0 01-.072-.072l.001.001z"/>
+              </svg>
+              Linux
+            </button>
+            <button class="os-btn" data-os="macos">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.85c.62-.75 1.04-1.8.92-2.85-.9.04-2 .6-2.65 1.35-.58.67-.99 1.74-.88 2.76 1.01.08 2-.51 2.61-1.26z"/>
+              </svg>
+              macOS / Docker
+            </button>
+          </div>
+
+          <!-- Windows Panel -->
+          <div id="panel-windows" class="os-content active">
+            <div class="step-instruction-box">
+              <div class="instruction-title">
+                <span>Step 1 &mdash; Install the Python MCP Server</span>
+                <span class="badge-tag">pip</span>
+              </div>
+              <p class="instruction-desc">Requires Python 3.12+. Install from PyPI:</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <span>PowerShell</span>
+                  <button class="copy-btn" data-copy-text="pip install synfig-mcp">Copy</button>
+                </div>
+                <pre><code>pip install synfig-mcp</code></pre>
+              </div>
+            </div>
+
+            <div class="step-instruction-box">
+              <div class="instruction-title">
+                <span>Step 2 &mdash; Download Patched Synfig Studio 1.5.5</span>
+                <span class="badge-tag">GUI Mode</span>
+              </div>
+              <p class="instruction-desc">Download the prebuilt Windows bundle with the native C++ <code>mcp_bridge</code> module included:</p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+                <a href="https://github.com/anusara-bemal/synfig-mcp/releases" target="_blank" class="btn btn-primary btn-sm">
+                  Download Windows Bundle (.zip / .msix)
+                </a>
+                <a href="https://anusara-bemal.github.io/synfig-mcp/docs/install-windows/" target="_blank" class="btn btn-secondary btn-sm">
+                  Full Windows Guide ↗
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Linux Panel -->
+          <div id="panel-linux" class="os-content">
+            <div class="step-instruction-box">
+              <div class="instruction-title">
+                <span>Step 1 &mdash; Install Server via pip</span>
+                <span class="badge-tag">pip</span>
+              </div>
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Bash</span>
+                  <button class="copy-btn" data-copy-text="pip install synfig-mcp">Copy</button>
+                </div>
+                <pre><code>pip install synfig-mcp</code></pre>
+              </div>
+            </div>
+
+            <div class="step-instruction-box">
+              <div class="instruction-title">
+                <span>Step 2 &mdash; Run Patched AppImage</span>
+                <span class="badge-tag">AppImage</span>
+              </div>
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Terminal</span>
+                  <button class="copy-btn" data-copy-text="chmod +x synfig-studio-1.5.5-mcp.AppImage && ./synfig-studio-1.5.5-mcp.AppImage">Copy</button>
+                </div>
+                <pre><code>chmod +x synfig-studio-1.5.5-mcp.AppImage
+./synfig-studio-1.5.5-mcp.AppImage</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- macOS Panel -->
+          <div id="panel-macos" class="os-content">
+            <div class="step-instruction-box">
+              <div class="instruction-title">
+                <span>Headless Docker Container (Recommended for macOS)</span>
+                <span class="badge-tag">Docker</span>
+              </div>
+              <p class="instruction-desc">Run headless rendering and automation inside the official isolated container:</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Terminal</span>
+                  <button class="copy-btn" data-copy-text='docker run -i --rm \
+  -v "$(pwd)/animations:/workspace" \
+  ghcr.io/anusara-bemal/synfig-mcp:latest'>Copy</button>
+                </div>
+                <pre><code>docker run -i --rm \
+  -v "$(pwd)/animations:/workspace" \
+  ghcr.io/anusara-bemal/synfig-mcp:latest</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Client Configuration -->
+          <div class="step-instruction-box" style="margin-bottom:0;">
+            <div class="instruction-title">
+              <span>Step 3 &mdash; Connect Your MCP Client</span>
+              <span class="badge-tag">Config</span>
+            </div>
+            <p class="instruction-desc">Select your client and copy the ready-to-paste JSON configuration:</p>
+
+            <div style="border:1px solid var(--border-card);border-radius:var(--radius-sm);overflow:hidden;">
+              <div class="client-tabs-nav">
+                <button class="client-tab active" data-client="claude">Claude Desktop</button>
+                <button class="client-tab" data-client="cursor">Cursor IDE</button>
+                <button class="client-tab" data-client="claudecode">Claude Code (CLI)</button>
+                <button class="client-tab" data-client="vscode">VS Code / Cline</button>
+              </div>
+
+              <!-- Claude -->
+              <div id="tab-claude" class="client-panel active">
+                <div class="code-block">
+                  <div class="code-header">
+                    <span>claude_desktop_config.json</span>
+                    <button class="copy-btn" data-copy-target="code-claude-snippet">Copy JSON</button>
+                  </div>
+                  <pre><code id="code-claude-snippet">{
+  "mcpServers": {
+    "synfig": {
+      "command": "python",
+      "args": ["-m", "server.app"],
+      "env": {
+        "SYNFIG_MCP_PROFILE": "all",
+        "SYNFIG_BRIDGE_PORT": "19998"
+      }
+    }
+  }
+}</code></pre>
+                </div>
+                <p class="config-hint">Config file location: <code>%APPDATA%\Claude\claude_desktop_config.json</code> (Windows) or <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS)</p>
+              </div>
+
+              <!-- Cursor -->
+              <div id="tab-cursor" class="client-panel">
+                <div class="code-block">
+                  <div class="code-header">
+                    <span>.cursor/mcp.json</span>
+                    <button class="copy-btn" data-copy-target="code-cursor-snippet">Copy JSON</button>
+                  </div>
+                  <pre><code id="code-cursor-snippet">{
+  "mcpServers": {
+    "synfig-mcp": {
+      "command": "python",
+      "args": ["-m", "server.app"]
+    }
+  }
+}</code></pre>
+                </div>
+                <p class="config-hint">Place <code>.cursor/mcp.json</code> in your project root or home directory.</p>
+              </div>
+
+              <!-- Claude Code CLI -->
+              <div id="tab-claudecode" class="client-panel">
+                <div class="code-block">
+                  <div class="code-header">
+                    <span>Terminal</span>
+                    <button class="copy-btn" data-copy-target="code-cli-snippet">Copy</button>
+                  </div>
+                  <pre><code id="code-cli-snippet">claude mcp add synfig -- python -m server.app</code></pre>
+                </div>
+                <p class="config-hint">Run from the directory containing your <code>server/</code> module, or provide the full path to the module.</p>
+              </div>
+
+              <!-- VS Code -->
+              <div id="tab-vscode" class="client-panel">
+                <div class="code-block">
+                  <div class="code-header">
+                    <span>cline_mcp_settings.json</span>
+                    <button class="copy-btn" data-copy-target="code-vscode-snippet">Copy JSON</button>
+                  </div>
+                  <pre><code id="code-vscode-snippet">{
+  "mcpServers": {
+    "synfig": {
+      "command": "python",
+      "args": ["-m", "server.app"],
+      "disabled": false
+    }
+  }
+}</code></pre>
+                </div>
+                <p class="config-hint">Open VS Code settings &rarr; Extensions &rarr; Cline &rarr; MCP Servers to find this config file.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Tools Reference Section (81 Tools)
+       ======================================================================== -->
+  <section id="tools" class="tools-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">API Surface</span>
+        <h2 class="section-heading">81 Typed MCP Tools</h2>
+        <p class="section-subheading">
+          Filter by functional profile or search by keyword. Each tool has a typed parameter signature inspectable by any MCP client.
+        </p>
+      </div>
+
+      <div class="tools-filter-strip">
+        <div class="profile-pills">
+          <button class="profile-filter-btn active" data-profile="all">All (81)</button>
+          <button class="profile-filter-btn" data-profile="core">core (13)</button>
+          <button class="profile-filter-btn" data-profile="anim">anim (21)</button>
+          <button class="profile-filter-btn" data-profile="fx">fx (25)</button>
+          <button class="profile-filter-btn" data-profile="rig">rig (23)</button>
+          <button class="profile-filter-btn" data-profile="assets">assets (12)</button>
+          <button class="profile-filter-btn" data-profile="review">review (18)</button>
+        </div>
+        <div class="tools-search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="tool-search-input" class="search-input-field" placeholder="Search tools (e.g. bone, render, layer)…">
+          <span id="tools-count-badge" class="badge-tag">81 Tools</span>
+        </div>
+      </div>
+
+      <div id="tools-cards-grid" class="tools-cards-container">
+        <!-- Populated by script.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Security & Compliance Section
+       ======================================================================== -->
+  <section id="security" class="security-legal-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Production Hardening</span>
+        <h2 class="section-heading">Security Model &amp; Legal Compliance</h2>
+        <p class="section-subheading">
+          Built with sandboxed process boundaries, token authentication, and clean open-source licensing designed for production deployment.
+        </p>
+      </div>
+
+      <div class="security-cards-grid">
+        <div class="sec-card">
+          <div class="sec-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <h4>Loopback &amp; Token Auth</h4>
+          <p>The native bridge binds strictly to <code>127.0.0.1:19998</code>. Non-loopback attempts are rejected at the socket layer. Every JSON-RPC dispatch requires a per-session ephemeral bearer token.</p>
+        </div>
+
+        <div class="sec-card">
+          <div class="sec-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <h4>Filesystem Sandboxing</h4>
+          <p>Document writes, reads, and asset imports are restricted to allowed workspace root directories. Directory traversal attempts (<code>../</code>) and absolute path escapes are blocked at the Python layer.</p>
+        </div>
+
+        <div class="sec-card">
+          <div class="sec-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+            </svg>
+          </div>
+          <h4>SSRF &amp; SVG Sanitization</h4>
+          <p>Remote asset URLs are checked against RFC 1918 private IP ranges to prevent intranet scanning. Imported SVGs pass through XML entity stripping to prevent XXE injection and billion-laugh bomb attacks.</p>
+        </div>
+
+        <div class="sec-card">
+          <div class="sec-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h4>No Cloud, No Telemetry</h4>
+          <p>Synfig MCP operates entirely on <code>localhost</code>. No analytics, no crash reporting, no license pings. Your animation data never leaves your machine under any configuration.</p>
+        </div>
+
+        <div class="sec-card">
+          <div class="sec-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+          </div>
+          <h4>Dual Open-Source License</h4>
+          <p>Python server: <strong>MIT License</strong> &mdash; use freely in any project. C++ bridge: <strong>GPL-3.0</strong> &mdash; copyleft, source must remain open. Full compliance documentation provided.</p>
+        </div>
+
+        <div class="sec-card">
+          <div class="sec-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <h4>Render Quota Protection</h4>
+          <p>Headless render jobs include configurable timeout and frame-count limits to prevent runaway CI tasks from exhausting disk space or compute budget in automated pipelines.</p>
+        </div>
+      </div>
+
+      <!-- Legal Notice -->
+      <div class="legal-disclosure-card">
+        <strong>Legal &amp; Trademark Attribution:</strong>
+        Synfig MCP is an independent open-source project authored and maintained by <strong>Anusara Bemal</strong>.
+        The MCP Python server is licensed under the <strong>MIT License</strong>.
+        The native C++ bridge module is licensed under the <strong>GNU General Public License v3.0 (GPL-3.0)</strong>.
+        &ldquo;Synfig&rdquo; and &ldquo;Synfig Studio&rdquo; are trademarks of the Synfig Project.
+        Synfig MCP is <strong>not</strong> officially sponsored by, affiliated with, or endorsed by the Synfig Project.
+        Synfig Studio source code is used under the terms of the GPL-3.0 license.
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Footer
+       ======================================================================== -->
+  <footer id="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand-col">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <img src="assets/synfig-mcp-logo.svg" alt="Synfig MCP Logo" width="26" height="26">
+            <span style="font-weight:700;font-size:15px;color:var(--text-display);">Synfig MCP</span>
+            <span class="badge-tag">v1.0.0</span>
+          </div>
+          <p>Production-grade Model Context Protocol server for Synfig Studio. Bridging AI agents with professional 2D vector animation pipelines.</p>
+          <div class="footer-badges">
+            <span class="footer-badge">MIT + GPL-3.0</span>
+            <span class="footer-badge">Free Forever</span>
+            <span class="footer-badge">81 Tools</span>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h5>Documentation</h5>
+          <ul class="footer-links">
+            <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/install/">Installation Guide</a></li>
+            <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/install-windows/">Windows Setup</a></li>
+            <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/api/">Tools API Reference</a></li>
+            <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/recipes/">Effects Recipes</a></li>
+            <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/security/">Security Model</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5>Ecosystem</h5>
+          <ul class="footer-links">
+            <li><a href="https://www.synfig.org/" target="_blank">Synfig Studio Official ↗</a></li>
+            <li><a href="https://modelcontextprotocol.io/" target="_blank">Model Context Protocol ↗</a></li>
+            <li><a href="https://github.com/synfig/synfig" target="_blank">Synfig GitHub ↗</a></li>
+            <li><a href="https://forums.synfig.org/" target="_blank">Synfig Community ↗</a></li>
+            <li><a href="https://claude.ai/" target="_blank">Claude by Anthropic ↗</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5>Project</h5>
+          <ul class="footer-links">
+            <li><a href="https://github.com/anusara-bemal/synfig-mcp" target="_blank">GitHub Repository ↗</a></li>
+            <li><a href="https://github.com/anusara-bemal/synfig-mcp/releases" target="_blank">Releases &amp; Binaries ↗</a></li>
+            <li><a href="https://github.com/anusara-bemal/synfig-mcp/issues" target="_blank">Issue Tracker ↗</a></li>
+            <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/gpl-compliance/" target="_blank">GPL-3.0 Compliance</a></li>
+            <li><a href="https://github.com/anusara-bemal/synfig-mcp/blob/main/LICENSE">MIT License</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>Copyright &copy; 2026 Anusara Bemal and the synfig-mcp contributors. Server: MIT &middot; Bridge: GPL-3.0.</div>
+        <div>Built with Synfig Studio &mdash; 100% Free &amp; Open Source</div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

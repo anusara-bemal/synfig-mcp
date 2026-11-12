@@ -3,6 +3,7 @@
 [![Server CI](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml)
 [![Bridge Build](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/bridge-build.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/bridge-build.yml)
 [![CodeQL](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/codeql.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/codeql.yml)
+[![Website](https://img.shields.io/badge/website-live-1e73be.svg)](https://anusara-bemal.github.io/synfig-mcp/)
 [![Docs](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/docs.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/docs.yml)
 [![Release](https://img.shields.io/github/v/release/anusara-bemal/synfig-mcp?include_prereleases&sort=semver)](https://github.com/anusara-bemal/synfig-mcp/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -11,7 +12,7 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
+**Website:** [anusara-bemal.github.io/synfig-mcp](https://anusara-bemal.github.io/synfig-mcp/) · **Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 

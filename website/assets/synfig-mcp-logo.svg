@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="mcpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+  <!-- Outer Rounded Shield -->
+  <rect x="2" y="2" width="44" height="44" rx="10" fill="url(#mcpGrad)" stroke="#38bdf8" stroke-width="1.5"/>
+  <!-- Central Spline Curve (Animation Vector) -->
+  <path d="M12 34 C16 18, 32 30, 36 14" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+  <!-- Tangent Handles (Synfig Duck handles) -->
+  <line x1="12" y1="34" x2="20" y2="34" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <circle cx="20" cy="34" r="2.5" fill="#f59e0b"/>
+  <line x1="36" y1="14" x2="28" y2="14" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <circle cx="28" cy="14" r="2.5" fill="#f59e0b"/>
+  <!-- Keyframe Diamonds (MCP Protocol Triad) -->
+  <polygon points="12,30 16,34 12,38 8,34" fill="#38bdf8"/>
+  <polygon points="24,20 28,24 24,28 20,24" fill="#ffffff"/>
+  <polygon points="36,10 40,14 36,18 32,14" fill="#38bdf8"/>
+  <!-- MCP Connection Hub Node -->
+  <circle cx="24" cy="24" r="2" fill="#0284c7"/>
+</svg>
