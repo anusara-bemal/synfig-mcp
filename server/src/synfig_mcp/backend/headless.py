@@ -26,6 +26,7 @@ class HeadlessBackend(BackendBase):
     """Secondary backend operating on files via lxml and invoking synfig CLI for rendering."""
 
     def __init__(self, runner: CliRunner | None = None) -> None:
+        self._known_valuenodes: set[str] | None = None
         self.runner = runner or CliRunner()
         self._documents: dict[str, SifDocument] = {}
         self._doc_info: dict[str, DocumentInfo] = {}
@@ -536,6 +537,16 @@ class HeadlessBackend(BackendBase):
         layer = self._documents[doc_id].get_layer(layer_id)
         if layer is None:
             raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
+
+        # A node that this Synfig build does not have would make the document
+        # unloadable (the node set differs between Synfig releases).
+        if self._known_valuenodes is None:
+            self._known_valuenodes = set(await self.runner.get_valuenodes())
+        if self._known_valuenodes and type not in self._known_valuenodes:
+            raise SynfigError(
+                f"The installed Synfig has no '{type}' value node; a document using it "
+                f"would not load. Available: {', '.join(sorted(self._known_valuenodes))}."
+            )
 
         self._save_undo_state(doc_id)
         layer.convert_param(param_name, type)
