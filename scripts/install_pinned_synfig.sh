@@ -62,4 +62,7 @@ WRAPPER
 chmod +x "${DEST}/synfig"
 
 echo "=== Synfig engine ready: ${DEST}/synfig ==="
-"${DEST}/synfig" --version
+# This build prints its version but exits non-zero, which would abort the step
+# under the shell's ``-e``; the validity gate exercises the engine for real, so
+# the probe is informational only.
+"${DEST}/synfig" --version 2>&1 || true
