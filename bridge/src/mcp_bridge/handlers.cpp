@@ -10,6 +10,8 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <filesystem>
+#include <cctype>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -347,8 +349,43 @@ static bool is_within_root(const std::string& target_canon, const std::string& r
 }
 
 static bool is_overly_broad_root(const std::string& path_str, std::string& reason) {
-    (void)path_str;
-    (void)reason;
+    std::string normalized = path_str;
+    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    while (normalized.size() > 1 && normalized.back() == '/') normalized.pop_back();
+
+#ifdef _WIN32
+    std::string lower = normalized;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    const char* home = std::getenv("USERPROFILE");
+    const char* system_root = std::getenv("SYSTEMROOT");
+    const char* program_files = std::getenv("ProgramFiles");
+    const char* program_files_x86 = std::getenv("ProgramFiles(x86)");
+    auto same_path = [&lower](const char* value) {
+        if (!value || !*value) return false;
+        std::string candidate(value);
+        std::replace(candidate.begin(), candidate.end(), '\\', '/');
+        while (candidate.size() > 1 && candidate.back() == '/') candidate.pop_back();
+        std::transform(candidate.begin(), candidate.end(), candidate.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return lower == candidate;
+    };
+    if ((lower.size() == 2 && lower[1] == ':') || same_path(home) ||
+        same_path(system_root) || same_path(program_files) || same_path(program_files_x86)) {
+        reason = "filesystem, user, system, or program root";
+        return true;
+    }
+#else
+    const char* home = std::getenv("HOME");
+    std::string home_path = home ? home : "";
+    while (home_path.size() > 1 && home_path.back() == '/') home_path.pop_back();
+    if (normalized == "/" || (!home_path.empty() && normalized == home_path)) {
+        reason = "filesystem root or user home";
+        return true;
+    }
+#endif
     return false;
 }
 
@@ -427,12 +464,54 @@ void set_workspace_roots(const std::vector<std::string>& roots) {
 }
 
 static bool is_safe_bridge_path(const std::string& path, const std::vector<std::string>& allowed_exts, std::string& out_err) {
-    (void)allowed_exts;
     if (path.empty()) {
         out_err = "Security Sandbox Error: path cannot be empty";
         return false;
     }
-    return true;
+
+    std::string path_for_checks = path;
+    std::replace(path_for_checks.begin(), path_for_checks.end(), '\\', '/');
+    std::stringstream parts(path_for_checks);
+    std::string part;
+    while (std::getline(parts, part, '/')) {
+        if (part == "..") {
+            out_err = "Security Sandbox Error: directory traversal is not permitted";
+            return false;
+        }
+    }
+
+    std::string lower_path = path_for_checks;
+    std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    const auto dot = lower_path.find_last_of('.');
+    const auto slash = lower_path.find_last_of('/');
+    const std::string extension =
+        dot != std::string::npos && (slash == std::string::npos || dot > slash)
+            ? lower_path.substr(dot)
+            : "";
+    if (!allowed_exts.empty()) {
+        bool allowed = false;
+        for (const auto& candidate : allowed_exts) {
+            if (extension == candidate) {
+                allowed = true;
+                break;
+            }
+        }
+        if (!allowed) {
+            out_err = "Security Sandbox Error: file extension is not permitted";
+            return false;
+        }
+    }
+
+    ensure_default_workspace_roots();
+    const std::string canonical = normalize_path_str(path);
+    for (const auto& root : s_workspace_roots) {
+        if (is_within_root(canonical, root)) return true;
+    }
+
+    out_err = "Security Sandbox Error: path is outside configured workspace roots";
+    return false;
 }
 
 nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authenticated) {

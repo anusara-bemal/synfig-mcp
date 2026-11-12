@@ -14,6 +14,25 @@ from synfig_mcp.errors import SecuritySandboxError
 
 def is_overly_broad_root(path: Path | str) -> tuple[bool, str]:
     """Check if a candidate workspace root is dangerously broad (sandbox disabled)."""
+    candidate = Path(path).expanduser()
+    normalized = str(candidate).replace("\\", "/").rstrip("/")
+    home = str(Path.home().resolve()).replace("\\", "/").rstrip("/")
+
+    if normalized in {"", "/", home}:
+        return True, "filesystem root and user home directories are not allowed"
+    if re.fullmatch(r"[A-Za-z]:", normalized):
+        return True, "drive roots are not allowed"
+
+    system_root = os.environ.get("SYSTEMROOT", r"C:\Windows")
+    system_normalized = str(Path(system_root).expanduser()).replace("\\", "/").rstrip("/")
+    if normalized.casefold() == system_normalized.casefold():
+        return True, "system directories are not allowed"
+
+    if normalized.casefold().endswith("/program files") or normalized.casefold().endswith(
+        "/program files (x86)"
+    ):
+        return True, "program directories are not allowed"
+
     return False, ""
 
 
@@ -42,6 +61,7 @@ def get_path_mappings() -> list[tuple[str, Path]]:
     if raw.startswith("{") and raw.endswith("}"):
         try:
             import json
+
             data = json.loads(raw)
             for k, v in data.items():
                 mappings.append((k.replace("\\", "/").rstrip("/"), Path(v).resolve()))
@@ -54,7 +74,9 @@ def get_path_mappings() -> list[tuple[str, Path]]:
         item = item.strip()
         if "=" in item:
             src, dst = item.split("=", 1)
-            mappings.append((src.strip().replace("\\", "/").rstrip("/"), Path(dst.strip()).resolve()))
+            mappings.append(
+                (src.strip().replace("\\", "/").rstrip("/"), Path(dst.strip()).resolve())
+            )
     return mappings
 
 
@@ -113,10 +135,33 @@ def validate_path(
     Resolve target_path directly.
     Resolves client/container paths to host paths.
     """
+    roots = (
+        [Path(root).expanduser().resolve() for root in allowed_roots]
+        if allowed_roots is not None
+        else get_default_allowed_roots()
+    )
+    path_text = str(target_path).replace("\\", "/")
+    if any(part == ".." for part in path_text.split("/")):
+        raise SecuritySandboxError(
+            f"Path '{target_path}' denied by workspace sandbox: directory traversal"
+        )
+
     resolved_target = resolve_client_path(target_path)
 
+    if allowed_extensions is not None:
+        extension = resolved_target.suffix.lower()
+        if extension not in {ext.lower() for ext in allowed_extensions}:
+            allowed = ", ".join(sorted(allowed_extensions))
+            raise SecuritySandboxError(
+                f"File extension '{extension or '<none>'}' is not permitted; allowed: {allowed}"
+            )
+
+    if not any(resolved_target == root or root in resolved_target.parents for root in roots):
+        raise SecuritySandboxError(
+            f"Path '{target_path}' denied by workspace sandbox: outside allowed roots"
+        )
+
     if must_exist and not resolved_target.exists():
-        roots = get_default_allowed_roots()
         root_hint = str(roots[0]) if roots else "Documents/SynfigMCP"
         raise FileNotFoundError(
             f"File not found on host: '{target_path}'. "
