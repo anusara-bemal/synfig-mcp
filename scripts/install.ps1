@@ -18,7 +18,7 @@ function Write-Warn($Message)  { Write-Host "!   $Message" -ForegroundColor Yell
 function Write-Fail($Message)  { Write-Host "X   $Message" -ForegroundColor Red; exit 1 }
 
 Write-Host "synfig-mcp installer" -ForegroundColor Blue
-Write-Host "   author: Anusara Bemal - license: MIT (server) / GPL-3.0 (bridge)"
+Write-Host "   author: ABM - license: MIT (server) / GPL-3.0 (bridge)"
 Write-Host ""
 
 # --- prerequisites -----------------------------------------------------------

@@ -191,7 +191,7 @@ everything worked.
 
 ## Licensing
 
-- The **server** (`server/`) is MIT licensed — © 2026 **Anusara Bemal** and the
+- The **server** (`server/`) is MIT licensed — © 2026 **ABM** and the
   synfig-mcp contributors.
 - The **native bridge** (`bridge/`) is compiled into Synfig Studio and is a
   derivative work, therefore **GPL-3.0** — see

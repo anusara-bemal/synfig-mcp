@@ -4,7 +4,7 @@ site_url: https://anusara-bemal.github.io/synfig-mcp/
 repo_url: https://github.com/anusara-bemal/synfig-mcp
 repo_name: anusara-bemal/synfig-mcp
 edit_uri: edit/v1.0.0/docs/
-copyright: Copyright &copy; 2026 Anusara Bemal and the synfig-mcp contributors &mdash; server MIT, native bridge GPL-3.0
+copyright: Copyright &copy; 2026 ABM and the synfig-mcp contributors &mdash; server MIT, native bridge GPL-3.0
 
 theme:
   name: material

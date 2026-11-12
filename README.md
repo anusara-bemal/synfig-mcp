@@ -12,7 +12,7 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Website:** [anusara-bemal.github.io/synfig-mcp](https://anusara-bemal.github.io/synfig-mcp/) · **Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
+**Website:** [anusara-bemal.github.io/synfig-mcp](https://anusara-bemal.github.io/synfig-mcp/) · **Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 
@@ -524,7 +524,7 @@ bash bridge/scripts/build_linux.sh            # Linux
 
 ## License
 
-**Author: Anusara Bemal** — with the synfig-mcp contributors.
+**Author: ABM** — with the synfig-mcp contributors.
 
 - The Python **server** (`server/`) is MIT licensed — see [`LICENSE`](LICENSE).
 - The native **bridge** (`bridge/`) is compiled into Synfig Studio and is a
