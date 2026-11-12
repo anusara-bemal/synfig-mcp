@@ -1,471 +1,403 @@
-"""Rig-sheet extraction: turn one character sheet image into animated parts.
+"""
+Rig sheet slicing: turn one character sheet image into separate, transparent part images.
 
-A rig sheet ("model sheet") is a single raster with the character drawn several
-times plus notes. To animate a cut-out puppet we need the front view separated
-into overlapping body bands with real alpha.
+A rig sheet is a single picture with the body parts of a cut-out character laid
+out next to each other.  ``slice_rig_sheet`` finds every part (connected
+component of non-background pixels), crops it to its own PNG and writes a
+manifest.  It also draws a numbered preview so that a vision-capable MCP client
+can look at the sheet once and name the parts ("3 is the head").
 
-The hard part is not cutting: it is that the *paper white* and the character's
-*white clothing* are the same colour, and the clothing is open to the page at
-sleeve hems and cuffs. Colour thresholding alone therefore cannot tell them
-apart. This module resolves that by producing two masks from the same sheet:
-
-``parts``   precise silhouette from a border flood fill. Correct edges, but
-            white garments become transparent because the flood reached them.
-``backing`` a sealed silhouette (the ink outline grown, flooded, then eroded
-            back to the true edge) filled flat white. Placed behind the parts it
-            re-opaques white clothing while the precise edges still cut the
-            outside.
-
-Interior pockets that must stay open (the slot between legs) are punched from
-both masks via explicit seeds.
-
-Everything here is pure Pillow/NumPy and does not touch Synfig, so it is
-unit-testable and reusable from the CLI.
+Only numpy and Pillow are used; the labelling is a run-based union-find, which
+is fast enough for 4K sheets without SciPy.
 """
 
 from __future__ import annotations
 
+import base64
+import io
+import json
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
-from pydantic import BaseModel, Field
+from PIL import Image, ImageDraw
 
-__all__ = [
-    "BandSpec",
-    "CutoutParts",
-    "PartImage",
-    "SheetSpec",
-    "extract_sheet",
-    "load_manifest",
-    "prepare_background",
-    "render_shadow",
-]
+from synfig_mcp.errors import SynfigError
+
+#: Largest sheet edge that is analysed at full resolution.
+MAX_SHEET_EDGE = 8192
+#: Longest edge of the numbered preview handed back to the client.
+PREVIEW_EDGE = 768
+
+_SAFE_NAME = re.compile(r"[^A-Za-z0-9_]+")
 
 
-class BandSpec(BaseModel):
-    """One horizontal band of the figure, in normalised figure coordinates."""
-
-    name: str = Field(description="Part name, e.g. 'head', 'torso', 'lower'.")
-    top: float = Field(ge=0.0, le=1.0, description="Band top as a fraction of figure height.")
-    bottom: float = Field(ge=0.0, le=1.0, description="Band bottom as a fraction of figure height.")
-
-    def rows(self, height: int) -> tuple[int, int]:
-        return round(self.top * height), round(self.bottom * height)
+def safe_part_name(name: str) -> str:
+    """Normalise a part name so that it is usable as a file name and a layer id."""
+    cleaned = _SAFE_NAME.sub("_", name.strip()).strip("_").lower()
+    return cleaned or "part"
 
 
-class SheetSpec(BaseModel):
-    """How to cut one sheet into parts."""
+@dataclass
+class SheetPart:
+    """One part found on a rig sheet."""
 
-    sheet_path: str = Field(description="Path to the character sheet image.")
-    output_dir: str = Field(description="Directory to write parts and manifest into.")
-    background_path: str | None = Field(
-        default=None, description="Optional background image stored in the manifest."
-    )
-    crop: tuple[int, int, int, int] | None = Field(
-        default=None,
-        description="Optional (left, top, right, bottom) crop isolating the front view.",
-    )
-    bands: list[BandSpec] = Field(
-        default_factory=lambda: [
-            BandSpec(name="head", top=0.0, bottom=0.245),
-            BandSpec(name="torso", top=0.215, bottom=0.668),
-            BandSpec(name="lower", top=0.645, bottom=1.0),
-        ],
-        description="Body bands, listed top of stack first. Keep adjacent bands overlapping.",
-    )
-    pocket_seeds: list[tuple[int, int]] = Field(
-        default_factory=list,
-        description="(x, y) points in figure pixels of background pockets to keep transparent.",
-    )
-    pocket_bounds: tuple[int, int, int, int] | None = Field(
-        default=None,
-        description="(x0, y0, x1, y1) in figure pixels limiting how far a pocket flood may grow.",
-    )
-    paper_threshold: int = Field(
-        default=205, description="Minimum channel value counted as paper white."
-    )
-    paper_spread: int = Field(default=26, description="Max RGB spread still counted as paper white.")
-    ink_luma: int = Field(default=235, description="Luminance below which a pixel counts as ink.")
-    seal_px: int = Field(default=4, description="Pixels the ink outline is grown to seal pen gaps.")
-    isolate_px: int = Field(
-        default=2,
-        description=(
-            "Radius used to sever guide lines that stitch note sketches to the figure. "
-            "The figure is eroded by this much to find its true body, then dilated back "
-            "and intersected with the raw cut. Raise it for sheets whose guide lines are "
-            "thick, but very thin fingers start to disappear above 3."
-        ),
-    )
-    min_part_px: int = Field(
-        default=40, description="Restored blobs smaller than this are dropped as sheet noise."
-    )
-    ignore_regions: list[tuple[int, int, int, int]] = Field(
-        default_factory=list,
-        description=(
-            "Boxes (left, top, right, bottom) in sheet coordinates to erase before cutting, "
-            "e.g. stray hand studies, colour swatches or notes that touch the figure."
-        ),
-    )
-    make_backing: bool = Field(default=True, description="Write a white backing plate part.")
+    index: int
+    bbox: tuple[int, int, int, int]  # x, y, width, height in sheet pixels
+    area: int
+    name: str = ""
+    file: str = ""
+    labels: list[int] = field(default_factory=list)
 
-    @property
-    def out(self) -> Path:
-        return Path(self.output_dir)
-
-
-class PartImage(BaseModel):
-    """A written part image plus where it sits in figure space."""
-
-    name: str
-    file: str
-    x: int
-    y: int
-    w: int
-    h: int
-
-
-class CutoutParts(BaseModel):
-    """Result of a sheet extraction."""
-
-    figure_w: int
-    figure_h: int
-    parts: list[PartImage]
-    pivots: dict[str, tuple[int, int]] = Field(
-        default_factory=dict, description="Neck / hip / feet pivot in figure pixels."
-    )
-    background_path: str | None = None
-    manifest_path: str
+    def as_dict(self) -> dict[str, Any]:
+        x, y, w, h = self.bbox
+        return {
+            "index": self.index,
+            "name": self.name,
+            "file": self.file,
+            "bbox": {"x": x, "y": y, "width": w, "height": h},
+            "area": self.area,
+        }
 
 
 # ---------------------------------------------------------------------------
-# masks
+# Connected component labelling (8-connectivity, run based)
 # ---------------------------------------------------------------------------
-def _paper_mask(rgb: np.ndarray, threshold: int, spread: int) -> np.ndarray:
-    return (rgb.min(axis=2) >= threshold) & ((rgb.max(axis=2) - rgb.min(axis=2)) <= spread)
 
 
-def _outside_mask(passable: np.ndarray) -> np.ndarray:
-    """Flood the `passable` region inwards from the image border.
+def _row_runs(row: np.ndarray) -> list[tuple[int, int]]:
+    """Return the [start, end) runs of True values in a boolean row."""
+    if not row.any():
+        return []
+    padded = np.concatenate(([False], row, [False]))
+    edges = np.flatnonzero(padded[1:] != padded[:-1])
+    return list(zip(edges[0::2].tolist(), edges[1::2].tolist(), strict=True))
 
-    Uses Pillow's flood fill (C) instead of a Python BFS so large sheets stay
-    fast. Pillow floods *equal-valued* neighbours, so passable pixels are written
-    as 0 and barriers as 255; a 0-valued frame around the image guarantees the
-    seed pixel is always passable.
+
+def label_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
+    """Label the 8-connected components of a boolean mask.
+
+    Returns ``(labels, count)`` where ``labels`` has 0 for background and
+    ``1..count`` for the components.
     """
-    h, w = passable.shape
-    canvas = np.full((h + 2, w + 2), 255, np.uint8)
-    canvas[1:-1, 1:-1] = np.where(passable, 0, 255).astype(np.uint8)
-    canvas[0, :] = canvas[-1, :] = canvas[:, 0] = canvas[:, -1] = 0
-    # .copy() detaches the buffer: writing into an array-backed image is a no-op
-    img = Image.fromarray(canvas, "L").copy()
-    ImageDraw.floodfill(img, (0, 0), 128, thresh=0)
-    return np.asarray(img)[1:-1, 1:-1] == 128
+    height, width = mask.shape
+    labels = np.zeros((height, width), dtype=np.int32)
+    parent: list[int] = [0]
 
+    def find(item: int) -> int:
+        root = item
+        while parent[root] != root:
+            root = parent[root]
+        while parent[item] != root:
+            parent[item], item = root, parent[item]
+        return root
 
-def _components(mask: np.ndarray) -> tuple[np.ndarray, int]:
-    """Label 4-connected components of `mask` by unioning runs per row.
+    previous: list[tuple[int, int, int]] = []
+    for y in range(height):
+        current: list[tuple[int, int, int]] = []
+        pointer = 0
+        for start, end in _row_runs(mask[y]):
+            label = 0
+            # Runs of the previous row that touch this run (diagonals included).
+            while pointer < len(previous) and previous[pointer][1] < start:
+                pointer += 1
+            probe = pointer
+            while probe < len(previous) and previous[probe][0] <= end:
+                other = find(previous[probe][2])
+                if label == 0:
+                    label = other
+                elif other != label:
+                    low, high = (label, other) if label < other else (other, label)
+                    parent[high] = low
+                    label = low
+                probe += 1
+            if label == 0:
+                label = len(parent)
+                parent.append(label)
+            labels[y, start:end] = label
+            current.append((start, end, label))
+        previous = current
 
-    Row-run union-find keeps this O(runs) instead of a per-pixel Python BFS,
-    which matters on multi-megapixel sheets.
-    """
-    h, w = mask.shape
-    parent: list[int] = []
-
-    def find(i: int) -> int:
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    def union(a: int, b: int) -> None:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[max(ra, rb)] = min(ra, rb)
-
-    labels = np.zeros((h, w), np.int32)
-    prev: list[tuple[int, int, int]] = []  # (start, end, label)
-    for y in range(h):
-        row = mask[y]
-        if not row.any():
-            prev = []
-            continue
-        edges = np.diff(np.concatenate(([0], row.view(np.int8), [0])).astype(np.int8))
-        starts = np.flatnonzero(edges == 1)
-        ends = np.flatnonzero(edges == -1) - 1
-        cur: list[tuple[int, int, int]] = []
-        for s, e in zip(starts, ends, strict=True):
-            label = len(parent)
-            parent.append(label)
-            labels[y, s:e + 1] = label
-            for ps, pe, pl in prev:
-                if ps <= e and s <= pe:
-                    union(label, pl)
-            cur.append((int(s), int(e), label))
-        prev = cur
-
-    # flatten
+    # Compact the label ids.
+    lookup = np.zeros(len(parent), dtype=np.int32)
+    count = 0
     remap: dict[int, int] = {}
-    flat = np.zeros((h, w), np.int32)
-    for y in range(h):
-        row = mask[y]
-        if not row.any():
-            continue
-        idx = np.flatnonzero(row)
-        for x in idx:
-            root = find(int(labels[y, x]))
-            if root not in remap:
-                remap[root] = len(remap) + 1
-            flat[y, x] = remap[root]
-    return flat, len(remap)
+    for label in range(1, len(parent)):
+        root = find(label)
+        if root not in remap:
+            count += 1
+            remap[root] = count
+        lookup[label] = remap[root]
+    return lookup[labels], count
 
 
-def _largest_component(mask: np.ndarray) -> np.ndarray:
-    labels, count = _components(mask)
+# ---------------------------------------------------------------------------
+# Foreground detection
+# ---------------------------------------------------------------------------
+
+
+def foreground_mask(rgba: np.ndarray, bg_tolerance: int = 28) -> tuple[np.ndarray, str]:
+    """Return the foreground mask of a sheet and how the background was detected.
+
+    A sheet with real transparency uses its alpha channel.  An opaque sheet uses
+    the border colour: only background-coloured pixels that are *connected to
+    the border* count as background, so white eyes on a white sheet survive.
+    """
+    alpha = rgba[..., 3]
+    transparent = float((alpha < 16).mean())
+    if transparent > 0.01:
+        return alpha >= 16, "alpha"
+
+    rgb = rgba[..., :3].astype(np.int16)
+    border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
+    bg_colour = np.median(border, axis=0)
+    distance = np.abs(rgb - bg_colour).max(axis=-1)
+    similar = distance <= bg_tolerance
+
+    labels, _count = label_components(similar)
+    edge_labels = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
+    edge_labels = edge_labels[edge_labels != 0]
+    background = np.isin(labels, edge_labels)
+    return ~background, "border_colour"
+
+
+# ---------------------------------------------------------------------------
+# Part detection
+# ---------------------------------------------------------------------------
+
+
+def _bbox_gap(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> int:
+    """Pixel gap between two x0,y0,x1,y1 boxes (0 when they touch or overlap)."""
+    dx = max(a[0] - b[2], b[0] - a[2], 0)
+    dy = max(a[1] - b[3], b[1] - a[3], 0)
+    return max(dx, dy)
+
+
+def _contains(outer: tuple[int, int, int, int], inner: tuple[int, int, int, int]) -> bool:
+    return (
+        outer[0] <= inner[0]
+        and outer[1] <= inner[1]
+        and outer[2] >= inner[2]
+        and outer[3] >= inner[3]
+    )
+
+
+def detect_parts(
+    mask: np.ndarray,
+    min_area: int | None = None,
+    merge_gap: int = 6,
+) -> tuple[np.ndarray, list[SheetPart]]:
+    """Find the parts of a sheet.
+
+    Specks smaller than ``min_area`` are attached to a part within ``merge_gap``
+    pixels (a detached highlight, an eyebrow) or dropped as noise.  A component
+    that lies completely inside the bounding box of a bigger one is merged into
+    it.  The parts are returned in reading order.
+    """
+    labels, count = label_components(mask)
     if count == 0:
-        return mask
-    sizes = np.bincount(labels.ravel())
-    sizes[0] = 0
-    return labels == int(sizes.argmax())
+        return labels, []
+
+    height, width = mask.shape
+    if min_area is None:
+        min_area = max(48, int(width * height * 0.0004))
+
+    areas = np.bincount(labels.ravel(), minlength=count + 1)
+    boxes: dict[int, tuple[int, int, int, int]] = {}
+    ys, xs = np.nonzero(labels)
+    values = labels[ys, xs]
+    order = np.argsort(values, kind="stable")
+    values, ys, xs = values[order], ys[order], xs[order]
+    starts = np.flatnonzero(np.concatenate(([True], values[1:] != values[:-1])))
+    ends = np.concatenate((starts[1:], [len(values)]))
+    for start, end in zip(starts.tolist(), ends.tolist(), strict=True):
+        label = int(values[start])
+        boxes[label] = (
+            int(xs[start:end].min()),
+            int(ys[start:end].min()),
+            int(xs[start:end].max()) + 1,
+            int(ys[start:end].max()) + 1,
+        )
+
+    big = sorted((lb for lb in boxes if areas[lb] >= min_area), key=lambda lb: -int(areas[lb]))
+    small = [lb for lb in boxes if areas[lb] < min_area]
+
+    groups: list[dict[str, Any]] = []
+    for label in big:
+        box = boxes[label]
+        host = next((g for g in groups if _contains(g["box"], box)), None)
+        if host is not None:
+            host["labels"].append(label)
+            host["area"] += int(areas[label])
+        else:
+            groups.append({"box": box, "labels": [label], "area": int(areas[label])})
+
+    for label in small:
+        box = boxes[label]
+        best: dict[str, Any] | None = None
+        best_gap = merge_gap + 1
+        for group in groups:
+            gap = _bbox_gap(group["box"], box)
+            if gap < best_gap:
+                best, best_gap = group, gap
+        if best is not None:
+            best["labels"].append(label)
+            best["area"] += int(areas[label])
+            old = best["box"]
+            best["box"] = (
+                min(old[0], box[0]),
+                min(old[1], box[1]),
+                max(old[2], box[2]),
+                max(old[3], box[3]),
+            )
+
+    # Reading order: rows of parts from top to bottom, left to right inside a row.
+    groups.sort(key=lambda g: (g["box"][1], g["box"][0]))
+    rows: list[list[dict[str, Any]]] = []
+    for group in groups:
+        centre = (group["box"][1] + group["box"][3]) / 2
+        if rows and centre < max(g["box"][3] for g in rows[-1]):
+            rows[-1].append(group)
+        else:
+            rows.append([group])
+
+    parts: list[SheetPart] = []
+    for row in rows:
+        for group in sorted(row, key=lambda g: g["box"][0]):
+            x0, y0, x1, y1 = group["box"]
+            parts.append(
+                SheetPart(
+                    index=len(parts) + 1,
+                    bbox=(x0, y0, x1 - x0, y1 - y0),
+                    area=group["area"],
+                    labels=list(group["labels"]),
+                )
+            )
+    return labels, parts
 
 
-def _pocket_mask(paper: np.ndarray, seeds: list[tuple[int, int]], bounds: tuple[int, int, int, int] | None):
-    """Punch paper pockets that the border flood cannot reach."""
-    mask = np.zeros_like(paper)
-    h, w = paper.shape
-    for sx, sy in seeds:
-        if not (0 <= sy < h and 0 <= sx < w):
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+
+def _preview(image: Image.Image, parts: list[SheetPart]) -> str:
+    """Draw numbered boxes over the sheet and return a base64 PNG."""
+    scale = min(1.0, PREVIEW_EDGE / max(image.size))
+    size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
+    canvas = Image.new("RGBA", size, (255, 255, 255, 255))
+    canvas.alpha_composite(image.resize(size, Image.Resampling.LANCZOS))
+    draw = ImageDraw.Draw(canvas)
+    for part in parts:
+        x, y, w, h = part.bbox
+        box = (x * scale, y * scale, (x + w) * scale - 1, (y + h) * scale - 1)
+        draw.rectangle(box, outline=(230, 30, 60, 255), width=2)
+        label = f"{part.index}" + (f" {part.name}" if part.name else "")
+        text_box = draw.textbbox((box[0] + 3, box[1] + 2), label)
+        draw.rectangle(
+            (text_box[0] - 2, text_box[1] - 1, text_box[2] + 2, text_box[3] + 1),
+            fill=(230, 30, 60, 255),
+        )
+        draw.text((box[0] + 3, box[1] + 2), label, fill=(255, 255, 255, 255))
+    buffer = io.BytesIO()
+    canvas.convert("RGB").save(buffer, format="PNG", optimize=True)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def slice_rig_sheet(
+    sheet_path: Path,
+    output_dir: Path,
+    names: dict[str, str] | None = None,
+    min_area: int | None = None,
+    merge_gap: int = 6,
+    bg_tolerance: int = 28,
+    padding: int = 2,
+    preview: bool = True,
+) -> dict[str, Any]:
+    """Slice a rig sheet into one transparent PNG per part.
+
+    ``names`` maps the part number (as shown in the preview) to a part name, for
+    example ``{"1": "head", "2": "torso"}``.  When names are given only the named
+    parts are written, which is how captions and stray marks on a sheet are
+    left out.  Without names every part is written as ``part_NN``.
+    """
+    try:
+        with Image.open(sheet_path) as source:
+            image = source.convert("RGBA")
+    except Exception as err:
+        raise SynfigError(f"Cannot read rig sheet '{sheet_path}': {err}") from err
+
+    if max(image.size) > MAX_SHEET_EDGE:
+        raise SynfigError(
+            f"Rig sheet is {image.width}x{image.height}; the longest edge may not exceed "
+            f"{MAX_SHEET_EDGE} pixels."
+        )
+
+    rgba = np.asarray(image)
+    mask, method = foreground_mask(rgba, bg_tolerance=bg_tolerance)
+    labels, parts = detect_parts(mask, min_area=min_area, merge_gap=merge_gap)
+    if not parts:
+        raise SynfigError(
+            "No parts were found on the rig sheet. The sheet needs a transparent or a "
+            "uniform background; try a larger bg_tolerance or a smaller min_area."
+        )
+
+    wanted: dict[int, str] = {}
+    if names:
+        for key, value in names.items():
+            try:
+                index = int(key)
+            except (TypeError, ValueError) as err:
+                raise SynfigError(f"names keys must be part numbers, got '{key}'.") from err
+            if not 1 <= index <= len(parts):
+                raise SynfigError(
+                    f"names refers to part {index}, but the sheet has parts 1..{len(parts)}."
+                )
+            wanted[index] = safe_part_name(str(value))
+        duplicates = {n for n in wanted.values() if list(wanted.values()).count(n) > 1}
+        if duplicates:
+            raise SynfigError(f"Part names must be unique, repeated: {sorted(duplicates)}.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[SheetPart] = []
+    for part in parts:
+        if wanted and part.index not in wanted:
             continue
-        if not paper[sy, sx]:
-            # seed landed on ink: nudge to the nearest paper pixel in a small window
-            found = None
-            for radius in range(1, 6):
-                ys = slice(max(0, sy - radius), min(h, sy + radius + 1))
-                xs = slice(max(0, sx - radius), min(w, sx + radius + 1))
-                window = paper[ys, xs]
-                if window.any():
-                    dy, dx = np.argwhere(window)[0]
-                    found = (xs.start + dx, ys.start + dy)
-                    break
-            if found is None:
-                raise ValueError(f"pocket seed {(sx, sy)} is not on a paper pocket")
-            sx, sy = found
-        stack, seen = [(sy, sx)], {(sy, sx)}
-        while stack:
-            cy, cx = stack.pop()
-            mask[cy, cx] = True
-            for ny, nx in ((cy - 1, cx), (cy + 1, cx), (cy, cx - 1), (cy, cx + 1)):
-                if bounds and not (bounds[1] <= ny < bounds[3] and bounds[0] <= nx < bounds[2]):
-                    continue
-                if not (0 <= ny < h and 0 <= nx < w):
-                    continue
-                if paper[ny, nx] and (ny, nx) not in seen:
-                    seen.add((ny, nx))
-                    stack.append((ny, nx))
-    mask[~paper] = False
-    return mask
+        part.name = wanted.get(part.index, f"part_{part.index:02d}")
+        x, y, w, h = part.bbox
+        x0, y0 = max(0, x - padding), max(0, y - padding)
+        x1, y1 = min(image.width, x + w + padding), min(image.height, y + h + padding)
+        crop = rgba[y0:y1, x0:x1].copy()
+        own = np.isin(labels[y0:y1, x0:x1], part.labels)
+        crop[..., 3] = np.where(own, crop[..., 3], 0)
+        target = output_dir / f"{part.name}.png"
+        Image.fromarray(crop, "RGBA").save(target, format="PNG", optimize=True)
+        part.bbox = (x0, y0, x1 - x0, y1 - y0)
+        part.file = str(target)
+        written.append(part)
 
-
-def _pocket_bounds(seeds: list[tuple[int, int]], shape: tuple[int, int]) -> tuple[int, int, int, int] | None:
-    """Allow the pocket flood to grow at most a quarter of the figure around a seed."""
-    if not seeds:
-        return None
-    h, w = shape
-    span = max(24, round(min(h, w) * 0.25))
-    xs = [s[0] for s in seeds]
-    ys = [s[1] for s in seeds]
-    return (max(0, min(xs) - span), max(0, min(ys) - span),
-            min(w, max(xs) + span), min(h, max(ys) + span))
-
-
-# ---------------------------------------------------------------------------
-# extraction
-# ---------------------------------------------------------------------------
-def extract_sheet(spec: SheetSpec) -> CutoutParts:
-    """Cut one rig sheet into overlapping alpha parts plus a white backing plate."""
-    sheet_path = Path(spec.sheet_path).expanduser()
-    if not sheet_path.is_file():
-        raise FileNotFoundError(f"sheet not found: {sheet_path}")
-    out = spec.out
-    parts_dir = out / "parts"
-    parts_dir.mkdir(parents=True, exist_ok=True)
-
-    image = Image.open(sheet_path).convert("RGB")
-    if spec.ignore_regions:
-        draw = ImageDraw.Draw(image)
-        for box in spec.ignore_regions:
-            draw.rectangle(box, fill=(255, 255, 255))
-    if spec.crop:
-        left, top, right, bottom = spec.crop
-        image = image.crop((left, top, right, bottom))
-
-    # 1px paper margin so every border pixel can seed the flood
-    rgb_pad = np.pad(np.asarray(image).astype(np.int16), ((1, 1), (1, 1), (0, 0)),
-                     mode="constant", constant_values=255)
-    h, w = rgb_pad.shape[:2]
-    paper = _paper_mask(rgb_pad, spec.paper_threshold, spec.paper_spread)
-    luma = rgb_pad.reshape(-1, 3).mean(axis=1).reshape(h, w)
-
-    # --- precise cut -------------------------------------------------------
-    # The raw cut is the whole ink drawing, including the stray note sketches
-    # and any other view that shares the crop. Guide lines join those to the
-    # figure, so we erode hard enough to sever them, keep the biggest body,
-    # then dilate back and intersect with the raw cut to restore real edges.
-    raw = ~_outside_mask(paper)
-    radius = max(1, spec.isolate_px)
-    eroded = np.asarray(
-        Image.fromarray((raw * 255).astype(np.uint8), "L").filter(
-            ImageFilter.MinFilter(radius * 2 + 1))
-    ) > 127
-    body = _largest_component(eroded)
-    grown = np.asarray(
-        Image.fromarray((body * 255).astype(np.uint8), "L").filter(
-            ImageFilter.MaxFilter(radius * 2 + 1))
-    ) > 127
-    restored = grown & raw
-    labels, count = _components(restored)
-    sizes = np.bincount(labels.ravel())
-    sizes[0] = 0
-    keep = {i for i in range(1, count + 1) if sizes[i] >= max(1, spec.min_part_px)}
-    precise = np.isin(labels, list(keep))
-    precise = np.asarray(
-        Image.fromarray((precise * 255).astype(np.uint8), "L").filter(
-            ImageFilter.MedianFilter(3))
-    ) > 127
-    if not precise.any():
-        raise ValueError("no character found: the sheet is blank or entirely paper")
-
-    # --- sealed body -------------------------------------------------------
-    ink = luma < spec.ink_luma
-    grow = spec.seal_px * 2 + 1
-    barrier = np.asarray(
-        Image.fromarray((ink * 255).astype(np.uint8), "L").filter(ImageFilter.MaxFilter(grow))
-    ) > 127
-    solid = ~_outside_mask(~barrier)
-    solid = _largest_component(solid)
-    solid = np.asarray(
-        Image.fromarray((solid * 255).astype(np.uint8), "L").filter(ImageFilter.MinFilter(grow))
-    ) > 127
-    # keep the backing on the figure only, never on note sketches
-    body_area = np.asarray(
-        Image.fromarray((body * 255).astype(np.uint8), "L").filter(
-            ImageFilter.MaxFilter((radius + 2) * 2 + 1))
-    ) > 127
-    solid &= body_area
-
-    # --- common trim box ---------------------------------------------------
-    bbox = Image.fromarray((precise * 255).astype(np.uint8), "L").getbbox()
-    if not bbox:
-        raise ValueError("no character found: the sheet is blank or entirely paper")
-    left, top, right, bottom = bbox
-    x0, y0 = max(1, left - 2), max(1, top - 2)
-    x1, y1 = min(w - 1, right + 2), min(h - 1, bottom + 2)
-    crop_box = (x0 - 1, y0 - 1, x1 - 1, y1 - 1)
-    figure = image.crop(crop_box)
-
-    # --- pockets (in figure coordinates) -----------------------------------
-    paper_fig = paper[y0:y1, x0:x1]
-    pockets = _pocket_mask(
-        paper_fig,
-        spec.pocket_seeds,
-        spec.pocket_bounds or _pocket_bounds(spec.pocket_seeds, paper_fig.shape),
-    )
-    precise_fig = precise[y0:y1, x0:x1].copy()
-    solid_fig = solid[y0:y1, x0:x1].copy()
-    precise_fig[pockets] = False
-    solid_fig[pockets] = False
-
-    rgba = figure.convert("RGBA")
-    rgba.putalpha(Image.fromarray((precise_fig * 255).astype(np.uint8), "L")
-                  .filter(ImageFilter.GaussianBlur(0.7)))
-
-    if spec.make_backing:
-        backing = Image.new("RGBA", rgba.size, (255, 255, 255, 0))
-        backing.putalpha(Image.fromarray((solid_fig * 255).astype(np.uint8), "L")
-                         .filter(ImageFilter.GaussianBlur(0.6)))
-        backing.save(parts_dir / "backing.png")
-
-    # --- bands -------------------------------------------------------------
-    written: list[PartImage] = []
-    for band in spec.bands:
-        y0, y1 = band.rows(rgba.height)
-        y0, y1 = max(0, y0), min(rgba.height, y1)
-        strip = rgba.crop((0, y0, rgba.width, y1))
-        alpha = strip.getchannel("A")
-        sb = alpha.getbbox()
-        if not sb:
-            raise ValueError(f"band '{band.name}' contains no pixels; check it against the figure")
-        strip = strip.crop(sb)
-        path = parts_dir / f"{band.name}.png"
-        strip.save(path)
-        written.append(PartImage(name=band.name, file=str(path), x=sb[0], y=y0 + sb[1],
-                                 w=strip.width, h=strip.height))
-
-    if spec.make_backing:
-        written.append(PartImage(name="backing", file=str(parts_dir / "backing.png"),
-                                 x=0, y=0, w=rgba.width, h=rgba.height))
-
-    # --- pivots: neck at the head band's base, hips at the torso band's base -
-    by_name = {band.name: band for band in spec.bands}
-    height = rgba.height
-    width = rgba.width
-
-    def base_of(name: str, fallback: float) -> int:
-        band = by_name.get(name)
-        frac = band.bottom if band else fallback
-        return round(frac * height)
-
-    pivots = {
-        "neck": (width // 2, base_of("head", 0.245)),
-        "hip": (width // 2, base_of("torso", 0.668)),
-        "feet": (width // 2, height),
+    manifest = {
+        "sheet": str(sheet_path),
+        "sheet_size": {"width": image.width, "height": image.height},
+        "background": method,
+        "parts": [p.as_dict() for p in written],
     }
+    manifest_path = output_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    manifest_path = out / "manifest.json"
-    result = CutoutParts(
-        figure_w=width,
-        figure_h=height,
-        parts=written,
-        pivots={k: (int(v[0]), int(v[1])) for k, v in pivots.items()},
-        background_path=spec.background_path,
-        manifest_path=str(manifest_path),
-    )
-    manifest_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
-    rgba.save(out / "figure.png")
-    (out / "parts" / "figure.png").write_bytes((out / "figure.png").read_bytes())
+    result: dict[str, Any] = {
+        "success": True,
+        "sheet": str(sheet_path),
+        "sheet_size": manifest["sheet_size"],
+        "background": method,
+        "output_dir": str(output_dir),
+        "manifest": str(manifest_path),
+        "detected_parts": len(parts),
+        "parts": manifest["parts"],
+        "named": bool(wanted),
+    }
+    if preview:
+        result["preview_base64"] = _preview(image, parts)
     return result
-
-
-def prepare_background(source: str, dest: Path, size: tuple[int, int]) -> Path:
-    """Cover-fit a background image to the canvas and sharpen the upscale."""
-    img = Image.open(Path(source).expanduser()).convert("RGB")
-    w, h = size
-    scale = max(w / img.width, h / img.height)
-    if abs(scale - 1.0) > 1e-3:
-        img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))),
-                         Image.LANCZOS)
-    left, top = (img.width - w) // 2, (img.height - h) // 2
-    img = img.crop((left, top, left + w, top + h))
-    if scale > 1.35:
-        img = img.filter(ImageFilter.UnsharpMask(radius=1.6, percent=55, threshold=3))
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    img.save(dest, quality=92)
-    return dest
-
-
-def render_shadow(dest: Path, width: int = 360, height: int = 104, strength: float = 0.8) -> Path:
-    """Soft elliptical contact shadow with a transparent surround."""
-    yy, xx = np.mgrid[0:height, 0:width]
-    radius = np.sqrt(((xx - width / 2) / (width / 2)) ** 2
-                     + ((yy - height / 2) / (height / 2)) ** 2)
-    alpha = (np.clip(1.0 - radius, 0.0, 1.0) ** 1.45) * strength
-    arr = np.zeros((height, width, 4), np.uint8)
-    arr[..., 0], arr[..., 1], arr[..., 2] = 14, 20, 30
-    arr[..., 3] = (alpha * 255).astype(np.uint8)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(arr, "RGBA").save(dest)
-    return dest
-
-
-def load_manifest(path: str) -> CutoutParts:
-    return CutoutParts.model_validate_json(Path(path).expanduser().read_text(encoding="utf-8"))

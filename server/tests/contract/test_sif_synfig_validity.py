@@ -370,22 +370,36 @@ async def test_every_supported_conversion_is_accepted_by_synfig(
     backend = HeadlessBackend(runner=CliRunner(BINARY))
     doc_id = await _new_doc(backend)
 
+    converted = 0
     for valuenode_type in sorted(VALUENODE_SPECS):
-        assert valuenode_type in real_valuenodes, (
-            f"'{valuenode_type}' is advertised as a conversion but Synfig has no such ValueNode"
-        )
         layer_type, param_name, value = _conversion_target(valuenode_type)
         layer = await backend.layer_add(doc_id=doc_id, layer_type=layer_type, params={})
         # The parameter has to exist before it can be converted.
         await backend.param_set(
             doc_id=doc_id, layer_id=layer["layer_id"], param_name=param_name, value=value
         )
+        if valuenode_type not in real_valuenodes:
+            # The node set differs between Synfig releases: a node this build
+            # lacks must be refused instead of written into the document.
+            with pytest.raises(SynfigError, match="has no"):
+                await backend.param_convert(
+                    doc_id=doc_id,
+                    layer_id=layer["layer_id"],
+                    param_name=param_name,
+                    type=valuenode_type,
+                )
+            continue
+        converted += 1
         await backend.param_convert(
             doc_id=doc_id,
             layer_id=layer["layer_id"],
             param_name=param_name,
             type=valuenode_type,
         )
+
+    assert converted >= len(VALUENODE_SPECS) * 0.8, (
+        f"only {converted} of {len(VALUENODE_SPECS)} advertised conversions exist in this Synfig"
+    )
 
     # The composite node works on vector and color parameters.
     composite = await backend.layer_add(
@@ -679,3 +693,42 @@ async def test_document_properties_and_time_range_produce_loadable_document(
     await backend.doc_set_time_range(doc_id=doc_id, start_time=0.0, end_time=2.0, fps=30.0)
 
     await assert_loadable(backend, doc_id, tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Rig sheet -> animated scene
+# ---------------------------------------------------------------------------
+
+
+async def test_auto_built_character_scene_loads_and_moves(tmp_path: Path) -> None:
+    """A scene built from a rig sheet must load in Synfig and render a moving character."""
+    from PIL import Image, ImageChops
+
+    from synfig_mcp.characters.production import SceneAutoBuilder
+    from synfig_mcp.characters.sheet import slice_rig_sheet
+    from tests.support.rig_assets import PART_NAMES, make_assets, scene_spec
+
+    assets = make_assets(tmp_path)
+    sliced = slice_rig_sheet(
+        Path(assets["sheet"]), tmp_path / "parts", names=PART_NAMES, preview=False
+    )
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    spec = scene_spec(assets, sliced["manifest"])
+    spec["characters"][0]["flip"] = True
+    built = await SceneAutoBuilder(backend).build(spec)
+    doc_id = built["doc_id"]
+
+    await assert_loadable(backend, doc_id, tmp_path)
+
+    frames = []
+    for index, time in enumerate((0.0, 1.5)):
+        target = tmp_path / f"frame_{index}.png"
+        await backend.render_frame(
+            doc_id=doc_id, output_path=str(target), width=320, height=180, time=time
+        )
+        assert target.is_file() and target.stat().st_size > 0, "Synfig rendered no frame"
+        frames.append(Image.open(target).convert("RGB"))
+    assert len(frames[0].getcolors(maxcolors=320 * 180) or []) > 3, "the frame is empty"
+    assert ImageChops.difference(frames[0], frames[1]).getbbox() is not None, (
+        "the character did not move between two frames"
+    )

@@ -43,3 +43,17 @@ def pytest_terminal_summary(
     terminalreporter.write_sep("=", "Synfig MCP Test Summary")
     terminalreporter.write_line(f"Total skipped tests: {skipped_count}")
     terminalreporter.write_line(f"Total real_studio marked tests: {_real_studio_count}")
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    """On GitHub Actions, surface every failing test as an annotation on the run.
+
+    The annotation carries the last lines of the failure, so a red check can be
+    diagnosed from the pull request page without opening the raw job log.
+    """
+    if not os.environ.get("GITHUB_ACTIONS") or not report.failed:
+        return
+    path, line, _name = report.location
+    tail = str(report.longrepr).strip().splitlines()[-12:]
+    message = "%0A".join(text.replace("%", "%25").replace("\r", "") for text in tail)
+    print(f"\n::error file=server/{path},line={(line or 0) + 1},title={report.nodeid}::{message}")

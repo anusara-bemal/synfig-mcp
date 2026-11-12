@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 81 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 83 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -8,7 +8,7 @@
 ## Table of Contents
 
 - [Animation & Keyframes](#animation-keyframes) (10 tools)
-- [Canvas & Scene](#canvas-scene) (9 tools)
+- [Canvas & Scene](#canvas-scene) (10 tools)
 - [Character Rigging](#character-rigging) (3 tools)
 - [Core & Diagnostics](#core-diagnostics) (2 tools)
 - [Document Management](#document-management) (8 tools)
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (1 tools)
+- [Other](#other) (2 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -25,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 81 tools.**
+**Total: 83 tools.**
 
 ## Animation & Keyframes
 
@@ -414,17 +414,58 @@ Gotcha: Looking for a layer ID without checking nested 'children' inside group l
 
 ---
 
+### `scene_auto_build`
+
+*Profiles: all, rig*
+
+Build a whole animated shot in one call: background, rigged cut-out characters, props,
+
+camera moves and audio. One undo step; everything is validated before the document changes.
+
+spec: {width, height, fps, duration, background: {file|color, fit},
+
+characters: [{id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
+
+position: {x, y}, height, flip, z, actions: [{motion, start, end, move_to: {x, y}, speed}]}],
+
+props: [{id, file, position, height, rotation, z, actions}],
+
+camera: [{time, zoom, center: {x, y}}], audio: {file, delay}, save_path, preview}.
+
+Positions are canvas pixels from the top-left (coords: "units" for Synfig units); a character
+
+stands with its feet on 'position'. Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
+
+Returns: {doc_id, characters, props, warnings, saved_to, preview: {contact_sheet_base64, ...}}.
+
+Gotcha: Parts named by body role get default joints; other parts need parent + attach.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `spec` | `object` | Yes | - |
+| `dry_run` | `boolean` | No | - |
+
+---
+
 ## Character Rigging
 
 ### `character_rig_from_parts`
 
 *Profiles: all, rig*
 
-Assemble a hierarchical 2D cut-out character puppet from geometric or imported parts.
+Assemble a jointed cut-out character from part images (or primitives) in an open document.
 
-Returns: Rig summary with character ID, root group, and parts count.
+spec: {doc_id, id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
 
-Gotcha: Use dry_run=true to preview hierarchy before assembling.
+position: {x, y}, height, flip, layout: "assemble" | "in_place", actions?}.
+
+Every part gets a joint layer <id>_<part>_rot; turning a part carries its children.
+
+Returns: Rig summary with root group, parts, roles and joint layer ids.
+
+Gotcha: Use dry_run=true to preview the hierarchy; pivot/attach are fractions of the image.
 
 #### Parameters
 
@@ -439,11 +480,13 @@ Gotcha: Use dry_run=true to preview hierarchy before assembling.
 
 *Profiles: all, rig*
 
-Apply a named pose preset (idle, punch, jump, walk_contact, walk_passing) to character parts.
+Key a pose on a rigged character: a preset (idle, punch, jump, walk_contact, walk_passing)
 
-Returns: Status with applied bone rotations and active facial slots.
+or explicit joint angles, e.g. angles={"upper_arm_r": 120, "head": -10} (degrees from rest).
 
-Gotcha: Verify character_id matches the rigged puppet root prefix.
+Returns: The joint layers that were keyed and the joints the character does not have.
+
+Gotcha: Fails when the character has none of the addressed joints - nothing is keyed silently.
 
 #### Parameters
 
@@ -453,6 +496,7 @@ Gotcha: Verify character_id matches the rigged puppet root prefix.
 | `character_id` | `string` | No | - |
 | `pose_name` | `string` | No | - |
 | `time` | `number` | No | - |
+| `angles` | `any` | No | - |
 
 ---
 
@@ -460,11 +504,13 @@ Gotcha: Verify character_id matches the rigged puppet root prefix.
 
 *Profiles: all, rig*
 
-Apply a complete motion cycle preset (walk, punch, idle) across keyframe waypoints.
+Animate a rigged character: walk, run, idle, talk (loop until end_time), wave, jump, nod,
 
-Returns: Applied keyframe sequence, cycle duration, and target character ID.
+punch (play once), rest, move. move_to={x, y} (canvas pixels) travels there by end_time.
 
-Gotcha: Automatically sets multi-frame easing waypoints along the timeline.
+Returns: Keyframe times, waypoint count, animated layers and skipped joints.
+
+Gotcha: The character must have been built by character_rig_from_parts or scene_auto_build.
 
 #### Parameters
 
@@ -474,6 +520,9 @@ Gotcha: Automatically sets multi-frame easing waypoints along the timeline.
 | `character_id` | `string` | No | - |
 | `motion_name` | `string` | No | - |
 | `start_time` | `number` | No | - |
+| `end_time` | `any` | No | - |
+| `speed` | `number` | No | - |
+| `move_to` | `any` | No | - |
 
 ---
 
@@ -483,7 +532,7 @@ Gotcha: Automatically sets multi-frame easing waypoints along the timeline.
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, review).
+Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, characters, review).
 
 Returns: Markdown guide text and list of available guide topics.
 
@@ -1079,6 +1128,36 @@ Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it
 | `width` | `number` | No | - |
 | `tip_width` | `number` | No | - |
 | `parent_index` | `integer` | No | - |
+
+---
+
+### `rig_sheet_slice`
+
+*Profiles: all, assets, rig*
+
+Cut a character rig sheet (one image, many body parts) into one transparent PNG per part.
+
+Call once without names and look at preview_base64 (numbered boxes), then call again with
+
+names={"1": "head", "2": "torso", "3": "upper_arm_l", ...} to export only the real parts.
+
+Returns: {parts: [{index, name, file, bbox}], manifest, output_dir, preview_base64}.
+
+Gotcha: Needs a transparent or uniform background. Name parts by body role (head, torso,
+
+upper_arm_l, forearm_l, hand_l, upper_leg_r, lower_leg_r, foot_r) so rigs assemble themselves.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `file_path` | `string` | Yes | - |
+| `names` | `any` | No | - |
+| `output_dir` | `any` | No | - |
+| `min_area` | `any` | No | - |
+| `merge_gap` | `integer` | No | - |
+| `bg_tolerance` | `integer` | No | - |
+| `preview` | `boolean` | No | - |
 
 ---
 

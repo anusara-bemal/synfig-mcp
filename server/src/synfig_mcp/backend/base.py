@@ -506,6 +506,14 @@ class BackendBase(ABC):
     # Declarative Scene Operations (Phase A1)
     # -----------------------------------------------------------------------
 
+    async def doc_view_box(self, doc_id: str) -> tuple[float, float, float, float] | None:  # noqa: ARG002
+        """Visible area of the root canvas as (left, top, right, bottom) in Synfig units.
+
+        ``None`` means the backend cannot tell; callers then assume Synfig's
+        default of 60 pixels per unit.
+        """
+        return None
+
     @abstractmethod
     async def scene_build(
         self,

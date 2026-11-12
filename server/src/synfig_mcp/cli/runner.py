@@ -95,9 +95,14 @@ class CliRunner:
     async def is_valid_layer_type(self, layer_name: str) -> bool:
         """Check whether the Synfig binary knows the given layer type."""
         if not self.is_available:
-            # Without a binary we cannot validate; assume the type is valid so
-            # offline usage keeps working.
-            return True
+            # Without a binary the bundled, introspected layer table decides, so
+            # a misspelled type is still rejected instead of written to disk.
+            from synfig_mcp.schema.param_types import load_param_types
+
+            known = {name.lower() for name in load_param_types()}
+            if not known:
+                return True
+            return layer_name.lower() in known | {"pastecanvas", "group"}
         catalog = await self.get_layer_catalog()
         if layer_name in catalog:
             return True

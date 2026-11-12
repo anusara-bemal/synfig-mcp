@@ -92,7 +92,12 @@ async def run_all(binary: Path) -> list[dict[str, Any]]:
         results.append(await _check("param_export", backend, doc.id, tmp, binary))
 
         # 4. Value node conversions
+        # The value node set differs between Synfig releases; check the ones this build has.
+        known_nodes = set(await runner.get_valuenodes())
         for valuenode in ("linear", "add", "subtract", "scale", "absolute", "duplicate"):
+            if known_nodes and valuenode not in known_nodes:
+                print(f"SKIP  param_convert_{valuenode}: not in this Synfig build")
+                continue
             backend = HeadlessBackend(runner=runner)
             doc = await backend.doc_new(width=320, height=240, fps=24.0)
             layer = await backend.layer_add(
@@ -106,9 +111,7 @@ async def run_all(binary: Path) -> list[dict[str, Any]]:
                 param_name="radius",
                 type=valuenode,
             )
-            results.append(
-                await _check(f"param_convert_{valuenode}", backend, doc.id, tmp, binary)
-            )
+            results.append(await _check(f"param_convert_{valuenode}", backend, doc.id, tmp, binary))
 
         # 5. Waypoints and interpolations
         for interpolation in ("linear", "constant", "halt", "clamped", "auto", "manual"):
@@ -124,9 +127,7 @@ async def run_all(binary: Path) -> list[dict[str, Any]]:
                 interpolation_in=interpolation,
                 interpolation_out=interpolation,
             )
-            results.append(
-                await _check(f"waypoint_{interpolation}", backend, doc.id, tmp, binary)
-            )
+            results.append(await _check(f"waypoint_{interpolation}", backend, doc.id, tmp, binary))
 
         # 6. Grouping and keyframes
         backend = HeadlessBackend(runner=runner)
