@@ -6,25 +6,31 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 81 tools, 75,641 bytes, **20,479 tokens** (`cl100k_base`).
-- **Minimal Profile (`core`)**: 13 tools, 11,262 bytes, **2,984 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 89 tools, 84,831 bytes, **23,356 tokens** (`cl100k_base`).
+- **Minimal Profile (`core`)**: 13 tools, 10,962 bytes, **2,947 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **20,479 tokens** to **2,984 tokens**.
+> from **23,356 tokens** to **2,947 tokens**.
+>
+> The anime production pipeline added six tools (`produce_anime_project`, `production_plan`,
+> `character_model_sheet`, `procedural_asset_list`, `procedural_asset_generate`,
+> `sprite_slice`). Their verbose brief schema lives in the `synfig://guide/production`
+> resource instead of the tool docstrings, keeping the added footprint to ~1.9k tokens.
 
 ### Profile Allocations & Measured Counts
 
 | Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
 |---|---|---|---|---|
-| `core` | 13 | **2,984** | 2,991 | ✅ Pass (< 3000) |
-| `anim` | 21 | **5,158** | 5,164 | ❌ Exceeds (4500) |
-| `fx` | 25 | **5,900** | 5,907 | ❌ Exceeds (4500) |
-| `rig` | 23 | **5,493** | 5,504 | ❌ Exceeds (3000) |
-| `assets` | 12 | **2,682** | 2,687 | ❌ Exceeds (2000) |
-| `review` | 18 | **4,904** | 4,915 | ❌ Exceeds (4000) |
-| `all` | 81 | **20,479** | 20,503 | ❌ Exceeds (16000) |
+| `core` | 13 | **2,947** | 2,954 | ✅ Pass (< 3000) |
+| `anim` | 21 | **5,097** | 5,103 | ❌ Exceeds (4500) |
+| `fx` | 25 | **5,827** | 5,834 | ❌ Exceeds (4500) |
+| `rig` | 27 | **7,398** | 7,415 | ❌ Exceeds (3000) |
+| `assets` | 16 | **4,090** | 4,091 | ❌ Exceeds (2000) |
+| `review` | 18 | **4,852** | 4,863 | ❌ Exceeds (4000) |
+| `all` | 89 | **23,356** | 23,379 | ❌ Exceeds (16000) |
+
 
 ---
 

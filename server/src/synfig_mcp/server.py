@@ -35,6 +35,45 @@ def create_server(
 mcp = create_server()
 
 
+def _run_produce(parsed: argparse.Namespace) -> int:
+    """Load a brief, run the production pipeline, and print the report."""
+    import asyncio
+    import json
+    from pathlib import Path
+
+    from synfig_mcp.backend.select import get_backend
+    from synfig_mcp.production import AnimeProductionPipeline, ProductionBrief
+
+    if parsed.brief == "-":
+        raw = sys.stdin.read()
+    else:
+        try:
+            raw = Path(parsed.brief).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"Cannot read brief '{parsed.brief}': {exc}", file=sys.stderr)
+            return 2
+    try:
+        brief = ProductionBrief.model_validate(json.loads(raw))
+    except (ValueError, json.JSONDecodeError) as exc:
+        print(f"Invalid brief: {exc}", file=sys.stderr)
+        return 2
+
+    pipeline = AnimeProductionPipeline(backend=get_backend(), output_dir=parsed.output_dir)
+    report = asyncio.run(pipeline.run(brief, dry_run=parsed.dry_run))
+
+    if parsed.json:
+        print(json.dumps(report.model_dump(), indent=2, default=str))
+    else:
+        print(f"{report.title}  [{report.style}]  success={report.success}")
+        for stage in report.stages:
+            print(f"  {stage.name:<12} {stage.status:<8} {stage.detail}")
+        for label, path in report.artifacts.items():
+            print(f"  {label}: {path}")
+        for warning in report.warnings:
+            print(f"  warning: {warning}")
+    return 0 if report.success else 1
+
+
 def main(args: list[str] | None = None) -> None:
     """Run the MCP server over stdio or streamable HTTP transport, or run diagnostics."""
     raw_args = args if args is not None else sys.argv[1:]
@@ -51,6 +90,31 @@ def main(args: list[str] | None = None) -> None:
     # synfig-mcp usage-report
     subparsers.add_parser(
         "usage-report", help="Display token budget baseline and profile consumption metrics"
+    )
+
+    # synfig-mcp produce BRIEF.json
+    produce = subparsers.add_parser(
+        "produce",
+        help="Run the one-command anime production pipeline from a JSON brief",
+    )
+    produce.add_argument(
+        "brief",
+        help="Path to a JSON brief, or '-' to read the brief from standard input",
+    )
+    produce.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Plan the run and report the stages without building a document",
+    )
+    produce.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory for the .sif, video and contact sheet (default: <slug>_production)",
+    )
+    produce.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the full ProductionReport as JSON instead of a summary",
     )
 
     # server options
@@ -106,6 +170,9 @@ def main(args: list[str] | None = None) -> None:
         else:
             print("Token budget documentation not found at docs/TOKEN_BUDGET.md")
         sys.exit(0)
+
+    if parsed.command == "produce":
+        sys.exit(_run_produce(parsed))
 
     if parsed.transport == "streamable-http":
         from synfig_mcp.http_transport import run_http_server
