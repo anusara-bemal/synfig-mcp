@@ -1205,6 +1205,33 @@ class HeadlessBackend(BackendBase):
         if doc_id not in self._documents:
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
 
+        # Validate that all referenced files in layers exist
+        file_errors = []
+        for lyr in parsed_spec.layers:
+            if lyr.type in ("import", "sound"):
+                fn_val = None
+                if "filename" in lyr.params:
+                    p = lyr.params["filename"]
+                    fn_val = p.get("value") if isinstance(p, dict) else p
+                if fn_val:
+                    try:
+                        resolved_fn = validate_path(fn_val, must_exist=True)
+                        resolved_str = str(resolved_fn)
+                        if isinstance(lyr.params["filename"], dict):
+                            lyr.params["filename"]["value"] = resolved_str
+                        else:
+                            lyr.params["filename"] = resolved_str
+                    except Exception as err:
+                        file_errors.append(f"Layer '{lyr.id}' (type '{lyr.type}'): {err}")
+
+        if file_errors:
+            return {
+                "success": False,
+                "valid": False,
+                "error": f"File validation failed: {'; '.join(file_errors)}",
+                "doc_id": doc_id,
+            }
+
         created_layers: list[str] = []
         modified_layers: list[str] = []
 

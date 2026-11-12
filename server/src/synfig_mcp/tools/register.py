@@ -193,11 +193,14 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
                     try:
                         return await fn(*args, **kwargs)
                     except SynfigError as exc:
-                        # The MCP SDK turns uncaught exceptions into a generic
-                        # "Error executing tool <name>" crash, hiding the cause.
-                        # Raise its anticipated-error type so the model receives
-                        # the actionable diagnostic instead of a dead end.
-                        raise ToolError(diagnostic(exc)) from exc
+                        # Return clear structured error with tool name and actionable hint
+                        raise ToolError(f"[{name}] {diagnostic(exc)}") from exc
+                    except FileNotFoundError as exc:
+                        raise ToolError(f"[{name}] File not found: {exc}") from exc
+                    except Exception as exc:
+                        # Catch Pydantic or any internal exception and return explicit diagnostic
+                        # rather than generic MCP SDK 'Error executing tool <name>'
+                        raise ToolError(f"[{name}] Failed with {type(exc).__name__}: {exc}") from exc
 
                 mcp.tool(name=name, annotations=annotations)(wrapper)
                 return cast(F, wrapper)
@@ -386,9 +389,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         spec: dict[str, Any],
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Apply a declarative scene build spec (layers, params, waypoints, groups) atomically as one undo step.
-        Returns: Compact diff {action: 'scene.build', created: [...], modified: [...]}.
-        Gotcha: spec.doc_id defaults to the currently selected document; never call doc_new/doc_open first - implement in the open document.
+        """Apply declarative scene build spec.
+        Spec: {doc_id, layers: [{id, type, params}], groups}. Layer 'id' required. Image paths host-resolved or via SYNFIG_MCP_PATH_MAPPING.
+        Returns: Diff {action: 'scene.build', created: [...], modified: [...]}.
+        Gotcha: Defaults to active document; do not call doc_new/doc_open first.
         """
         res = await backend.scene_build(spec=spec, dry_run=dry_run)
         return wrap_untrusted(res)

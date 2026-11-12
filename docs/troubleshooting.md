@@ -51,6 +51,27 @@ Common issues, root causes, and verified resolutions encountered when building, 
 
 ---
 
+## 6. Client Container File Access & Path Mapping
+
+- **Cause**: The Synfig MCP server and Synfig Studio execute on the host machine (e.g., Windows), while an MCP client (such as Claude Desktop or Docker runner) may run in an isolated Linux container with paths like `/home/claude/...` or `/mnt/user-data/...`.
+- **Filesystem Paths Read by Bridge**:
+  - The bridge reads files directly from the host filesystem. By default, host files in `~/Documents/SynfigMCP` (e.g. `C:\Users\<username>\Documents\SynfigMCP`) are automatically discovered.
+  - If a file path passed by the client does not exist as-is on the host, the server searches configured workspace roots for the matching filename or relative path.
+- **Configuring Container Path Mapping**:
+  Set the `SYNFIG_MCP_PATH_MAPPING` environment variable before launching the server:
+  ```bash
+  # Syntax: <container_prefix>=<host_directory>[,<prefix2>=<host_dir2>]
+  export SYNFIG_MCP_PATH_MAPPING="/mnt/user-data/outputs=C:\Users\<user>\Documents\SynfigMCP,/home/claude=C:\Users\<user>\Documents\SynfigMCP"
+  ```
+  Or pass JSON:
+  ```bash
+  export SYNFIG_MCP_PATH_MAPPING='{"/mnt/user-data/outputs": "C:\\Users\\<user>\\Documents\\SynfigMCP"}'
+  ```
+- **Declarative Layer Validation**:
+  In `scene_build`, `rig_sheet_slice`, and `scene_auto_build`, paths are validated for existence during both dry-run and commit. If a file is missing, the tool returns a structured error identifying the failing layer, the target path, and the resolved host path.
+
+---
+
 ## 6. Windows NTFS File Permissions (`icacls` vs `chmod`)
 
 - **Cause**: POSIX `chmod 600` on Windows Python does not modify NTFS Access Control Lists (ACLs), leaving inherited parent folder permissions active and allowing other local accounts access.

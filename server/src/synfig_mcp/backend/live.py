@@ -79,6 +79,15 @@ class LiveBackend(BackendBase):
 
     async def health_check(self) -> HealthStatus:
         """Probe the live bridge socket and report capabilities."""
+        import platform
+        from synfig_mcp.security.sandbox import get_default_allowed_roots, get_path_mappings
+
+        fs_info = {
+            "host_os": platform.system(),
+            "workspace_roots": [str(r) for r in get_default_allowed_roots()],
+            "path_mappings": [f"{s} -> {d}" for s, d in get_path_mappings()],
+            "sandbox_enabled": False,
+        }
         try:
             client = await self._ensure_client()
             return HealthStatus(
@@ -89,6 +98,7 @@ class LiveBackend(BackendBase):
                     "host": self.host,
                     "port": self.port,
                     "capabilities": client.capabilities,
+                    "filesystem": fs_info,
                 },
             )
         except Exception as e:
@@ -99,6 +109,7 @@ class LiveBackend(BackendBase):
                 "bridge_reachable": False,
                 "studio_process_detected": detected,
                 "error": str(e),
+                "filesystem": fs_info,
             }
             if detected:
                 details["warning"] = (
@@ -882,6 +893,66 @@ class LiveBackend(BackendBase):
             }
         doc_id = parsed_spec.doc_id
 
+        # Validate that all referenced files in layers exist and normalize parameters
+        file_errors = []
+        normalized_layers = []
+        for lyr in parsed_spec.layers:
+            lyr_dict = lyr.model_dump()
+            norm_params: dict[str, Any] = {}
+            for k, v in lyr.params.items():
+                if isinstance(v, dict) and "type" in v:
+                    norm_params[k] = dict(v)
+                elif isinstance(v, bool):
+                    norm_params[k] = {"type": "bool", "value": v}
+                elif isinstance(v, int):
+                    norm_params[k] = {"type": "integer", "value": v}
+                elif isinstance(v, float):
+                    norm_params[k] = {"type": "real", "value": v}
+                elif isinstance(v, str):
+                    norm_params[k] = {"type": "string", "value": v}
+                elif isinstance(v, (list, tuple)) and len(v) == 2:
+                    norm_params[k] = {"type": "vector", "x": float(v[0]), "y": float(v[1])}
+                elif isinstance(v, (list, tuple)) and len(v) in (3, 4):
+                    norm_params[k] = {
+                        "type": "color",
+                        "r": float(v[0]),
+                        "g": float(v[1]),
+                        "b": float(v[2]),
+                        "a": float(v[3]) if len(v) == 4 else 1.0,
+                    }
+                else:
+                    norm_params[k] = v
+
+            if lyr.type in ("import", "sound"):
+                if "filename" in norm_params:
+                    fn_p = norm_params["filename"]
+                    fn_val = fn_p.get("value") if isinstance(fn_p, dict) else fn_p
+                    if fn_val:
+                        try:
+                            resolved_fn = validate_path(fn_val, must_exist=True)
+                            resolved_str = str(resolved_fn)
+                            if isinstance(norm_params["filename"], dict):
+                                norm_params["filename"]["value"] = resolved_str
+                            else:
+                                norm_params["filename"] = {"type": "string", "value": resolved_str}
+                        except Exception as err:
+                            file_errors.append(f"Layer '{lyr.id}' (type '{lyr.type}'): {err}")
+
+            lyr_dict["params"] = norm_params
+            normalized_layers.append(lyr_dict)
+
+        if file_errors:
+            return {
+                "success": False,
+                "valid": False,
+                "error": f"File validation failed: {'; '.join(file_errors)}",
+                "doc_id": doc_id,
+            }
+
+        # Update spec copy with host-resolved paths and normalized params
+        spec_to_send = dict(spec)
+        spec_to_send["layers"] = normalized_layers
+
         if dry_run:
             created = [lyr.id for lyr in parsed_spec.layers] + [g.id for g in parsed_spec.groups]
             return {
@@ -897,7 +968,7 @@ class LiveBackend(BackendBase):
             }
 
         client = await self._ensure_client()
-        res = await client.call("scene.build", spec)
+        res = await client.call("scene.build", spec_to_send)
         if isinstance(res, dict) and "diff" in res:
             return res
         return {

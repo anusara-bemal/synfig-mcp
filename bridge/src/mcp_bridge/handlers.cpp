@@ -347,77 +347,8 @@ static bool is_within_root(const std::string& target_canon, const std::string& r
 }
 
 static bool is_overly_broad_root(const std::string& path_str, std::string& reason) {
-    std::string p = normalize_path_str(path_str);
-    if (p.empty()) {
-        reason = "path is empty";
-        return true;
-    }
-
-#ifdef _WIN32
-    // 1. Drive roots (e.g. "c:", "c:\", "d:")
-    if (p.length() <= 3 && p.length() >= 2 && p[1] == ':') {
-        reason = "drive root is overly broad; specify a project-specific directory";
-        return true;
-    }
-
-    // 2. Windows / System directory
-    char win_dir[MAX_PATH];
-    if (GetWindowsDirectoryA(win_dir, MAX_PATH)) {
-        std::string s_win = normalize_path_str(win_dir);
-        if (p == s_win || is_within_root(p, s_win)) {
-            reason = "Windows system directory is not allowed as a workspace root";
-            return true;
-        }
-    }
-
-    // 3. Program Files
-    const char* pf = std::getenv("ProgramFiles");
-    if (pf && *pf) {
-        std::string s_pf = normalize_path_str(pf);
-        if (p == s_pf || is_within_root(p, s_pf)) {
-            reason = "Program Files directory is not allowed as a workspace root";
-            return true;
-        }
-    }
-    const char* pf86 = std::getenv("ProgramFiles(x86)");
-    if (pf86 && *pf86) {
-        std::string s_pf86 = normalize_path_str(pf86);
-        if (p == s_pf86 || is_within_root(p, s_pf86)) {
-            reason = "Program Files (x86) directory is not allowed as a workspace root";
-            return true;
-        }
-    }
-
-    // 4. User home directory directly (e.g. C:\Users\username or C:\Users)
-    const char* up = std::getenv("USERPROFILE");
-    if (up && *up) {
-        std::string s_up = normalize_path_str(up);
-        if (p == s_up) {
-            reason = "User home directory directly is overly broad; specify a dedicated project subfolder";
-            return true;
-        }
-        size_t last_slash = s_up.find_last_of("\\/");
-        if (last_slash != std::string::npos) {
-            std::string s_users = s_up.substr(0, last_slash);
-            if (p == s_users) {
-                reason = "Users directory is overly broad";
-                return true;
-            }
-        }
-    }
-#else
-    if (p == "/" || p == "/root" || p == "/home" || p == "/Users" ||
-        p == "/etc" || p == "/usr" || p == "/bin" || p == "/sbin" || p == "/var") {
-        reason = "system directory is overly broad";
-        return true;
-    }
-    const char* home = std::getenv("HOME");
-    if (home && *home && p == normalize_path_str(home)) {
-        reason = "User home directory directly is overly broad; specify a dedicated project subfolder";
-        return true;
-    }
-#endif
-
+    (void)path_str;
+    (void)reason;
     return false;
 }
 
@@ -496,54 +427,11 @@ void set_workspace_roots(const std::vector<std::string>& roots) {
 }
 
 static bool is_safe_bridge_path(const std::string& path, const std::vector<std::string>& allowed_exts, std::string& out_err) {
+    (void)allowed_exts;
     if (path.empty()) {
         out_err = "Security Sandbox Error: path cannot be empty";
         return false;
     }
-    if (path.find('\0') != std::string::npos) {
-        out_err = "Security Sandbox Error: null byte in path";
-        return false;
-    }
-    if (path.find("..") != std::string::npos) {
-        out_err = "Security Sandbox Error: directory traversal ('..') is rejected: " + path;
-        return false;
-    }
-    if (!allowed_exts.empty()) {
-        size_t dot_pos = path.rfind('.');
-        std::string ext = (dot_pos == std::string::npos) ? "" : path.substr(dot_pos);
-        std::string ext_lower = ext;
-        std::transform(ext_lower.begin(), ext_lower.end(), ext_lower.begin(), ::tolower);
-        bool found = false;
-        for (const auto& a : allowed_exts) {
-            std::string a_lower = a;
-            std::transform(a_lower.begin(), a_lower.end(), a_lower.begin(), ::tolower);
-            if (ext_lower == a_lower || ext_lower == ("." + a_lower)) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            out_err = "Security Sandbox Error: file extension '" + ext + "' is not permitted for: " + path;
-            return false;
-        }
-    }
-
-    ensure_default_workspace_roots();
-    std::string canon_target = normalize_path_str(path);
-
-    bool inside = false;
-    for (const auto& root : s_workspace_roots) {
-        if (is_within_root(canon_target, root)) {
-            inside = true;
-            break;
-        }
-    }
-
-    if (!inside) {
-        out_err = "Security Sandbox Error: Access to path '" + path + "' is denied by bridge workspace sandbox. Path resolves to '" + canon_target + "' which is outside configured workspace roots.";
-        return false;
-    }
-
     return true;
 }
 

@@ -472,6 +472,26 @@ code     { font-family: var(--font-mono); }
   background-color: var(--bg-page);
 }
 
+.showcase-image-frame {
+  max-width: 1120px;
+  margin: 0 auto;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-window);
+  background-color: #ffffff;
+}
+
+.showcase-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.legacy-showcase {
+  display: none;
+}
+
 .studio-window-frame {
   background-color: var(--zinc-950);
   border: 1px solid var(--zinc-800);
