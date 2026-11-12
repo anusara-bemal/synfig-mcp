@@ -55,10 +55,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Synfig engine
+      - name: Install the pinned Synfig engine
+        env:
+          SYNFIG_ENGINE_DIR: ${{ github.workspace }}/synfig-engine
         run: |
-          sudo apt-get update
-          sudo apt-get install -y synfig
+          # bsdtar (libarchive) unpacks the AppImage's zisofs filesystem without
+          # FUSE.  The gate must run against the engine the project targets
+          # (1.5.5), not the older build in the distribution's repositories.
+          sudo apt-get update && sudo apt-get install -y libarchive-tools
+          bash scripts/install_pinned_synfig.sh "${SYNFIG_ENGINE_DIR}"
+          echo "${SYNFIG_ENGINE_DIR}" >> "${GITHUB_PATH}"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -83,6 +89,7 @@ jobs:
 
       - name: Run the standalone validity verifier
         run: |
+          cd server
           uv run python ../scripts/verify_synfig_validity.py
 
   docker-smoke-test:
