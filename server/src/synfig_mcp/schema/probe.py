@@ -218,6 +218,25 @@ async def probe_synfig_cli(
     seed_builtin_schemas(registry)
 
     if not runner.is_available:
+        # No binary: report the layer types of the bundled, introspected table
+        # instead of only the handful of seeded ones.
+        from synfig_mcp.schema.param_types import is_editable_param
+        from synfig_mcp.schema.registry import LayerParamInfo
+
+        for layer_name, types in load_param_types().items():
+            if registry.get_layer(layer_name):
+                continue
+            registry.register_layer(
+                LayerTypeInfo(
+                    name=layer_name,
+                    params={
+                        name: LayerParamInfo(
+                            name=name, type=vtype, editable=is_editable_param(name, vtype)
+                        )
+                        for name, vtype in types.items()
+                    },
+                )
+            )
         return
 
     # Introspect layers

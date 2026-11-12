@@ -18,6 +18,12 @@ from synfig_mcp.sif.parser import SifDocument, synfig_value_to_xml
 from synfig_mcp.sif.valuenodes import build_valuenode_element
 
 
+def _must(element: etree._Element | None) -> etree._Element:
+    """Return the element, failing the test when the lookup found nothing."""
+    assert element is not None, "expected XML element is missing"
+    return element
+
+
 def _sif(layer_params: str = "") -> str:
     return (
         '<canvas version="1.2" width="480" height="270" fps="24.000">'
@@ -41,7 +47,7 @@ def test_real_round_trips_with_full_precision() -> None:
     """A real must parse back to the exact same double."""
     elem = synfig_value_to_xml({"type": "real", "value": 0.1 + 0.2})
     assert elem.tag == "real"
-    assert float(elem.get("value")) == 0.1 + 0.2
+    assert float(str(elem.get("value"))) == 0.1 + 0.2
 
 
 def test_integral_reals_have_no_trailing_zero() -> None:
@@ -88,10 +94,10 @@ def test_bline_point_writes_t2_only_when_split() -> None:
     }
     unsplit = synfig_value_to_xml({**point, "split": False})
     assert unsplit.find("t2") is None, "t2 implies split tangents and must be conditional"
-    assert unsplit.find("width/real").get("value") == "0.75"
+    assert _must(unsplit.find("width/real")).get("value") == "0.75"
 
     split = synfig_value_to_xml({**point, "split": True})
-    assert split.find("t2/vector/x").text == "0.3"
+    assert _must(split.find("t2/vector/x")).text == "0.3"
 
 
 def test_bline_point_list_is_a_dynamic_list_of_entries() -> None:
@@ -125,26 +131,22 @@ def test_bone_writes_linkable_fields() -> None:
     assert elem.tag == "bone"
     assert elem.get("type") == "bone_object"
     assert elem.findtext("name/string") == "upper_arm"
-    assert elem.find("origin/vector/x").text == "1"
-    assert elem.find("angle/angle").get("value") == "45"
-    assert elem.find("scalelx/real").get("value") == "2"
+    assert _must(elem.find("origin/vector/x")).text == "1"
+    assert _must(elem.find("angle/angle")).get("value") == "45"
+    assert _must(elem.find("scalelx/real")).get("value") == "2"
 
 
 def test_plain_list_uses_value_children() -> None:
-    elem = synfig_value_to_xml(
-        {"type": "list", "entries": [{"type": "real", "value": 1.0}]}
-    )
+    elem = synfig_value_to_xml({"type": "list", "entries": [{"type": "real", "value": 1.0}]})
     assert elem.tag == "list"
-    assert elem.find("value/real").get("value") == "1"
+    assert _must(elem.find("value/real")).get("value") == "1"
 
 
 def test_static_list_requires_an_element_type() -> None:
     with pytest.raises(UnsupportedValueTypeError):
         synfig_value_to_xml({"type": "static_list", "entries": []})
 
-    elem = synfig_value_to_xml(
-        {"type": "static_list", "value_type": "real", "entries": [1.0, 2.0]}
-    )
+    elem = synfig_value_to_xml({"type": "static_list", "value_type": "real", "entries": [1.0, 2.0]})
     assert elem.tag == "static_list"
     assert elem.get("type") == "real"
     assert len(elem.findall("entry")) == 2
@@ -168,8 +170,8 @@ def test_width_point_list_is_a_dynamic_list() -> None:
     assert elem.get("type") == "width_point"
     width_point = elem.find("entry/width_point")
     assert width_point is not None
-    assert width_point.find("position/real").get("value") == "0.5"
-    assert width_point.find("side_before/integer").get("value") == "1"
+    assert _must(width_point.find("position/real")).get("value") == "0.5"
+    assert _must(width_point.find("side_before/integer")).get("value") == "1"
 
 
 def test_dash_item_list_is_a_dynamic_list() -> None:
@@ -181,7 +183,7 @@ def test_dash_item_list_is_a_dynamic_list() -> None:
     )
     assert elem.tag == "dilist"
     assert elem.get("type") == "dash_item"
-    assert elem.find("entry/dash_item/length/real").get("value") == "0.25"
+    assert _must(elem.find("entry/dash_item/length/real")).get("value") == "0.25"
 
 
 def test_unknown_value_type_raises_instead_of_stringifying() -> None:
@@ -211,8 +213,8 @@ def test_linear_matches_the_upstream_link_layout() -> None:
     node = build_valuenode_element("linear", "real", _value("real", "2.5"))
     assert node.tag == "linear"
     assert node.get("type") == "real"
-    assert node.find("slope/real").get("value") == "0"
-    assert node.find("offset/real").get("value") == "2.5"
+    assert _must(node.find("slope/real")).get("value") == "0"
+    assert _must(node.find("offset/real")).get("value") == "2.5"
 
 
 def test_composite_of_color_uses_colour_channels() -> None:
@@ -224,9 +226,9 @@ def test_composite_of_color_uses_colour_channels() -> None:
     node = build_valuenode_element("composite", "color", source)
     assert node.tag == "composite"
     assert node.get("type") == "color"
-    assert node.find("red/real").get("value") == "0.5"
-    assert node.find("green/real").get("value") == "0.25"
-    assert node.find("alpha/real").get("value") == "1"
+    assert _must(node.find("red/real")).get("value") == "0.5"
+    assert _must(node.find("green/real")).get("value") == "0.25"
+    assert _must(node.find("alpha/real")).get("value") == "1"
 
 
 def test_composite_of_real_is_rejected() -> None:
@@ -264,7 +266,7 @@ def test_export_param_writes_defs_and_use_reference() -> None:
     assert len(param) == 0, "an exported parameter must not keep an inline value"
 
     # <defs> must precede the layers for the loader to resolve the reference.
-    children = [etree.QName(child.tag).localname for child in doc.root]
+    children = [etree.QName(str(child.tag)).localname for child in doc.root]
     assert children.index("defs") < children.index("layer")
 
 
@@ -310,7 +312,7 @@ def test_set_param_detaches_an_exported_link() -> None:
     param = layer.element.find("param[@name='radius']")
     assert param is not None
     assert param.get("use") is None
-    assert param.find("real").get("value") == "3"
+    assert _must(param.find("real")).get("value") == "3"
 
 
 def test_convert_param_linear_keeps_the_value() -> None:
@@ -324,20 +326,18 @@ def test_convert_param_linear_keeps_the_value() -> None:
     node = param.find("linear")
     assert node is not None
     assert node.get("type") == "real"
-    assert node.find("offset/real").get("value") == "1.25"
+    assert _must(node.find("offset/real")).get("value") == "1.25"
 
 
 def test_convert_param_composite_color() -> None:
-    doc = _doc(
-        '<param name="color"><color><r>0.5</r><g>0.25</g><b>0</b><a>1</a></color></param>'
-    )
+    doc = _doc('<param name="color"><color><r>0.5</r><g>0.25</g><b>0</b><a>1</a></color></param>')
     layer = doc.get_layer("c1")
     assert layer is not None
     layer.convert_param("color", "composite")
 
     node = layer.element.find("param[@name='color']/composite")
     assert node is not None
-    assert node.find("red/real").get("value") == "0.5"
+    assert _must(node.find("red/real")).get("value") == "0.5"
 
 
 def test_convert_param_rejects_unknown_valuenode() -> None:
@@ -360,7 +360,7 @@ def test_convert_param_rejects_an_exported_parameter() -> None:
 def test_complex_values_are_not_silently_downgraded() -> None:
     doc = _doc(
         '<param name="bline"><bline type="bline_point">'
-        '<entry><bline_point><vertex><vector><x>0</x><y>0</y></vector></vertex>'
+        "<entry><bline_point><vertex><vector><x>0</x><y>0</y></vector></vertex>"
         "<t1><vector><x>0</x><y>0</y></vector></t1></bline_point></entry>"
         "</bline></param>"
     )
