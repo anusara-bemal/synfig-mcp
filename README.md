@@ -11,7 +11,7 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 81 · **Profile:** `all` enabled by default
+**Author:** Anusara Bemal · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 
@@ -45,7 +45,8 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 |---|---|
 | **Live editing** | Drives a running, patched Synfig Studio through an authenticated local bridge. Every mutation is an undoable Studio action. |
 | **Headless fallback** | Works without a GUI through a lossless `.sif` / `.sifz` / `.sfg` engine and the `synfig` CLI. Ideal for CI, containers, and render farms. |
-| **Complete surface** | All 74 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
+| **Complete surface** | All 83 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
+| **Rig sheet to scene** | `rig_sheet_slice` cuts a character sheet into parts, `scene_auto_build` assembles jointed characters, background, props, camera and motion (walk, run, wave, jump, ...) in one call and one undo step. See [`docs/characters.md`](docs/characters.md). |
 | **Verified output** | Every generated document is loaded by the *real* Synfig engine in CI — a document the engine rejects never passes. |
 | **Visual feedback loop** | Renders frames and returns base64 previews plus objective metrics: SSIM, palette, safe areas, clipping, strobe/photosensitivity, diff heatmaps. |
 | **Hardened by default** | Token-authenticated bridge, loopback-only binding, sandboxed file access, SSRF-resistant asset downloads, SVG sanitization. |
@@ -65,7 +66,7 @@ graph TB
     end
 
     subgraph server["synfig-mcp server (Python · MIT)"]
-        TOOLS["74 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
+        TOOLS["83 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
         SCHEMA["Schema introspection<br/>layer types · parameters · value nodes · targets"]
         PIPE["Render pipeline<br/>frame · sequence · video · contact sheet"]
         REVIEW["Visual review<br/>SSIM · palette · clipping · strobe"]
@@ -316,7 +317,7 @@ flowchart TD
 
 ## Tool profiles
 
-All 81 tools are exposed by default. Narrow the surface when the client has a tight context budget:
+All 83 tools are exposed by default. Narrow the surface when the client has a tight context budget:
 
 | Profile | Tools | ≈ tokens (cl100k) | Focus |
 |---|---:|---:|---|
@@ -324,8 +325,8 @@ All 81 tools are exposed by default. Narrow the surface when the client has a ti
 | `core` | 13 | ~2,980 | Scene build/export, inspection, undo/redo, single-frame render |
 | `anim` | 21 | ~5,000 | Keyframes, timeline, waypoints, interpolation |
 | `fx` | 25 | ~6,000 | Layer hierarchy, effect recipes, style presets |
-| `rig` | 23 | ~4,500 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
-| `assets` | 12 | ~2,800 | Licensed asset search, hardened downloads, attribution |
+| `rig` | 25 | ~4,500 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
+| `assets` | 13 | ~2,800 | Licensed asset search, hardened downloads, attribution |
 | `review` | 18 | ~5,200 | Frame/sequence/compare review, objective metrics, jobs |
 
 ```bash
@@ -373,7 +374,7 @@ graph LR
 - **Characters** — cut-out puppet assembly, pose presets, motion cycles, storyboard animatics.
 - **Rendering** — single frames, sequences, MP4/GIF video, contact sheets, plus the visual review loop.
 
-Full reference: [`docs/tools.md`](docs/tools.md) (all 74 tools) and [`docs/api.md`](docs/api.md).
+Full reference: [`docs/tools.md`](docs/tools.md) (all 83 tools) and [`docs/api.md`](docs/api.md).
 
 ---
 
@@ -509,7 +510,7 @@ bash bridge/scripts/build_linux.sh            # Linux
 
 | Document | Contents |
 |---|---|
-| [`docs/tools.md`](docs/tools.md) | All 74 tools with typed parameters |
+| [`docs/tools.md`](docs/tools.md) | All 83 tools with typed parameters |
 | [`docs/api.md`](docs/api.md) | Tool surface per profile |
 | [`docs/architecture.md`](docs/architecture.md) | Bridge protocol, threading, undo model |
 | [`docs/protocol.md`](docs/protocol.md) | JSON-RPC wire format |
