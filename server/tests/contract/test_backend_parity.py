@@ -24,6 +24,7 @@ from synfig_mcp.backend.live import LiveBackend
 from synfig_mcp.protocol.client import BridgeClient
 from synfig_mcp.protocol.fake_bridge import FakeBridgeServer
 from synfig_mcp.server import create_server
+from synfig_mcp.validation import find_synfig_binary
 
 
 @pytest_asyncio.fixture(params=["headless", "live_fake"])
@@ -45,6 +46,18 @@ async def mcp_app(request: pytest.FixtureRequest) -> AsyncIterator[Any]:
     yield create_server(backend=LiveBackend(client=bridge_client))
     await bridge_client.close()
     await fake_bridge.stop()
+
+
+#: The headless backend can only validate layer types against a real Synfig
+#: binary.  Without one it cannot distinguish a real layer from an invented
+#: name, so the checks that assert rejection are skipped rather than weakened.
+_HEADLESS_ENGINE_MISSING = find_synfig_binary() is None
+
+
+def _skip_headless_without_engine(request: pytest.FixtureRequest) -> None:
+    """Skip the headless half of a case when no Synfig binary is installed."""
+    if _HEADLESS_ENGINE_MISSING and request.node.callspec.params.get("mcp_app") == "headless":
+        pytest.skip("headless backend needs a Synfig binary to validate layer types")
 
 
 def _text(result: Any) -> str:
@@ -189,7 +202,10 @@ async def test_invalid_interpolation_is_rejected_in_both_backends(mcp_app: Any) 
 
 
 @pytest.mark.asyncio
-async def test_unknown_layer_type_is_rejected_in_both_backends(mcp_app: Any) -> None:
+async def test_unknown_layer_type_is_rejected_in_both_backends(
+    mcp_app: Any, request: pytest.FixtureRequest
+) -> None:
+    _skip_headless_without_engine(request)
     async with Client(mcp_app) as mcp:
         doc_id = await _new_document(mcp)
         result = await mcp.call_tool(
@@ -290,7 +306,10 @@ async def test_scene_tree_has_the_same_shape_in_both_backends(mcp_app: Any) -> N
 
 
 @pytest.mark.asyncio
-async def test_schema_tools_report_the_installed_synfig(mcp_app: Any) -> None:
+async def test_schema_tools_report_the_installed_synfig(
+    mcp_app: Any, request: pytest.FixtureRequest
+) -> None:
+    _skip_headless_without_engine(request)
     async with Client(mcp_app) as mcp:
         layers = await mcp.call_tool("schema_list_layers", {})
         payload = _text(layers)
