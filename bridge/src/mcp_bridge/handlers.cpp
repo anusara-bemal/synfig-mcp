@@ -1788,8 +1788,6 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         if (layer_id.empty()) {
             return make_input_error(req, 2002, "Layer ID cannot be empty or null.");
         }
-            return make_input_error(req, 2002, "Layer ID cannot be empty or null.");
-        }
 
         return run_on_main_thread([&, doc_id, layer_id, bone_time, origin_x, origin_y, bone_angle,
                                    bone_width, tip_width, parent_index]() -> nlohmann::json {
