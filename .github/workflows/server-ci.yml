@@ -83,6 +83,7 @@ jobs:
 
       - name: Run the standalone validity verifier
         run: |
+          cd server
           uv run python ../scripts/verify_synfig_validity.py
 
   docker-smoke-test:
