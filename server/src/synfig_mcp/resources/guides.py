@@ -21,9 +21,10 @@ GUIDE_TOPICS: dict[str, str] = {
     "profiles": """# Synfig MCP Tool Profiles
 
 Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
-- `all` (default): The complete suite - all 83 tools: documents, canvases, scene
+- `all` (default): The complete suite - all 89 tools: documents, canvases, scene
   building, layers, parameters and value nodes, animation, selection, history,
-  effect recipes, style presets, character rigging, storyboards, licensed assets,
+  effect recipes, style presets, character rigging, storyboards, licensed assets, the anime
+  production pipeline,
   rendering (frame, sequence, video, contact sheet, async jobs), visual review
   and schema introspection.
 - `core`: Minimal set for document lifecycle, declarative build, inspection, undo
@@ -163,6 +164,51 @@ The defaults are estimates. Look at the preview, then override per part:
 - For quick alignment and critique: render at `320x240` (only ~103 Claude tokens / ~258 Gemini tokens).
 - For multi-frame animation checks: use `render_contact_sheet` to composite multiple frames into one compact grid.
 - Objective metrics flag luminance clipping, safe-area boundary violations, and strobe hazards without consuming vision tokens.
+""",
+    "production": """# Anime Production Pipeline (produce_anime_project)
+
+One brief in, one renderable project out. The pipeline runs seven stages:
+document -> storyboard -> characters -> assets -> scene_build -> style -> render -> review.
+
+## Brief shape
+```json
+{
+  "title": "Skyline Run",
+  "style": "shonen_action",
+  "width": 1280, "height": 720, "fps": 24.0, "duration": 6.0, "seed": 7,
+  "shots": [{"shot_id": "shot_01", "description": "rooftop chase", "duration_seconds": 3.0,
+             "camera_movement": "pan_right", "characters_present": ["hero"]}],
+  "characters": [{"id": "hero", "archetype": "humanoid", "height": 420.0,
+    "palette": ["#2b3a55", "#ff5c5c", "#f2e8cf", "#6fa8dc"],
+    "facing": "right", "position": {"x": 200, "y": 660}, "z": 10,
+    "actions": [{"motion": "run", "start": 0.0, "end": 6.0, "move_to": {"x": 1000, "y": 660}}]}],
+  "assets": [{"id": "tree1", "kind": "prop", "procedural": {"generator": "tree"},
+              "position": {"x": 300, "y": 660}, "height": 180}],
+  "background": {"generator": "landscape"},
+  "camera": [{"time": 0.0, "zoom": 1.0, "center": {"x": 640, "y": 360}}],
+  "render": {"video": true, "video_format": "mp4", "contact_sheet": true,
+             "review": true, "preview_frames": 4},
+  "output_dir": "out", "save_path": "out/reel.sif"
+}
+```
+- `archetype`: `humanoid` or `chibi`. `facing`: `left` or `right`.
+- Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
+- Positions are canvas pixels from the top-left; a character stands with its feet on `position`.
+- `assets[].kind`: `background`, `prop` or `texture`. Sources: `procedural: {generator}` or
+  `search: {query, provider, license}` (opt-in network fetch; every asset is license-checked).
+- Styles: shonen_action, dark_fantasy, supernatural_noir, cyber_mecha, retro_anime.
+
+## Other entry points
+- `production_plan(brief)`: dry-run; reports stages and layer counts without building.
+- `character_model_sheet(descriptor)`: labeled front/three-quarter/side sheet in its own document.
+- `procedural_asset_list()` / `procedural_asset_generate(...)`: the IP-safe vector generators.
+- `sprite_slice(source, output_dir, strategy)`: slice a sprite sheet into rig-ready part PNGs.
+- CLI: `synfig-mcp produce brief.json [--dry-run] [--json] [--output-dir DIR]`.
+
+## Limits
+- Rendering needs the Synfig CLI on PATH; without it the document is still saved and the
+  render/review stages report "skipped" rather than failing.
+- Characters are cut-out (vector) rigs driven by forward-kinematic rotations; no IK or mesh deform.
 """,
 }
 
