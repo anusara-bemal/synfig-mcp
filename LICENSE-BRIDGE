@@ -1,0 +1,15 @@
+Bridge license notice
+=====================
+
+The Python server in `server/` and the project as a whole are distributed under
+the MIT license in `LICENSE`.
+
+The native bridge in `bridge/` is compiled into Synfig Studio and is therefore a
+derivative work of Synfig Studio. It is distributed under the GNU General Public
+License version 3.0 or later (GPL-3.0-or-later).
+
+See `bridge/GPL_NOTICE.txt` for the full notice and the corresponding source
+offer, and `docs/gpl-compliance.md` for how the obligations are met.
+
+Synfig Studio itself is copyright (c) the Synfig Project and is distributed
+under the GPL-3.0.

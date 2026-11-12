@@ -217,13 +217,6 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
         return decorator
 
-    @mcp.resource("synfig://guide/{topic}")
-    def guide_resource(topic: str) -> str:
-        """Resource providing detailed guidance on Synfig concepts, recipes, and tools."""
-        from synfig_mcp.resources.guides import get_guide_content
-
-        return get_guide_content(topic)
-
     @tool_for("synfig_help", annotations=READ_ONLY)
     async def synfig_help(topic: str = "overview") -> dict[str, Any]:
         """Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, characters, review).
@@ -1541,13 +1534,6 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     # -----------------------------------------------------------------------
     # Visual Review Loop (Phase A2)
     # -----------------------------------------------------------------------
-
-    @mcp.resource("synfig://rubrics/{style}")
-    def rubric_resource(style: str) -> str:
-        """Resource providing vision critique checklists and rubrics for animation styles."""
-        from synfig_mcp.review.rubrics import get_rubric
-
-        return get_rubric(style)
 
     @tool_for("review_frame", annotations=READ_ONLY)
     async def review_frame(

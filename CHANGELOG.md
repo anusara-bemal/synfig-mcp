@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **MCP prompts**: five guided workflows exposed as client slash-commands - `create_animation_scene`, `rig_and_animate_character`, `render_and_review`, `produce_anime_project` and `troubleshoot_connection`. Each walks a model through the correct tool sequence for a common task.
+- **MCP resources**: concrete resources at `synfig://index`, `synfig://guide/{topic}`, `synfig://templates/{template}` and `synfig://rubrics/{style}`, plus one enumerable resource per guide topic, scene template and review rubric so `resources/list` is populated.
+- **Scene templates**: ready-to-use `scene_build` specs for `bouncing_ball`, `logo_sting` and `lower_third`, readable as MCP resources.
+- **Zero-install documentation**: README now leads with `uvx synfig-mcp` and `pipx` install paths and copy-pasteable Claude Desktop, Cursor, VS Code and generic JSON configs.
+
+### Changed
+- `LICENSE` is now a clean MIT file so GitHub detects the license correctly; the native bridge's GPL-3.0 notice moved to `LICENSE-BRIDGE`.
+- Tool counts in `README.md` and `docs/api.md` corrected to the real total (89 tools).
+- The server now advertises `instructions` and registers its prompts and resources on every start.
+
+### Added (continued)
 - **Rig sheet to animated scene**: `rig_sheet_slice` finds the parts of a character sheet, returns a numbered preview and writes one transparent PNG per named part. `scene_auto_build` builds a whole shot from a compact spec - background, jointed cut-out characters, props, camera keys, audio, motions - validated up front and applied as one `scene_build` (one round trip, one undo step), with optional save and contact-sheet preview.
 - **Real cut-out rigs**: every part gets a rotate joint layer (`<id>_<part>_rot`) nested so that a parent carries its children; hierarchy, pivots and stacking default from body-role names and can be overridden per part. Motion library: walk, run, idle, talk, wave, jump, nod, punch, rest, pose, move, with `move_to` travel.
 - `character_pose_apply` accepts explicit joint `angles`; `character_motion_apply` accepts `end_time`, `speed` and `move_to`.
