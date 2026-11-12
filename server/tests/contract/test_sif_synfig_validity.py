@@ -732,3 +732,109 @@ async def test_auto_built_character_scene_loads_and_moves(tmp_path: Path) -> Non
     assert ImageChops.difference(frames[0], frames[1]).getbbox() is not None, (
         "the character did not move between two frames"
     )
+
+
+# ---------------------------------------------------------------------------
+# Anime production pipeline
+# ---------------------------------------------------------------------------
+
+
+async def test_produced_anime_project_loads_and_animates(tmp_path: Path) -> None:
+    """A full production brief must produce a document Synfig loads and that animates."""
+    from PIL import Image, ImageChops
+
+    from synfig_mcp.production import (
+        AnimeProductionPipeline,
+        AssetRequest,
+        CharacterDescriptor,
+        ProductionBrief,
+    )
+
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    pipeline = AnimeProductionPipeline(backend=backend, output_dir=tmp_path)
+    brief = ProductionBrief(
+        title="Validity Gate Reel",
+        style="shonen_action",
+        width=320,
+        height=180,
+        fps=24.0,
+        duration=2.0,
+        seed=11,
+        characters=[
+            CharacterDescriptor(
+                id="hero",
+                archetype="humanoid",
+                position={"x": 60.0, "y": 165.0},
+                actions=[
+                    {
+                        "motion": "walk",
+                        "start": 0.0,
+                        "end": 2.0,
+                        "move_to": {"x": 260.0, "y": 165.0},
+                    }
+                ],
+            )
+        ],
+        assets=[
+            AssetRequest(
+                id="tree1",
+                kind="prop",
+                procedural={"generator": "tree"},
+                position={"x": 280.0, "y": 165.0},
+                height=70.0,
+            )
+        ],
+    )
+    report = await pipeline.run(brief)
+    assert report.success, [s.model_dump() for s in report.stages if s.status == "failed"]
+    assert report.doc_id is not None
+
+    await assert_loadable(backend, report.doc_id, tmp_path)
+
+    frames = []
+    for index, time in enumerate((0.0, 1.5)):
+        target = tmp_path / f"prod_frame_{index}.png"
+        await backend.render_frame(
+            doc_id=report.doc_id, output_path=str(target), width=320, height=180, time=time
+        )
+        assert target.is_file() and target.stat().st_size > 0, "Synfig rendered no frame"
+        frames.append(Image.open(target).convert("RGB"))
+    assert len(frames[0].getcolors(maxcolors=320 * 180) or []) > 3, "the frame is empty"
+    assert ImageChops.difference(frames[0], frames[1]).getbbox() is not None, (
+        "the produced scene did not animate"
+    )
+
+
+async def test_every_recipe_and_style_produces_a_loadable_document(tmp_path: Path) -> None:
+    """Every recipe and every style stack must build layers the Synfig engine accepts."""
+    from synfig_mcp.recipes.engine import RecipeEngine
+    from synfig_mcp.recipes.registry import RECIPES
+    from synfig_mcp.recipes.styles import list_style_presets
+
+    runner = CliRunner(BINARY)
+    for name in sorted(RECIPES):
+        backend = HeadlessBackend(runner=runner)
+        doc_id = await _new_doc(backend)
+        result = await RecipeEngine(backend).apply_recipe(doc_id=doc_id, name=name)
+        assert result.get("success") is not False, f"recipe '{name}' failed: {result}"
+        await assert_loadable(backend, doc_id, tmp_path / f"recipe_{name}")
+
+    for preset in list_style_presets():
+        backend = HeadlessBackend(runner=runner)
+        doc_id = await _new_doc(backend)
+        result = await RecipeEngine(backend).apply_style(doc_id=doc_id, style_name=preset["name"])
+        assert result.get("success") is not False, f"style '{preset['name']}' failed: {result}"
+        await assert_loadable(backend, doc_id, tmp_path / f"style_{preset['name']}")
+
+
+async def test_generated_model_sheet_loads_in_synfig(tmp_path: Path) -> None:
+    """A generated character model sheet must be a document Synfig can load."""
+    from synfig_mcp.production import AnimeProductionPipeline, ProductionBrief
+    from synfig_mcp.production.models import CharacterDescriptor
+
+    backend = HeadlessBackend(runner=CliRunner(BINARY))
+    pipeline = AnimeProductionPipeline(backend=backend, output_dir=tmp_path)
+    brief = ProductionBrief(title="Sheet", width=320, height=180, fps=24.0)
+    result = await pipeline.model_sheet(CharacterDescriptor(id="hero", archetype="chibi"), brief)
+    assert result.get("success") is True
+    await assert_loadable(backend, result["sheet_doc_id"], tmp_path)
