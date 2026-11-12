@@ -18,12 +18,6 @@ from synfig_mcp.sif.parser import SifDocument, synfig_value_to_xml
 from synfig_mcp.sif.valuenodes import build_valuenode_element
 
 
-def _must(element: etree._Element | None) -> etree._Element:
-    """Return the element, failing the test when the lookup found nothing."""
-    assert element is not None, "expected XML element is missing"
-    return element
-
-
 def _sif(layer_params: str = "") -> str:
     return (
         '<canvas version="1.2" width="480" height="270" fps="24.000">'
@@ -38,6 +32,20 @@ def _doc(layer_params: str = "") -> SifDocument:
     return SifDocument.from_string(_sif(layer_params))
 
 
+def _find(elem: etree._Element, path: str) -> etree._Element:
+    """Return a required descendant element, failing loudly when it is absent."""
+    found = elem.find(path)
+    assert found is not None, f"missing element: {path}"
+    return found
+
+
+def _attr(elem: etree._Element, name: str) -> str:
+    """Return a required attribute value, failing loudly when it is absent."""
+    value = elem.get(name)
+    assert value is not None, f"missing attribute: {name}"
+    return value
+
+
 # ---------------------------------------------------------------------------
 # synfig_value_to_xml
 # ---------------------------------------------------------------------------
@@ -47,7 +55,7 @@ def test_real_round_trips_with_full_precision() -> None:
     """A real must parse back to the exact same double."""
     elem = synfig_value_to_xml({"type": "real", "value": 0.1 + 0.2})
     assert elem.tag == "real"
-    assert float(str(elem.get("value"))) == 0.1 + 0.2
+    assert float(_attr(elem, "value")) == 0.1 + 0.2
 
 
 def test_integral_reals_have_no_trailing_zero() -> None:
@@ -94,10 +102,10 @@ def test_bline_point_writes_t2_only_when_split() -> None:
     }
     unsplit = synfig_value_to_xml({**point, "split": False})
     assert unsplit.find("t2") is None, "t2 implies split tangents and must be conditional"
-    assert _must(unsplit.find("width/real")).get("value") == "0.75"
+    assert _attr(_find(unsplit, "width/real"), "value") == "0.75"
 
     split = synfig_value_to_xml({**point, "split": True})
-    assert _must(split.find("t2/vector/x")).text == "0.3"
+    assert _find(split, "t2/vector/x").text == "0.3"
 
 
 def test_bline_point_list_is_a_dynamic_list_of_entries() -> None:
@@ -131,15 +139,15 @@ def test_bone_writes_linkable_fields() -> None:
     assert elem.tag == "bone"
     assert elem.get("type") == "bone_object"
     assert elem.findtext("name/string") == "upper_arm"
-    assert _must(elem.find("origin/vector/x")).text == "1"
-    assert _must(elem.find("angle/angle")).get("value") == "45"
-    assert _must(elem.find("scalelx/real")).get("value") == "2"
+    assert _find(elem, "origin/vector/x").text == "1"
+    assert _attr(_find(elem, "angle/angle"), "value") == "45"
+    assert _attr(_find(elem, "scalelx/real"), "value") == "2"
 
 
 def test_plain_list_uses_value_children() -> None:
     elem = synfig_value_to_xml({"type": "list", "entries": [{"type": "real", "value": 1.0}]})
     assert elem.tag == "list"
-    assert _must(elem.find("value/real")).get("value") == "1"
+    assert _attr(_find(elem, "value/real"), "value") == "1"
 
 
 def test_static_list_requires_an_element_type() -> None:
@@ -168,10 +176,9 @@ def test_width_point_list_is_a_dynamic_list() -> None:
     )
     assert elem.tag == "wplist"
     assert elem.get("type") == "width_point"
-    width_point = elem.find("entry/width_point")
-    assert width_point is not None
-    assert _must(width_point.find("position/real")).get("value") == "0.5"
-    assert _must(width_point.find("side_before/integer")).get("value") == "1"
+    width_point = _find(elem, "entry/width_point")
+    assert _attr(_find(width_point, "position/real"), "value") == "0.5"
+    assert _attr(_find(width_point, "side_before/integer"), "value") == "1"
 
 
 def test_dash_item_list_is_a_dynamic_list() -> None:
@@ -183,7 +190,7 @@ def test_dash_item_list_is_a_dynamic_list() -> None:
     )
     assert elem.tag == "dilist"
     assert elem.get("type") == "dash_item"
-    assert _must(elem.find("entry/dash_item/length/real")).get("value") == "0.25"
+    assert _attr(_find(elem, "entry/dash_item/length/real"), "value") == "0.25"
 
 
 def test_unknown_value_type_raises_instead_of_stringifying() -> None:
@@ -213,8 +220,8 @@ def test_linear_matches_the_upstream_link_layout() -> None:
     node = build_valuenode_element("linear", "real", _value("real", "2.5"))
     assert node.tag == "linear"
     assert node.get("type") == "real"
-    assert _must(node.find("slope/real")).get("value") == "0"
-    assert _must(node.find("offset/real")).get("value") == "2.5"
+    assert _attr(_find(node, "slope/real"), "value") == "0"
+    assert _attr(_find(node, "offset/real"), "value") == "2.5"
 
 
 def test_composite_of_color_uses_colour_channels() -> None:
@@ -226,9 +233,9 @@ def test_composite_of_color_uses_colour_channels() -> None:
     node = build_valuenode_element("composite", "color", source)
     assert node.tag == "composite"
     assert node.get("type") == "color"
-    assert _must(node.find("red/real")).get("value") == "0.5"
-    assert _must(node.find("green/real")).get("value") == "0.25"
-    assert _must(node.find("alpha/real")).get("value") == "1"
+    assert _attr(_find(node, "red/real"), "value") == "0.5"
+    assert _attr(_find(node, "green/real"), "value") == "0.25"
+    assert _attr(_find(node, "alpha/real"), "value") == "1"
 
 
 def test_composite_of_real_is_rejected() -> None:
@@ -253,20 +260,17 @@ def test_export_param_writes_defs_and_use_reference() -> None:
 
     layer.export_param("radius", "sharedRadius", layer.parent_canvas)
 
-    defs = doc.root.find("defs")
-    assert defs is not None
-    exported = defs.find("real")
-    assert exported is not None
-    assert exported.get("id") == "sharedRadius"
-    assert exported.get("value") == "1.5"
+    defs = _find(doc.root, "defs")
+    exported = _find(defs, "real")
+    assert _attr(exported, "id") == "sharedRadius"
+    assert _attr(exported, "value") == "1.5"
 
-    param = layer.element.find("param[@name='radius']")
-    assert param is not None
-    assert param.get("use") == "sharedRadius"
+    param = _find(layer.element, "param[@name='radius']")
+    assert _attr(param, "use") == "sharedRadius"
     assert len(param) == 0, "an exported parameter must not keep an inline value"
 
     # <defs> must precede the layers for the loader to resolve the reference.
-    children = [etree.QName(str(child.tag)).localname for child in doc.root]
+    children = [etree.QName(child).localname for child in doc.root]
     assert children.index("defs") < children.index("layer")
 
 
@@ -309,10 +313,9 @@ def test_set_param_detaches_an_exported_link() -> None:
     layer.export_param("radius", "shared", layer.parent_canvas)
     layer.set_param("radius", {"type": "real", "value": 3.0})
 
-    param = layer.element.find("param[@name='radius']")
-    assert param is not None
+    param = _find(layer.element, "param[@name='radius']")
     assert param.get("use") is None
-    assert _must(param.find("real")).get("value") == "3"
+    assert _attr(_find(param, "real"), "value") == "3"
 
 
 def test_convert_param_linear_keeps_the_value() -> None:
@@ -321,12 +324,9 @@ def test_convert_param_linear_keeps_the_value() -> None:
     assert layer is not None
     layer.convert_param("radius", "linear")
 
-    param = layer.element.find("param[@name='radius']")
-    assert param is not None
-    node = param.find("linear")
-    assert node is not None
+    node = _find(layer.element, "param[@name='radius']/linear")
     assert node.get("type") == "real"
-    assert _must(node.find("offset/real")).get("value") == "1.25"
+    assert _attr(_find(node, "offset/real"), "value") == "1.25"
 
 
 def test_convert_param_composite_color() -> None:
@@ -335,9 +335,8 @@ def test_convert_param_composite_color() -> None:
     assert layer is not None
     layer.convert_param("color", "composite")
 
-    node = layer.element.find("param[@name='color']/composite")
-    assert node is not None
-    assert _must(node.find("red/real")).get("value") == "0.5"
+    node = _find(layer.element, "param[@name='color']/composite")
+    assert _attr(_find(node, "red/real"), "value") == "0.5"
 
 
 def test_convert_param_rejects_unknown_valuenode() -> None:
