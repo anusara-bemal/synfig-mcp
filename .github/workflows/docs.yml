@@ -1,4 +1,4 @@
-name: Docs
+name: Website & Docs
 
 on:
   push:
@@ -9,9 +9,11 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: docs-${{ github.workflow }}-${{ github.ref }}
+  group: pages-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -19,20 +21,29 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - name: Install MkDocs Material
+      - name: Install documentation dependencies
         run: |
           python -m pip install --upgrade pip
           pip install mkdocs-material
 
-      - name: Build documentation (strict)
-        run: mkdocs build --strict
+      - name: Build MkDocs documentation
+        run: |
+          # Build full documentation suite into site/docs/
+          mkdocs build --strict --site-dir site/docs
+
+      - name: Assemble promotional website at site root
+        run: |
+          # Copy Synfig-styled promotional website to root of site/
+          cp -r website/* site/
+          touch site/.nojekyll
 
       - name: Upload documentation artifact
         uses: actions/upload-artifact@v7
@@ -41,3 +52,21 @@ jobs:
           path: site/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
