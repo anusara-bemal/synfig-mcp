@@ -50,6 +50,9 @@ include = ["src", "tests", "docs", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests import ``tests.conftest``; the bare ``pytest`` console script does not
+# put the repo root on sys.path, so make it importable here.
+pythonpath = ["."]
 addopts = "-q"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
