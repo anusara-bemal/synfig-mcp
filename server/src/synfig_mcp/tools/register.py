@@ -200,7 +200,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
                     except Exception as exc:
                         # Catch Pydantic or any internal exception and return explicit diagnostic
                         # rather than generic MCP SDK 'Error executing tool <name>'
-                        raise ToolError(f"[{name}] Failed with {type(exc).__name__}: {exc}") from exc
+                        raise ToolError(
+                            f"[{name}] Failed with {type(exc).__name__}: {exc}"
+                        ) from exc
 
                 mcp.tool(name=name, annotations=annotations)(wrapper)
                 return cast(F, wrapper)

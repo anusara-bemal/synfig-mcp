@@ -379,7 +379,9 @@ class SceneAutoBuilder:
                 doc_id = docs[0].id
                 frame = await self.rigging.canvas_frame(doc_id, coords=spec.coords)
             else:
-                info = await self.backend.doc_new(width=spec.width, height=spec.height, fps=spec.fps)
+                info = await self.backend.doc_new(
+                    width=spec.width, height=spec.height, fps=spec.fps
+                )
                 doc_id = info.id
                 created_doc = True
                 frame = await self.rigging.canvas_frame(doc_id, coords=spec.coords)
