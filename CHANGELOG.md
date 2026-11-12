@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP resources**: concrete resources at `synfig://index`, `synfig://guide/{topic}`, `synfig://templates/{template}` and `synfig://rubrics/{style}`, plus one enumerable resource per guide topic, scene template and review rubric so `resources/list` is populated.
 - **Scene templates**: ready-to-use `scene_build` specs for `bouncing_ball`, `logo_sting` and `lower_third`, readable as MCP resources.
 - **Zero-install documentation**: README now leads with `uvx synfig-mcp` and `pipx` install paths and copy-pasteable Claude Desktop, Cursor, VS Code and generic JSON configs.
+- **Website prompts and resources**: the project site gains a "Prompts & Resources" section, and its tool catalog is now generated from the live registry by `scripts/generate_website_catalog.py` (run via `poe docs`). It previously advertised 81 tools, many of which did not exist, and used a stale `python -m server.app` command; both are fixed.
 
 ### Changed
 - `LICENSE` is now a clean MIT file so GitHub detects the license correctly; the native bridge's GPL-3.0 notice moved to `LICENSE-BRIDGE`.

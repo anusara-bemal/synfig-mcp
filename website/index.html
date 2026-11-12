@@ -7,7 +7,7 @@
   <meta name="description" content="Production-grade Model Context Protocol server for Synfig Studio. Automate live vector canvases, bone rigging, and headless rendering with Claude, Cursor, and any MCP client. 100% Free and Unlimited.">
   <meta name="author" content="ABM">
   <meta property="og:title" content="Synfig MCP — MCP Server for Synfig Studio">
-  <meta property="og:description" content="Connect Claude, Cursor, and any MCP client directly to Synfig Studio. 81 typed tools. 100% Free.">
+  <meta property="og:description" content="Connect Claude, Cursor, and any MCP client directly to Synfig Studio. 89 typed tools. 100% Free.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://anusara-bemal.github.io/synfig-mcp/">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -33,7 +33,8 @@
         <li><a href="#why-mcp" class="nav-link">Why MCP</a></li>
         <li><a href="#capabilities" class="nav-link">Features</a></li>
         <li><a href="#install" class="nav-link">Setup</a></li>
-        <li><a href="#tools" class="nav-link">Tools (81)</a></li>
+        <li><a href="#tools" class="nav-link">Tools (89)</a></li>
+        <li><a href="#prompts" class="nav-link">Prompts</a></li>
         <li><a href="#security" class="nav-link">Security</a></li>
         <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/" target="_blank" class="nav-link">Docs ↗</a></li>
       </ul>
@@ -63,7 +64,7 @@
         <li><a href="#why-mcp">Why MCP</a></li>
         <li><a href="#capabilities">Features</a></li>
         <li><a href="#install">Setup Wizard</a></li>
-        <li><a href="#tools">Tools API (81)</a></li>
+        <li><a href="#tools">Tools API (89)</a></li>
         <li><a href="#security">Security &amp; Legal</a></li>
         <li><a href="https://anusara-bemal.github.io/synfig-mcp/docs/" target="_blank">Documentation ↗</a></li>
         <li><a href="https://github.com/anusara-bemal/synfig-mcp" target="_blank">GitHub Repository ↗</a></li>
@@ -99,8 +100,8 @@
           Setup Wizard
         </a>
         <div class="install-quick-pill">
-          <span>pip install synfig-mcp</span>
-          <button class="copy-code-btn" data-copy-text="pip install synfig-mcp" aria-label="Copy install command">
+          <span>uvx synfig-mcp</span>
+          <button class="copy-code-btn" data-copy-text="uvx synfig-mcp" aria-label="Copy install command">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -124,7 +125,7 @@
       <!-- Stats strip -->
       <div class="hero-stats-strip">
         <div class="stat-item">
-          <span class="stat-number">81</span>
+          <span class="stat-number">89</span>
           <span class="stat-label">MCP Tools</span>
         </div>
         <div class="stat-divider"></div>
@@ -520,7 +521,7 @@
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
               </svg>
             </div>
-            <h3>81 Typed MCP Tools</h3>
+            <h3>89 Typed MCP Tools</h3>
             <p>Complete API surface across 7 tuned profiles &mdash; <code>core</code>, <code>anim</code>, <code>fx</code>, <code>rig</code>, <code>assets</code>, <code>review</code>, <code>all</code> &mdash; optimizing AI context budgets.</p>
           </div>
           <div class="bento-footer-row">
@@ -689,16 +690,16 @@
           <div id="panel-windows" class="os-content active">
             <div class="step-instruction-box">
               <div class="instruction-title">
-                <span>Step 1 &mdash; Install the Python MCP Server</span>
-                <span class="badge-tag">pip</span>
+                <span>Step 1 &mdash; Run the Python MCP Server</span>
+                <span class="badge-tag">uvx</span>
               </div>
               <p class="instruction-desc">Requires Python 3.12+. Install from PyPI:</p>
               <div class="code-block">
                 <div class="code-header">
                   <span>PowerShell</span>
-                  <button class="copy-btn" data-copy-text="pip install synfig-mcp">Copy</button>
+                  <button class="copy-btn" data-copy-text="uvx synfig-mcp">Copy</button>
                 </div>
-                <pre><code>pip install synfig-mcp</code></pre>
+                <pre><code>uvx synfig-mcp</code></pre>
               </div>
             </div>
 
@@ -723,15 +724,15 @@
           <div id="panel-linux" class="os-content">
             <div class="step-instruction-box">
               <div class="instruction-title">
-                <span>Step 1 &mdash; Install Server via pip</span>
-                <span class="badge-tag">pip</span>
+                <span>Step 1 &mdash; Run the Server via uvx</span>
+                <span class="badge-tag">uvx</span>
               </div>
               <div class="code-block">
                 <div class="code-header">
                   <span>Bash</span>
-                  <button class="copy-btn" data-copy-text="pip install synfig-mcp">Copy</button>
+                  <button class="copy-btn" data-copy-text="uvx synfig-mcp">Copy</button>
                 </div>
-                <pre><code>pip install synfig-mcp</code></pre>
+                <pre><code>uvx synfig-mcp</code></pre>
               </div>
             </div>
 
@@ -799,11 +800,11 @@
                   <pre><code id="code-claude-snippet">{
   "mcpServers": {
     "synfig": {
-      "command": "python",
-      "args": ["-m", "server.app"],
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": {
         "SYNFIG_MCP_PROFILE": "all",
-        "SYNFIG_BRIDGE_PORT": "19998"
+        "SYNFIG_MCP_BACKEND": "auto"
       }
     }
   }
@@ -821,9 +822,10 @@
                   </div>
                   <pre><code id="code-cursor-snippet">{
   "mcpServers": {
-    "synfig-mcp": {
-      "command": "python",
-      "args": ["-m", "server.app"]
+    "synfig": {
+      "command": "uvx",
+      "args": ["synfig-mcp"],
+      "env": { "SYNFIG_MCP_PROFILE": "all", "SYNFIG_MCP_BACKEND": "auto" }
     }
   }
 }</code></pre>
@@ -838,9 +840,9 @@
                     <span>Terminal</span>
                     <button class="copy-btn" data-copy-target="code-cli-snippet">Copy</button>
                   </div>
-                  <pre><code id="code-cli-snippet">claude mcp add synfig -- python -m server.app</code></pre>
+                  <pre><code id="code-cli-snippet">claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- uvx synfig-mcp</code></pre>
                 </div>
-                <p class="config-hint">Run from the directory containing your <code>server/</code> module, or provide the full path to the module.</p>
+                <p class="config-hint">Requires <a href="https://docs.astral.sh/uv/" target="_blank">uv</a>. Prefer <code>pipx run synfig-mcp</code> if you installed it with pipx.</p>
               </div>
 
               <!-- VS Code -->
@@ -851,16 +853,17 @@
                     <button class="copy-btn" data-copy-target="code-vscode-snippet">Copy JSON</button>
                   </div>
                   <pre><code id="code-vscode-snippet">{
-  "mcpServers": {
+  "servers": {
     "synfig": {
-      "command": "python",
-      "args": ["-m", "server.app"],
-      "disabled": false
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["synfig-mcp"],
+      "env": { "SYNFIG_MCP_PROFILE": "all" }
     }
   }
 }</code></pre>
                 </div>
-                <p class="config-hint">Open VS Code settings &rarr; Extensions &rarr; Cline &rarr; MCP Servers to find this config file.</p>
+                <p class="config-hint">Add to your VS Code <code>mcp.json</code> (Command Palette &rarr; "MCP: Open User Configuration").</p>
               </div>
             </div>
           </div>
@@ -870,13 +873,13 @@
   </section>
 
   <!-- ========================================================================
-       Tools Reference Section (81 Tools)
+       Tools Reference Section
        ======================================================================== -->
   <section id="tools" class="tools-section">
     <div class="container">
       <div class="section-header">
         <span class="section-label">API Surface</span>
-        <h2 class="section-heading">81 Typed MCP Tools</h2>
+        <h2 class="section-heading">89 Typed MCP Tools</h2>
         <p class="section-subheading">
           Filter by functional profile or search by keyword. Each tool has a typed parameter signature inspectable by any MCP client.
         </p>
@@ -884,12 +887,12 @@
 
       <div class="tools-filter-strip">
         <div class="profile-pills">
-          <button class="profile-filter-btn active" data-profile="all">All (81)</button>
+          <button class="profile-filter-btn active" data-profile="all">All (89)</button>
           <button class="profile-filter-btn" data-profile="core">core (13)</button>
           <button class="profile-filter-btn" data-profile="anim">anim (21)</button>
           <button class="profile-filter-btn" data-profile="fx">fx (25)</button>
-          <button class="profile-filter-btn" data-profile="rig">rig (23)</button>
-          <button class="profile-filter-btn" data-profile="assets">assets (12)</button>
+          <button class="profile-filter-btn" data-profile="rig">rig (27)</button>
+          <button class="profile-filter-btn" data-profile="assets">assets (16)</button>
           <button class="profile-filter-btn" data-profile="review">review (18)</button>
         </div>
         <div class="tools-search-wrap">
@@ -898,12 +901,117 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           <input type="text" id="tool-search-input" class="search-input-field" placeholder="Search tools (e.g. bone, render, layer)…">
-          <span id="tools-count-badge" class="badge-tag">81 Tools</span>
+          <span id="tools-count-badge" class="badge-tag">89 Tools</span>
         </div>
       </div>
 
       <div id="tools-cards-grid" class="tools-cards-container">
         <!-- Populated by script.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Prompts & Resources Section
+       ======================================================================== -->
+  <section id="prompts" class="prompts-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Beyond Tools</span>
+        <h2 class="section-heading">Prompts &amp; Resources</h2>
+        <p class="section-subheading">
+          The server also speaks the full MCP protocol: guided <strong>prompts</strong> your client
+          can run as slash-commands, and readable <strong>resources</strong> you can attach to context.
+        </p>
+      </div>
+
+      <h3 class="prompts-subhead">Guided prompts</h3>
+      <div class="tools-cards-container">
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">create_animation_scene</span>
+              <span class="tool-category-badge">title · style</span>
+            </div>
+            <p class="tool-card-desc">Walks through building a complete animated scene: background, shapes, keyframes and a preview render.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">rig_and_animate_character</span>
+              <span class="tool-category-badge">character · motion</span>
+            </div>
+            <p class="tool-card-desc">Slices a character sheet, builds a jointed cut-out rig and applies a motion cycle.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">render_and_review</span>
+              <span class="tool-category-badge">doc · output</span>
+            </div>
+            <p class="tool-card-desc">Renders a frame or sequence and critiques it with the objective review metrics.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">produce_anime_project</span>
+              <span class="tool-category-badge">title · style</span>
+            </div>
+            <p class="tool-card-desc">Plans and produces a full multi-shot project end to end with the production pipeline.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">troubleshoot_connection</span>
+              <span class="tool-category-badge">no args</span>
+            </div>
+            <p class="tool-card-desc">Diagnoses bridge connectivity, backend selection and render prerequisites.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="prompts-subhead">Readable resources</h3>
+      <div class="tools-cards-container">
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">synfig://index</span>
+              <span class="tool-category-badge">markdown</span>
+            </div>
+            <p class="tool-card-desc">Index of every guide, scene template and review rubric the server exposes.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">synfig://guide/{topic}</span>
+              <span class="tool-category-badge">markdown</span>
+            </div>
+            <p class="tool-card-desc">Guidance on <code>overview</code>, <code>profiles</code>, <code>declarative_build</code>, <code>animation</code>, <code>characters</code>, <code>review</code> and <code>production</code>.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">synfig://templates/{template}</span>
+              <span class="tool-category-badge">json</span>
+            </div>
+            <p class="tool-card-desc">Ready-to-use <code>scene_build</code> specs: <code>bouncing_ball</code>, <code>logo_sting</code>, <code>lower_third</code>.</p>
+          </div>
+        </div>
+        <div class="tool-item-card">
+          <div>
+            <div class="tool-card-head">
+              <span class="tool-fn-name">synfig://rubrics/{style}</span>
+              <span class="tool-category-badge">markdown</span>
+            </div>
+            <p class="tool-card-desc">Vision critique rubrics: <code>general</code>, <code>cinematic</code>, <code>dark_fantasy</code>, <code>shonen_action</code>, <code>supernatural_noir</code>.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1016,7 +1124,7 @@
           <div class="footer-badges">
             <span class="footer-badge">MIT + GPL-3.0</span>
             <span class="footer-badge">Free Forever</span>
-            <span class="footer-badge">81 Tools</span>
+            <span class="footer-badge">89 Tools</span>
           </div>
         </div>
 
