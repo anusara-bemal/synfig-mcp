@@ -55,6 +55,8 @@ by a test that fails without the fix.
 
 | Gap | Impact | Next step |
 |---|---|---|
+| Cut-out rigs use rotate layers, not Synfig bones | No IK, no mesh/skeleton deformation, no lip-sync or part swapping in `scene_auto_build` | Bone-linked rigs once `bones` / `transformation` can be written |
+| `scene_auto_build` is not yet verified against a real Studio session | The live path relies on the generic `scene.build` handler | Add a `real_studio` e2e test |
 | Complex parameters `wplist`, `dilist`, `bones`, `transformation`, `canvas` cannot be written | No weight-paint, bone rigging or transformation authoring through the MCP | Dedicated serialisers, verified by the validity gate |
 | 41 of 69 value nodes cannot be *created* (28 can) | Limited procedural expression vocabulary | Extend `VALUENODE_SPECS` with the remaining upstream link layouts |
 | Live mode cannot *write* splines | The headless engine writes `bline` points; the bridge needs Synfig's `ValueNode_BLine` API | Implement the spline write in the bridge |

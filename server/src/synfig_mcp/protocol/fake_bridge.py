@@ -386,6 +386,25 @@ class FakeBridgeServer:
             }
 
         if method == "scene.tree":
+            # Layers created through scene.build are reported after the canned
+            # layer, so tools that read back what they built see their layers.
+            built = [
+                {
+                    "id": lyr["id"],
+                    "desc": lyr["id"],
+                    "description": lyr["id"],
+                    "type": lyr.get("type", "circle"),
+                    "active": True,
+                    "depth": index + 1,
+                    "params": {
+                        k: v for k, v in (lyr.get("params") or {}).items() if isinstance(v, dict)
+                    },
+                    "children": [],
+                }
+                for index, lyr in enumerate(
+                    self._fake_docs.get(params.get("doc_id", "doc_0"), {}).get("layers", [])
+                )
+            ]
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
@@ -416,7 +435,8 @@ class FakeBridgeServer:
                                 },
                             },
                             "children": [],
-                        }
+                        },
+                        *built,
                     ],
                 },
             }

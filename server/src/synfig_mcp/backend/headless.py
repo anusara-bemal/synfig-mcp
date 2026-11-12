@@ -1160,6 +1160,19 @@ class HeadlessBackend(BackendBase):
     # Declarative Scene Operations (Phase A1)
     # -----------------------------------------------------------------------
 
+    async def doc_view_box(self, doc_id: str) -> tuple[float, float, float, float] | None:
+        """Read the view box of the root canvas."""
+        doc = self._documents.get(doc_id)
+        if doc is None:
+            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
+        try:
+            left, top, right, bottom = (float(v) for v in doc.root.get("view-box", "").split())
+        except ValueError:
+            return None
+        if left == right or top == bottom:
+            return None
+        return (left, top, right, bottom)
+
     async def scene_build(
         self,
         spec: dict[str, Any],

@@ -121,6 +121,8 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "selection_get": {"rig", "all"},
     "selection_set": {"rig", "all"},
     # Cut-out Characters & Storyboards (Phase A4)
+    "rig_sheet_slice": {"rig", "assets", "all"},
+    "scene_auto_build": {"rig", "all"},
     "character_rig_from_parts": {"rig", "all"},
     "rig_bone_add": {"rig", "all"},
     "character_pose_apply": {"rig", "all"},
@@ -212,7 +214,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("synfig_help", annotations=READ_ONLY)
     async def synfig_help(topic: str = "overview") -> dict[str, Any]:
-        """Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, review).
+        """Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, characters, review).
         Returns: Markdown guide text and list of available guide topics.
         Gotcha: Querying help avoids loading large documentation into the active context.
         """
@@ -1134,14 +1136,75 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             parent_index=parent_index,
         )
 
+    @tool_for("rig_sheet_slice", annotations=IDEMPOTENT)
+    async def rig_sheet_slice(
+        file_path: str,
+        names: dict[str, str] | None = None,
+        output_dir: str | None = None,
+        min_area: int | None = None,
+        merge_gap: int = 6,
+        bg_tolerance: int = 28,
+        preview: bool = True,
+    ) -> dict[str, Any]:
+        """Cut a character rig sheet (one image, many body parts) into one transparent PNG per part.
+        Call once without names and look at preview_base64 (numbered boxes), then call again with
+        names={"1": "head", "2": "torso", "3": "upper_arm_l", ...} to export only the real parts.
+        Returns: {parts: [{index, name, file, bbox}], manifest, output_dir, preview_base64}.
+        Gotcha: Needs a transparent or uniform background. Name parts by body role (head, torso,
+        upper_arm_l, forearm_l, hand_l, upper_leg_r, lower_leg_r, foot_r) so rigs assemble themselves.
+        """
+        from pathlib import Path
+
+        from synfig_mcp.characters.cutout import IMAGE_EXTENSIONS
+        from synfig_mcp.characters.sheet import slice_rig_sheet
+        from synfig_mcp.security.sandbox import validate_path
+
+        sheet = validate_path(file_path, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True)
+        target = validate_path(output_dir or str(sheet.parent / f"{sheet.stem}_parts"))
+        res = slice_rig_sheet(
+            Path(sheet),
+            Path(target),
+            names=names,
+            min_area=min_area,
+            merge_gap=merge_gap,
+            bg_tolerance=bg_tolerance,
+            preview=preview,
+        )
+        return wrap_untrusted(res)
+
+    @tool_for("scene_auto_build", annotations=MUTATING)
+    async def scene_auto_build(
+        spec: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Build a whole animated shot in one call: background, rigged cut-out characters, props,
+        camera moves and audio. One undo step; everything is validated before the document changes.
+        spec: {width, height, fps, duration, background: {file|color, fit},
+          characters: [{id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
+            position: {x, y}, height, flip, z, actions: [{motion, start, end, move_to: {x, y}, speed}]}],
+          props: [{id, file, position, height, rotation, z, actions}],
+          camera: [{time, zoom, center: {x, y}}], audio: {file, delay}, save_path, preview}.
+        Positions are canvas pixels from the top-left (coords: "units" for Synfig units); a character
+        stands with its feet on 'position'. Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
+        Returns: {doc_id, characters, props, warnings, saved_to, preview: {contact_sheet_base64, ...}}.
+        Gotcha: Parts named by body role get default joints; other parts need parent + attach.
+        """
+        from synfig_mcp.characters.production import SceneAutoBuilder
+
+        res = await SceneAutoBuilder(backend=backend).build(spec, dry_run=dry_run)
+        return wrap_untrusted(res)
+
     @tool_for("character_rig_from_parts", annotations=MUTATING)
     async def character_rig_from_parts(
         spec: dict[str, Any],
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Assemble a hierarchical 2D cut-out character puppet from geometric or imported parts.
-        Returns: Rig summary with character ID, root group, and parts count.
-        Gotcha: Use dry_run=true to preview hierarchy before assembling.
+        """Assemble a jointed cut-out character from part images (or primitives) in an open document.
+        spec: {doc_id, id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
+          position: {x, y}, height, flip, layout: "assemble" | "in_place", actions?}.
+        Every part gets a joint layer <id>_<part>_rot; turning a part carries its children.
+        Returns: Rig summary with root group, parts, roles and joint layer ids.
+        Gotcha: Use dry_run=true to preview the hierarchy; pivot/attach are fractions of the image.
         """
         from synfig_mcp.characters.rigging import RiggingEngine
 
@@ -1155,16 +1218,18 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         character_id: str = "hero",
         pose_name: str = "idle",
         time: float = 0.0,
+        angles: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Apply a named pose preset (idle, punch, jump, walk_contact, walk_passing) to character parts.
-        Returns: Status with applied bone rotations and active facial slots.
-        Gotcha: Verify character_id matches the rigged puppet root prefix.
+        """Key a pose on a rigged character: a preset (idle, punch, jump, walk_contact, walk_passing)
+        or explicit joint angles, e.g. angles={"upper_arm_r": 120, "head": -10} (degrees from rest).
+        Returns: The joint layers that were keyed and the joints the character does not have.
+        Gotcha: Fails when the character has none of the addressed joints - nothing is keyed silently.
         """
         from synfig_mcp.characters.rigging import RiggingEngine
 
         engine = RiggingEngine(backend=backend)
         res = await engine.character_pose_apply(
-            doc_id=doc_id, character_id=character_id, pose_name=pose_name, time=time
+            doc_id=doc_id, character_id=character_id, pose_name=pose_name, time=time, angles=angles
         )
         return wrap_untrusted(res)
 
@@ -1174,16 +1239,26 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         character_id: str = "hero",
         motion_name: str = "walk",
         start_time: float = 0.0,
+        end_time: float | None = None,
+        speed: float = 1.0,
+        move_to: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Apply a complete motion cycle preset (walk, punch, idle) across keyframe waypoints.
-        Returns: Applied keyframe sequence, cycle duration, and target character ID.
-        Gotcha: Automatically sets multi-frame easing waypoints along the timeline.
+        """Animate a rigged character: walk, run, idle, talk (loop until end_time), wave, jump, nod,
+        punch (play once), rest, move. move_to={x, y} (canvas pixels) travels there by end_time.
+        Returns: Keyframe times, waypoint count, animated layers and skipped joints.
+        Gotcha: The character must have been built by character_rig_from_parts or scene_auto_build.
         """
         from synfig_mcp.characters.rigging import RiggingEngine
 
         engine = RiggingEngine(backend=backend)
         res = await engine.character_motion_apply(
-            doc_id=doc_id, character_id=character_id, motion_name=motion_name, start_time=start_time
+            doc_id=doc_id,
+            character_id=character_id,
+            motion_name=motion_name,
+            start_time=start_time,
+            end_time=end_time,
+            speed=speed,
+            move_to=move_to,
         )
         return wrap_untrusted(res)
 

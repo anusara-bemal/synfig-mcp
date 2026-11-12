@@ -570,6 +570,10 @@ class AutoBackend(BackendBase):
             end_time=end_time,
         )
 
+    async def doc_view_box(self, doc_id: str) -> tuple[float, float, float, float] | None:
+        """Delegate to the active backend."""
+        return await self._current().doc_view_box(doc_id)
+
     async def scene_build(self, spec: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
         """Delegate to the active backend."""
         return await self._current().scene_build(spec=spec, dry_run=dry_run)
