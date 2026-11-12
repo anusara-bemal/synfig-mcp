@@ -12,7 +12,7 @@
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
+**Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 89 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 
@@ -26,6 +26,7 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Connect an MCP client](#connect-an-mcp-client)
+- [Prompts and resources](#prompts-and-resources)
 - [Operating modes](#operating-modes)
 - [Tool profiles](#tool-profiles)
 - [What you can do](#what-you-can-do)
@@ -46,7 +47,7 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 |---|---|
 | **Live editing** | Drives a running, patched Synfig Studio through an authenticated local bridge. Every mutation is an undoable Studio action. |
 | **Headless fallback** | Works without a GUI through a lossless `.sif` / `.sifz` / `.sfg` engine and the `synfig` CLI. Ideal for CI, containers, and render farms. |
-| **Complete surface** | All 83 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
+| **Complete surface** | All 89 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
 | **Rig sheet to scene** | `rig_sheet_slice` cuts a character sheet into parts, `scene_auto_build` assembles jointed characters, background, props, camera and motion (walk, run, wave, jump, ...) in one call and one undo step. See [`docs/characters.md`](docs/characters.md). |
 | **Verified output** | Every generated document is loaded by the *real* Synfig engine in CI — a document the engine rejects never passes. |
 | **Visual feedback loop** | Renders frames and returns base64 previews plus objective metrics: SSIM, palette, safe areas, clipping, strobe/photosensitivity, diff heatmaps. |
@@ -67,7 +68,7 @@ graph TB
     end
 
     subgraph server["synfig-mcp server (Python · MIT)"]
-        TOOLS["83 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
+        TOOLS["89 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
         SCHEMA["Schema introspection<br/>layer types · parameters · value nodes · targets"]
         PIPE["Render pipeline<br/>frame · sequence · video · contact sheet"]
         REVIEW["Visual review<br/>SSIM · palette · clipping · strobe"]
@@ -156,7 +157,27 @@ sequenceDiagram
 
 ## Installation
 
-### Option A — one command (recommended)
+### Option A — `uvx` (zero-install, recommended)
+
+[`uvx`](https://docs.astral.sh/uv/guides/tools/) runs the server straight from
+PyPI with no clone and no virtualenv. If you have `uv`, you already have it:
+
+```bash
+uvx synfig-mcp doctor     # verify the install
+uvx synfig-mcp            # run the stdio server
+```
+
+### Option B — `pipx` (isolated, persistent)
+
+[`pipx`](https://pipx.pypa.io/) installs the server as an isolated CLI tool:
+
+```bash
+pipx install synfig-mcp
+synfig-mcp doctor
+synfig-mcp
+```
+
+### Option C — one command (installs a pinned Studio bundle)
 
 ```bash
 # Linux / macOS
@@ -169,20 +190,20 @@ irm https://raw.githubusercontent.com/anusara-bemal/synfig-mcp/main/scripts/inst
 The script installs the server with `uv`, verifies the installation with
 `synfig-mcp doctor`, and prints the ready-to-paste client configuration.
 
-### Option B — from source
+### Option D — `pip` / release wheel
+
+```bash
+pip install synfig-mcp
+synfig-mcp doctor
+```
+
+### Option E — from source
 
 ```bash
 git clone https://github.com/anusara-bemal/synfig-mcp.git
 cd synfig-mcp
 cd server && uv sync --all-extras && cd ..
 server/.venv/bin/synfig-mcp doctor      # or server\.venv\Scripts\synfig-mcp.exe doctor
-```
-
-### Option C — release wheel
-
-```bash
-pip install synfig-mcp
-synfig-mcp doctor
 ```
 
 ### Run it
@@ -197,6 +218,12 @@ synfig-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --token "$SY
 # diagnostics
 synfig-mcp doctor
 ```
+
+> **Only `uvx` / `pipx` / `pip` need PyPI access.** Live mode additionally needs
+> the patched Synfig Studio bundle from the
+> [Releases](https://github.com/anusara-bemal/synfig-mcp/releases) page; headless
+> rendering needs the `synfig` CLI on `PATH` (or use the container image, which
+> bundles it).
 
 ```mermaid
 graph LR
@@ -215,6 +242,10 @@ graph LR
 
 ## Connect an MCP client
 
+Every snippet below uses **`uvx synfig-mcp`**, so the server needs no manual
+install — the client fetches and runs it on demand. Swap `uvx` for `pipx run`
+(or a plain `synfig-mcp`) if you installed it another way.
+
 ### Claude Desktop
 
 `claude_desktop_config.json` (`%APPDATA%\Claude\claude_desktop_config.json` on Windows,
@@ -224,7 +255,8 @@ graph LR
 {
   "mcpServers": {
     "synfig": {
-      "command": "synfig-mcp",
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": {
         "SYNFIG_MCP_PROFILE": "all",
         "SYNFIG_MCP_BACKEND": "auto"
@@ -234,19 +266,50 @@ graph LR
 }
 ```
 
-### Claude Code
-
-```bash
-claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
-```
-
-### Cursor
+With `pipx` instead of `uvx`:
 
 ```json
 {
   "mcpServers": {
     "synfig": {
-      "command": "synfig-mcp",
+      "command": "pipx",
+      "args": ["run", "synfig-mcp"],
+      "env": { "SYNFIG_MCP_PROFILE": "all", "SYNFIG_MCP_BACKEND": "auto" }
+    }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- uvx synfig-mcp
+```
+
+### Cursor
+
+`~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (per project):
+
+```json
+{
+  "mcpServers": {
+    "synfig": {
+      "command": "uvx",
+      "args": ["synfig-mcp"],
+      "env": { "SYNFIG_MCP_PROFILE": "all", "SYNFIG_MCP_BACKEND": "auto" }
+    }
+  }
+}
+```
+
+With `pipx`:
+
+```json
+{
+  "mcpServers": {
+    "synfig": {
+      "command": "pipx",
+      "args": ["run", "synfig-mcp"],
       "env": { "SYNFIG_MCP_PROFILE": "all", "SYNFIG_MCP_BACKEND": "auto" }
     }
   }
@@ -260,7 +323,8 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
   "servers": {
     "synfig": {
       "type": "stdio",
-      "command": "synfig-mcp",
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": { "SYNFIG_MCP_PROFILE": "all" }
     }
   }
@@ -273,8 +337,8 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
 {
   "mcpServers": {
     "synfig": {
-      "command": "/absolute/path/to/synfig-mcp",
-      "args": [],
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": {
         "SYNFIG_MCP_PROFILE": "all",
         "SYNFIG_MCP_BACKEND": "auto",
@@ -284,6 +348,35 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
   }
 }
 ```
+
+---
+
+## Prompts and resources
+
+Beyond tools, the server exposes **MCP prompts** (client slash-commands) and
+**MCP resources** (readable documents you can attach to context).
+
+### Prompts
+
+| Prompt | Arguments | What it does |
+|---|---|---|
+| `create_animation_scene` | `title`, `style` | Guided `scene_build` workflow: background, shapes, keyframes, preview render. |
+| `rig_and_animate_character` | `character_name`, `motion` | Slice a character sheet, build a jointed rig, apply a motion cycle. |
+| `render_and_review` | `doc_id`, `output_path` | Render a frame or sequence and critique it with objective metrics. |
+| `produce_anime_project` | `title`, `style` | Plan and produce a full multi-shot project with the production pipeline. |
+| `troubleshoot_connection` | – | Diagnose bridge connectivity, backend selection and render prerequisites. |
+
+### Resources
+
+| URI | Contents |
+|---|---|
+| `synfig://index` | Index of every guide, template and rubric. |
+| `synfig://guide/{topic}` | Guidance: `overview`, `profiles`, `declarative_build`, `animation`, `characters`, `review`, `production`. |
+| `synfig://templates/{template}` | Ready-to-use `scene_build` specs: `bouncing_ball`, `logo_sting`, `lower_third`. |
+| `synfig://rubrics/{style}` | Vision critique rubrics: `general`, `cinematic`, `dark_fantasy`, `shonen_action`, `supernatural_noir`. |
+
+Each guide topic, template and rubric is also listed individually in
+`resources/list`, so clients and automated scanners can enumerate them.
 
 ---
 
@@ -318,16 +411,16 @@ flowchart TD
 
 ## Tool profiles
 
-All 83 tools are exposed by default. Narrow the surface when the client has a tight context budget:
+All 89 tools are exposed by default. Narrow the surface when the client has a tight context budget:
 
 | Profile | Tools | ≈ tokens (cl100k) | Focus |
 |---|---:|---:|---|
-| `all` *(default)* | 80 | ~20,100 | Everything: documents, layers, parameters, animation, FX, rigging, review, assets |
+| `all` *(default)* | 89 | ~23,400 | Everything: documents, layers, parameters, animation, FX, rigging, review, assets |
 | `core` | 13 | ~2,980 | Scene build/export, inspection, undo/redo, single-frame render |
 | `anim` | 21 | ~5,000 | Keyframes, timeline, waypoints, interpolation |
 | `fx` | 25 | ~6,000 | Layer hierarchy, effect recipes, style presets |
-| `rig` | 25 | ~4,500 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
-| `assets` | 13 | ~2,800 | Licensed asset search, hardened downloads, attribution |
+| `rig` | 27 | ~4,500 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
+| `assets` | 16 | ~2,800 | Licensed asset search, hardened downloads, attribution |
 | `review` | 18 | ~5,200 | Frame/sequence/compare review, objective metrics, jobs |
 
 ```bash
@@ -375,7 +468,7 @@ graph LR
 - **Characters** — cut-out puppet assembly, pose presets, motion cycles, storyboard animatics.
 - **Rendering** — single frames, sequences, MP4/GIF video, contact sheets, plus the visual review loop.
 
-Full reference: [`docs/tools.md`](docs/tools.md) (all 83 tools) and [`docs/api.md`](docs/api.md).
+Full reference: [`docs/tools.md`](docs/tools.md) (all 89 tools) and [`docs/api.md`](docs/api.md).
 
 ---
 
@@ -511,7 +604,7 @@ bash bridge/scripts/build_linux.sh            # Linux
 
 | Document | Contents |
 |---|---|
-| [`docs/tools.md`](docs/tools.md) | All 83 tools with typed parameters |
+| [`docs/tools.md`](docs/tools.md) | All 89 tools with typed parameters |
 | [`docs/api.md`](docs/api.md) | Tool surface per profile |
 | [`docs/architecture.md`](docs/architecture.md) | Bridge protocol, threading, undo model |
 | [`docs/protocol.md`](docs/protocol.md) | JSON-RPC wire format |
