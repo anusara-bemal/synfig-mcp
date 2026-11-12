@@ -133,3 +133,6 @@ live = "pytest -m real_studio -v -s"
 check = ["format-check", "lint", "typecheck", "test"]
 security = "bandit -r src/"
 verify-validity = "pytest tests/contract/test_sif_synfig_validity.py -v"
+docs-tools = "python ../scripts/generate_tool_docs.py"
+docs-website = "python ../scripts/generate_website_catalog.py"
+docs = ["docs-tools", "docs-website"]
