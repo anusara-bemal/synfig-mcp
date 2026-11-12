@@ -93,7 +93,7 @@ graph TB
     BRIDGE --> ACTIONS --> ENGINE
     HEAD --> CLI
     PIPE --> CLI
-    ENGINE --> PNG frames
+    ENGINE --> PNG["PNG frames"]
 
     classDef server fill:#e8f0fe,stroke:#4285f4,color:#111
     classDef studio fill:#fef7e0,stroke:#f9ab00,color:#111
