@@ -68,8 +68,9 @@ async def test_tools_list_token_ceiling() -> None:
     dumped = json.dumps(tools_raw)
     tokens = count_tokens(dumped)
 
-    # Full studio ceiling
-    assert tokens <= 22000, f"tools/list token bloat detected: {tokens} > 22000"
+    # Full studio ceiling.  Raised from 22,000 to 24,000 when the anime
+    # production pipeline (produce_anime_project and friends) was added.
+    assert tokens <= 24000, f"tools/list token bloat detected: {tokens} > 24000"
 
 
 @pytest.mark.asyncio

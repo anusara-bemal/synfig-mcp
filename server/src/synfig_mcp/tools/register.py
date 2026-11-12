@@ -128,6 +128,13 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "character_pose_apply": {"rig", "all"},
     "character_motion_apply": {"rig", "all"},
     "storyboard_from_script": {"rig", "all"},
+    # Anime Production Pipeline (Step 0-5)
+    "produce_anime_project": {"all"},
+    "production_plan": {"all"},
+    "character_model_sheet": {"rig", "all"},
+    "procedural_asset_list": {"assets", "all"},
+    "procedural_asset_generate": {"assets", "all"},
+    "sprite_slice": {"assets", "rig", "all"},
     # History & Undo
     "history_undo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "history_redo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
@@ -1704,3 +1711,194 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         """
         registry = await get_synfig_registry()
         return registry.list_renderers()
+
+    # -----------------------------------------------------------------------
+    # Anime Production Pipeline (Steps 0-5)
+    # -----------------------------------------------------------------------
+
+    @tool_for("produce_anime_project", annotations=MUTATING)
+    async def produce_anime_project(
+        brief: dict[str, Any],
+        dry_run: bool = False,
+        stages: list[str] | None = None,
+        resume_from: str | None = None,
+    ) -> dict[str, Any]:
+        """Build a whole anime-style project from one brief: storyboard, rigged characters,
+        assets, assembled scene, style stack, render and review.
+
+        brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
+        assets[], background, camera[], render{}, output_dir, save_path}. Call
+        synfig_help('production') for the full brief shape, styles and motion names.
+        Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
+        Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
+        and the render/review stages report "skipped".
+        """
+        from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+        report = await AnimeProductionPipeline(backend=backend).run(
+            brief, dry_run=dry_run, stages=stages, resume_from=resume_from
+        )
+        return wrap_untrusted(report.model_dump())
+
+    @tool_for("production_plan", annotations=READ_ONLY)
+    async def production_plan(brief: dict[str, Any]) -> dict[str, Any]:
+        """Dry-run the production pipeline: report the stages and layer counts without building.
+
+        brief: same shape as produce_anime_project (see synfig_help('production')).
+        Returns: the ProductionReport for the dry run; no document is created.
+        """
+        from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+        report = await AnimeProductionPipeline(backend=backend).run(brief, dry_run=True)
+        return wrap_untrusted(report.model_dump())
+
+    @tool_for("character_model_sheet", annotations=MUTATING)
+    async def character_model_sheet(
+        descriptor: dict[str, Any],
+        style: str = "shonen_action",
+        width: int = 1280,
+        height: int = 720,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Auto-generate a labeled model/rig sheet (front, three-quarter, side) for one character.
+
+        descriptor: {id, archetype: humanoid|chibi, height, palette, facing, position, z}.
+        Returns: {success, sheet_doc_id, sheet_group, views, layers}.
+        Gotcha: the sheet is vector cut-out geometry, not a re-drawn turnaround.
+        """
+        from synfig_mcp.production.models import CharacterDescriptor, ProductionBrief
+        from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+        pipeline = AnimeProductionPipeline(backend=backend)
+        brief = ProductionBrief(
+            title=str(descriptor.get("id", "character")),
+            style=style,
+            width=width,
+            height=height,
+        )
+        result = await pipeline.model_sheet(
+            CharacterDescriptor.model_validate(descriptor), brief, dry_run=dry_run
+        )
+        return wrap_untrusted(result)
+
+    @tool_for("procedural_asset_list", annotations=READ_ONLY)
+    async def procedural_asset_list() -> dict[str, Any]:
+        """List the built-in procedural asset generators (offline, IP-safe).
+
+        Returns: {background: [...], prop: [...], texture: [...]} to pass as
+        asset "procedural": {generator: <name>}.
+        """
+        from synfig_mcp.production.asset_generator import AssetGenerator
+
+        return wrap_untrusted(AssetGenerator.list_generators())
+
+    @tool_for("procedural_asset_generate", annotations=MUTATING)
+    async def procedural_asset_generate(
+        doc_id: str,
+        kind: str = "prop",
+        generator: str = "tree",
+        seed: int = 0,
+        position: dict[str, float] | None = None,
+        height: float | None = None,
+        style: str | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Generate one procedural vector asset and add it to a document.
+
+        kind: background | prop | texture; generator: see procedural_asset_list.
+        position/height are canvas pixels (props only). Returns: {success, created, dry_run}.
+        """
+        from synfig_mcp.production.asset_generator import AssetGenerator
+
+        generator_engine = AssetGenerator(style=style)
+        frame = await _document_frame(backend, doc_id)
+        if kind == "background":
+            layers = generator_engine.background(generator, frame, seed=seed)
+        elif kind == "texture":
+            layers = generator_engine.texture(generator, frame, seed=seed)
+        else:
+            left, top, right, bottom = frame
+            x_px = float(position["x"]) if position and "x" in position else (right - left) / 2
+            y_px = (
+                float(position["y"])
+                if position and "y" in position
+                else bottom + abs(top - bottom) * 0.2
+            )
+            info = await backend.doc_info(doc_id)
+            width_px = info.width if info else 1280
+            height_px = info.height if info else 720
+            ux = left + (right - left) * (x_px / max(1, width_px))
+            uy = top + (bottom - top) * (y_px / max(1, height_px))
+            size = abs(top - bottom) * ((height or height_px * 0.2) / max(1, height_px))
+            layers = generator_engine.prop(generator, (ux, uy), size, seed=seed)
+        if dry_run:
+            return wrap_untrusted(
+                {
+                    "success": True,
+                    "dry_run": True,
+                    "generator": generator,
+                    "kind": kind,
+                    "layers": [layer["id"] for layer in layers],
+                }
+            )
+        res = await backend.scene_build(spec={"doc_id": doc_id, "layers": layers})
+        return wrap_untrusted(
+            {
+                "success": res.get("success", True),
+                "generator": generator,
+                "kind": kind,
+                "created": res.get("diff", {}).get("created", []),
+                "dry_run": False,
+            }
+        )
+
+    @tool_for("sprite_slice", annotations=IDEMPOTENT)
+    async def sprite_slice(
+        source: str,
+        output_dir: str,
+        strategy: str = "alpha",
+        rows: int = 1,
+        cols: int = 1,
+        rectangles: list[dict[str, Any]] | None = None,
+        bg_tolerance: int = 28,
+        padding: int = 2,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Slice a sprite sheet or layered raster into named, rig-ready transparent part PNGs.
+
+        strategy: grid (rows x cols), alpha (connected components) or trim (tight alpha boxes);
+        pass rectangles [{name, x, y, width, height}] for exact control.
+        Returns: {success, detected_parts, parts: [{name, file, bbox}], output_dir}.
+        """
+        from pathlib import Path
+
+        from synfig_mcp.production.slicer import PartSlicer
+
+        if dry_run:
+            return wrap_untrusted(
+                {"success": True, "dry_run": True, "source": source, "output_dir": output_dir}
+            )
+        slicer = PartSlicer(Path(output_dir))
+        result = slicer.slice(
+            source,
+            strategy=strategy,  # type: ignore[arg-type]
+            rows=rows,
+            cols=cols,
+            rectangles=rectangles,
+            bg_tolerance=bg_tolerance,
+            padding=padding,
+        )
+        return wrap_untrusted(result)
+
+    async def _document_frame(
+        backend: BackendBase, doc_id: str
+    ) -> tuple[float, float, float, float]:
+        """The canvas frame of a document in Synfig units, for asset generators."""
+        from synfig_mcp.characters.cutout import CanvasFrame
+
+        info = await backend.doc_info(doc_id)
+        view_box = await backend.doc_view_box(doc_id)
+        width = info.width if info else 1280
+        height = info.height if info else 720
+        frame = CanvasFrame.for_document(width, height, view_box, coords="pixels")
+        return (frame.left, frame.top, frame.right, frame.bottom)

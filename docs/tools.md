@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 83 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 89 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -9,14 +9,14 @@
 
 - [Animation & Keyframes](#animation-keyframes) (10 tools)
 - [Canvas & Scene](#canvas-scene) (10 tools)
-- [Character Rigging](#character-rigging) (3 tools)
+- [Character Rigging](#character-rigging) (4 tools)
 - [Core & Diagnostics](#core-diagnostics) (2 tools)
 - [Document Management](#document-management) (8 tools)
 - [Effect Recipes](#effect-recipes) (3 tools)
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (2 tools)
+- [Other](#other) (7 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -25,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 83 tools.**
+**Total: 89 tools.**
 
 ## Animation & Keyframes
 
@@ -525,6 +525,30 @@ Gotcha: The character must have been built by character_rig_from_parts or scene_
 | `end_time` | `any` | No | - |
 | `speed` | `number` | No | - |
 | `move_to` | `any` | No | - |
+
+---
+
+### `character_model_sheet`
+
+*Profiles: all, rig*
+
+Auto-generate a labeled model/rig sheet (front, three-quarter, side) for one character.
+
+descriptor: {id, archetype: humanoid|chibi, height, palette, facing, position, z}.
+
+Returns: {success, sheet_doc_id, sheet_group, views, layers}.
+
+Gotcha: the sheet is vector cut-out geometry, not a re-drawn turnaround.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `descriptor` | `object` | Yes | - |
+| `style` | `string` | No | - |
+| `width` | `integer` | No | - |
+| `height` | `integer` | No | - |
+| `dry_run` | `boolean` | No | - |
 
 ---
 
@@ -1160,6 +1184,124 @@ upper_arm_l, forearm_l, hand_l, upper_leg_r, lower_leg_r, foot_r) so rigs assemb
 | `merge_gap` | `integer` | No | - |
 | `bg_tolerance` | `integer` | No | - |
 | `preview` | `boolean` | No | - |
+
+---
+
+### `produce_anime_project`
+
+*Profiles: all*
+
+Build a whole anime-style project from one brief: storyboard, rigged characters,
+
+assets, assembled scene, style stack, render and review.
+
+brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
+
+assets[], background, camera[], render{}, output_dir, save_path}. Call
+
+synfig_help('production') for the full brief shape, styles and motion names.
+
+Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
+
+Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
+
+and the render/review stages report "skipped".
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+| `dry_run` | `boolean` | No | - |
+| `stages` | `any` | No | - |
+| `resume_from` | `any` | No | - |
+
+---
+
+### `production_plan`
+
+*Profiles: all*
+
+Dry-run the production pipeline: report the stages and layer counts without building.
+
+brief: same shape as produce_anime_project (see synfig_help('production')).
+
+Returns: the ProductionReport for the dry run; no document is created.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+
+---
+
+### `procedural_asset_list`
+
+*Profiles: all, assets*
+
+List the built-in procedural asset generators (offline, IP-safe).
+
+Returns: {background: [...], prop: [...], texture: [...]} to pass as
+
+asset "procedural": {generator: <name>}.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `procedural_asset_generate`
+
+*Profiles: all, assets*
+
+Generate one procedural vector asset and add it to a document.
+
+kind: background | prop | texture; generator: see procedural_asset_list.
+
+position/height are canvas pixels (props only). Returns: {success, created, dry_run}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | Yes | - |
+| `kind` | `string` | No | - |
+| `generator` | `string` | No | - |
+| `seed` | `integer` | No | - |
+| `position` | `any` | No | - |
+| `height` | `any` | No | - |
+| `style` | `any` | No | - |
+| `dry_run` | `boolean` | No | - |
+
+---
+
+### `sprite_slice`
+
+*Profiles: all, assets, rig*
+
+Slice a sprite sheet or layered raster into named, rig-ready transparent part PNGs.
+
+strategy: grid (rows x cols), alpha (connected components) or trim (tight alpha boxes);
+
+pass rectangles [{name, x, y, width, height}] for exact control.
+
+Returns: {success, detected_parts, parts: [{name, file, bbox}], output_dir}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `source` | `string` | Yes | - |
+| `output_dir` | `string` | Yes | - |
+| `strategy` | `string` | No | - |
+| `rows` | `integer` | No | - |
+| `cols` | `integer` | No | - |
+| `rectangles` | `any` | No | - |
+| `bg_tolerance` | `integer` | No | - |
+| `padding` | `integer` | No | - |
+| `dry_run` | `boolean` | No | - |
 
 ---
 

@@ -146,9 +146,9 @@ class RecipeEngine:
                 layers_spec.append(
                     {
                         "id": f"ImpactInvert_{uid}",
-                        "type": "invert",
+                        "type": "inside_out",
                         "depth": 0,
-                        "params": {"amount": {"type": "real", "value": 1.0}},
+                        "params": {"origin": {"type": "vector", "value": {"x": 0.0, "y": 0.0}}},
                     }
                 )
 
