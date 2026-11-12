@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Rig sheet to animated scene**: `rig_sheet_slice` finds the parts of a character sheet, returns a numbered preview and writes one transparent PNG per named part. `scene_auto_build` builds a whole shot from a compact spec - background, jointed cut-out characters, props, camera keys, audio, motions - validated up front and applied as one `scene_build` (one round trip, one undo step), with optional save and contact-sheet preview.
+- **Real cut-out rigs**: every part gets a rotate joint layer (`<id>_<part>_rot`) nested so that a parent carries its children; hierarchy, pivots and stacking default from body-role names and can be overridden per part. Motion library: walk, run, idle, talk, wave, jump, nod, punch, rest, pose, move, with `move_to` travel.
+- `character_pose_apply` accepts explicit joint `angles`; `character_motion_apply` accepts `end_time`, `speed` and `move_to`.
+
+### Fixed
+- **Character poses and motions reported success without doing anything**: `character_pose_apply` set an `angle` parameter that the part layers do not have, swallowed the error and listed the bone as applied; `character_motion_apply` "succeeded" on characters that did not exist. Both now write waypoints on real joint layers and fail with a typed error when the character or the joints are missing.
+- **Imported character parts used a parameter that does not exist**: image parts were given an `origin` parameter; the `import` layer is placed with `tl` / `br`, which is what the rig writes now.
+
 ### Fixed
 - **The backend was frozen at startup**: the MCP server chose live or headless once, when the process started. The normal workflow - client first, Studio afterwards - therefore left the server editing an invisible headless document. The auto backend now re-evaluates on every call and switches as soon as Studio appears.
 - **Live documents reported a fake size**: the bridge sent only the id, name and path for `doc.list`, so every document looked like 1920x1080 @ 24fps. The real canvas metadata is reported now.

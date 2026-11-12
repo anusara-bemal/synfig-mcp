@@ -51,6 +51,7 @@ nav:
   - User guide:
       - Tools API: api.md
       - Full tool reference: tools.md
+      - Rig sheet to scene: characters.md
       - Effects and styles: recipes.md
       - Asset pipeline: assets.md
       - Feature coverage: COVERAGE.md
