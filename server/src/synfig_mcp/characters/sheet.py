@@ -30,6 +30,8 @@ from synfig_mcp.errors import SynfigError
 MAX_SHEET_EDGE = 8192
 #: Longest edge of the numbered preview handed back to the client.
 PREVIEW_EDGE = 768
+#: Enclosed-hole fill is reported for approval above this share of the foreground.
+APPROVAL_HOLE_FRACTION = 0.02
 
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9_]+")
 
@@ -42,7 +44,7 @@ def safe_part_name(name: str) -> str:
 
 @dataclass
 class SheetPart:
-    """One part found on a rig sheet."""
+    """One part found on a rig sheet, plus the rig metadata derived from its name."""
 
     index: int
     bbox: tuple[int, int, int, int]  # x, y, width, height in sheet pixels
@@ -50,6 +52,13 @@ class SheetPart:
     name: str = ""
     file: str = ""
     labels: list[int] = field(default_factory=list)
+    role: str | None = None
+    parent: str | None = None
+    pivot: tuple[float, float] | None = None  # fractions of the part image
+    z: float = 0.0
+    transparency: float = 0.0  # fraction of transparent pixels in the crop
+    confidence: float = 1.0  # heuristic 0..1; low means "look at the preview"
+    reconstructed_pixels: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         x, y, w, h = self.bbox
@@ -59,6 +68,15 @@ class SheetPart:
             "file": self.file,
             "bbox": {"x": x, "y": y, "width": w, "height": h},
             "area": self.area,
+            "role": self.role,
+            "parent": self.parent,
+            "pivot": (
+                {"fx": self.pivot[0], "fy": self.pivot[1]} if self.pivot is not None else None
+            ),
+            "z": self.z,
+            "transparency": round(self.transparency, 4),
+            "confidence": round(self.confidence, 2),
+            "reconstructed_pixels": self.reconstructed_pixels,
         }
 
 
@@ -279,6 +297,174 @@ def detect_parts(
 
 
 # ---------------------------------------------------------------------------
+# Best-effort reconstruction and rig metadata
+# ---------------------------------------------------------------------------
+
+
+def fill_enclosed_holes(crop: np.ndarray, mask: np.ndarray, limit: int) -> tuple[np.ndarray, int]:
+    """Fill background pixels fully enclosed by a part (occlusion reconstruction).
+
+    A hole is background that the border of the crop cannot reach, i.e. an area
+    the part paints around - a gap left where a limb covered the torso on the
+    sheet.  Each hole is inpainted with the median colour of the surrounding
+    opaque pixels so the part stays a single opaque silhouette.  Holes larger
+    than ``limit`` pixels are left transparent: that is a deliberate cut-out
+    (a mouth, a gap between the legs), not missing artwork.
+
+    Returns ``(rgba, filled_pixel_count)``.
+    """
+    height, width = mask.shape
+    outside = np.zeros((height, width), dtype=bool)
+    stack: list[tuple[int, int]] = []
+    for x in range(width):
+        for y in (0, height - 1):
+            if not mask[y, x] and not outside[y, x]:
+                outside[y, x] = True
+                stack.append((y, x))
+    for y in range(height):
+        for x in (0, width - 1):
+            if not mask[y, x] and not outside[y, x]:
+                outside[y, x] = True
+                stack.append((y, x))
+    while stack:
+        y, x = stack.pop()
+        for ny, nx in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
+            if 0 <= ny < height and 0 <= nx < width and not mask[ny, nx] and not outside[ny, nx]:
+                outside[ny, nx] = True
+                stack.append((ny, nx))
+
+    holes = ~mask & ~outside
+    if not holes.any():
+        return crop, 0
+
+    labels, count = label_components(holes)
+    filled = 0
+    for label in range(1, count + 1):
+        blob = labels == label
+        size = int(blob.sum())
+        if size > limit:
+            continue
+        ring = np.zeros_like(blob)
+        ys, xs = np.nonzero(blob)
+        y0, y1 = max(0, ys.min() - 1), min(height, ys.max() + 2)
+        x0, x1 = max(0, xs.min() - 1), min(width, xs.max() + 2)
+        ring[y0:y1, x0:x1] = True
+        ring &= ~blob
+        ring &= mask
+        if not ring.any():
+            continue
+        colour = np.median(crop[ring][:, :3], axis=0).astype(np.uint8)
+        crop[blob, 0:3] = colour
+        crop[blob, 3] = 255
+        filled += size
+    return crop, filled
+
+
+def infer_pivot(role: str | None) -> tuple[float, float]:
+    """Return the joint pivot (fractions of the part image) for a role."""
+    from synfig_mcp.characters.cutout import HUMANOID, split_role
+
+    base, _side = split_role(role)
+    default = HUMANOID.get(base or "")
+    if default is not None:
+        return default.pivot
+    return (0.5, 0.5)
+
+
+def _role_z(role: str | None) -> float:
+    """Default stacking for a role (matches the cut-out assembly defaults)."""
+    from synfig_mcp.characters.cutout import HUMANOID, split_role
+
+    base, side = split_role(role)
+    default = HUMANOID.get(base or "")
+    if default is None:
+        return 0.0
+    return default.z_left if side == "l" else default.z_right
+
+
+def rig_compatibility(parts: list[SheetPart]) -> dict[str, Any]:
+    """Assess how well a set of named parts assembles into a cut-out rig.
+
+    The checks mirror the assembly rules in :mod:`synfig_mcp.characters.cutout`:
+    every part should resolve to a known anatomical role, the rig needs a
+    torso/hips root, and every non-root part needs a parent role that is present.
+    Parts may sit anywhere on the sheet (assembly joins them at their pivots, not
+    at their sheet positions), so layout is not part of this check.  Results are
+    heuristic - they flag what a human should confirm, they do not block the
+    slice.
+    """
+    from synfig_mcp.characters.cutout import HUMANOID, split_role
+
+    named = [p for p in parts if p.name and not p.name.startswith("part_")]
+    if not named:
+        return {
+            "level": "unknown",
+            "score": 0.0,
+            "issues": ["no named parts"],
+            "hint": "Name parts by body role (head, torso, upper_arm_l, ...) then slice again.",
+        }
+
+    roles = {p.name: p.role for p in named}
+    owners: dict[str, str] = {}
+    for name, role in roles.items():
+        if role and role not in owners:
+            owners[role] = name
+
+    root_name = owners.get("torso") or owners.get("hips")
+    known_roles = set(HUMANOID) | {"torso", "hips"}
+    issues: list[str] = []
+    if root_name is None:
+        issues.append("no 'torso' or 'hips' part to root the rig on")
+
+    for part in named:
+        base, side = split_role(part.role)
+        if part.name == root_name:
+            part.parent = None
+            continue
+        if base is None or base not in known_roles:
+            issues.append(f"part '{part.name}' has an unrecognized role")
+            part.parent = root_name
+            continue
+        candidates = list(HUMANOID[base].parents) if base in HUMANOID else ["torso", "hips"]
+        parent = next(
+            (
+                owners.get(f"{c}_{side}") or owners.get(c)
+                for c in candidates
+                if owners.get(f"{c}_{side}") or owners.get(c)
+            ),
+            None,
+        )
+        part.parent = parent
+        if parent is None:
+            issues.append(f"part '{part.name}' has no parent role present")
+
+    present_roles = {r for r in roles.values() if r}
+    score = round(len(present_roles & known_roles) / max(1, len(known_roles)), 2)
+    level = ("low" if len(issues) > 2 else "medium") if issues else "high"
+    return {
+        "level": level,
+        "score": score,
+        "roles": sorted(present_roles),
+        "missing_roles": sorted(set(HUMANOID) - present_roles),
+        "issues": issues,
+    }
+
+
+def _assign_metadata(part: SheetPart, crop: np.ndarray) -> None:
+    """Fill a part's role/parent/pivot/z/transparency/confidence from its name and pixels."""
+    from synfig_mcp.characters.cutout import infer_role
+
+    part.role = infer_role(part.name)
+    part.pivot = infer_pivot(part.role)
+    part.transparency = float((crop[..., 3] < 16).mean())
+    part.z = _role_z(part.role)
+    if part.role:
+        part.confidence = 0.9 if not part.name.startswith("part_") else 0.5
+    else:
+        part.confidence = 0.4
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -315,6 +501,8 @@ def slice_rig_sheet(
     bg_tolerance: int = 28,
     padding: int = 2,
     preview: bool = True,
+    reconstruct: bool = True,
+    source: str = "file_path",
 ) -> dict[str, Any]:
     """Slice a rig sheet into one transparent PNG per part.
 
@@ -322,10 +510,17 @@ def slice_rig_sheet(
     example ``{"1": "head", "2": "torso"}``.  When names are given only the named
     parts are written, which is how captions and stray marks on a sheet are
     left out.  Without names every part is written as ``part_NN``.
+
+    With ``reconstruct`` the parts get a best-effort occlusion fill (enclosed
+    gaps are inpainted) and each part is annotated with the rig metadata derived
+    from its name (role, parent, pivot, z) plus transparency and a confidence
+    score, so a client can feed the manifest straight into
+    ``character_rig_from_parts``.  ``source`` records where the sheet came from
+    (``file_path`` or ``image_content``).
     """
     try:
-        with Image.open(sheet_path) as source:
-            image = source.convert("RGBA")
+        with Image.open(sheet_path) as source_image:
+            image = source_image.convert("RGBA")
     except Exception as err:
         raise SynfigError(f"Cannot read rig sheet '{sheet_path}': {err}") from err
 
@@ -372,20 +567,45 @@ def slice_rig_sheet(
         crop = rgba[y0:y1, x0:x1].copy()
         own = np.isin(labels[y0:y1, x0:x1], part.labels)
         crop[..., 3] = np.where(own, crop[..., 3], 0)
+        if reconstruct:
+            hole_limit = max(256, int(crop.shape[0] * crop.shape[1] * 0.2))
+            crop, part.reconstructed_pixels = fill_enclosed_holes(crop, own, hole_limit)
+        _assign_metadata(part, crop)
         target = output_dir / f"{part.name}.png"
         Image.fromarray(crop, "RGBA").save(target, format="PNG", optimize=True)
         part.bbox = (x0, y0, x1 - x0, y1 - y0)
         part.file = str(target)
         written.append(part)
 
+    compatibility = rig_compatibility(written)
+    foreground = int(mask.sum())
+    reconstructed = sum(p.reconstructed_pixels for p in written)
+    hole_fraction = reconstructed / foreground if foreground else 0.0
+
     manifest = {
+        "version": 2,
+        "source": source,
         "sheet": str(sheet_path),
         "sheet_size": {"width": image.width, "height": image.height},
         "background": method,
+        "reconstruction": {
+            "applied": reconstruct,
+            "pixels": reconstructed,
+            "fraction": round(hole_fraction, 4),
+        },
+        "rig_compatibility": compatibility,
         "parts": [p.as_dict() for p in written],
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    warnings: list[str] = []
+    if compatibility["level"] == "low":
+        warnings.append("Rig compatibility is low: " + "; ".join(compatibility.get("issues", [])))
+    if not wanted:
+        warnings.append(
+            "Parts are unnamed; call again with names={...} to map numbers to body roles."
+        )
 
     result: dict[str, Any] = {
         "success": True,
@@ -397,6 +617,10 @@ def slice_rig_sheet(
         "detected_parts": len(parts),
         "parts": manifest["parts"],
         "named": bool(wanted),
+        "reconstruction": manifest["reconstruction"],
+        "rig_compatibility": compatibility,
+        "warnings": warnings,
+        "requires_approval": hole_fraction >= APPROVAL_HOLE_FRACTION,
     }
     if preview:
         result["preview_base64"] = _preview(image, parts)

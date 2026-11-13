@@ -3,7 +3,9 @@
 Three calls take a character sheet and a background to a moving shot.
 
 1. `rig_sheet_slice(file_path)` - finds every part on the sheet and returns a numbered
-   preview. Look at `preview_base64` and decide what each number is.
+   preview. Look at `preview_base64` and decide what each number is. Each part already
+   carries its rig metadata (role, parent, pivot, z), a confidence score and a
+   `rig_compatibility` report; enclosed gaps are reconstructed best-effort.
 2. `rig_sheet_slice(file_path, names={"1": "head", "2": "torso", ...})` - writes one
    transparent PNG per named part and a `manifest.json`. Unnamed numbers (captions,
    stray marks) are left out.
