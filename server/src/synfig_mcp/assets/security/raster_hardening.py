@@ -28,18 +28,14 @@ def detect_image_format(data: bytes) -> str | None:
     return None
 
 
-def harden_raster_image(input_path: str | Path, output_path: str | Path) -> dict[str, int]:
+def sanitize_raster_bytes(raw_bytes: bytes) -> Image.Image:
     """
-    Validate and harden raster image:
-    1. Checks magic bytes.
-    2. Enforces pixel dimensions <= MAX_IMAGE_PIXELS.
-    3. Strips all EXIF/metadata and re-encodes clean image.
-    Returns: {"width": int, "height": int, "filesize": int}
-    """
-    p_in = Path(input_path)
-    p_out = Path(output_path)
+    Validate raw raster bytes and return a metadata-free copy of the image.
 
-    raw_bytes = p_in.read_bytes()
+    1. Checks magic bytes.
+    2. Enforces pixel dimensions <= MAX_IMAGE_PIXELS (and blocks PIL decompression bombs).
+    3. Rebuilds the pixels so no EXIF/metadata or embedded payload survives.
+    """
     fmt = detect_image_format(raw_bytes)
     if not fmt:
         raise ValueError("Invalid image file: magic bytes do not match supported raster formats.")
@@ -54,18 +50,32 @@ def harden_raster_image(input_path: str | Path, output_path: str | Path) -> dict
                 raise ValueError(
                     f"Image dimension {w}x{h} ({w * h} pixels) exceeds safety limit of {MAX_IMAGE_PIXELS} pixels."
                 )
-
             # Strip EXIF and re-encode
             clean_img = Image.new(img.mode, img.size)
             clean_img.putdata(list(img.getdata()))
-
-            p_out.parent.mkdir(parents=True, exist_ok=True)
-            clean_img.save(p_out, format="PNG", optimize=True)
-
-            return {
-                "width": w,
-                "height": h,
-                "filesize": p_out.stat().st_size,
-            }
+            return clean_img
+    except ValueError:
+        raise
     except Exception as exc:
         raise ValueError(f"Raster image decode failed: {exc}") from exc
+
+
+def harden_raster_image(input_path: str | Path, output_path: str | Path) -> dict[str, int]:
+    """
+    Validate and harden raster image:
+    1. Checks magic bytes.
+    2. Enforces pixel dimensions <= MAX_IMAGE_PIXELS.
+    3. Strips all EXIF/metadata and re-encodes clean image.
+    Returns: {"width": int, "height": int, "filesize": int}
+    """
+    p_in = Path(input_path)
+    p_out = Path(output_path)
+
+    clean_img = sanitize_raster_bytes(p_in.read_bytes())
+    p_out.parent.mkdir(parents=True, exist_ok=True)
+    clean_img.save(p_out, format="PNG", optimize=True)
+    return {
+        "width": clean_img.width,
+        "height": clean_img.height,
+        "filesize": p_out.stat().st_size,
+    }

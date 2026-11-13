@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 103 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 104 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (21 tools)
+- [Other](#other) (22 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -25,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 103 tools.**
+**Total: 104 tools.**
 
 ## Animation & Keyframes
 
@@ -1218,6 +1218,56 @@ Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it
 | `width` | `number` | No | - |
 | `tip_width` | `number` | No | - |
 | `parent_index` | `integer` | No | - |
+
+---
+
+### `rig_sheet_from_image`
+
+*Profiles: all, assets, rig*
+
+Ingest an uploaded image (MCP ImageContent base64, or a local path) and slice it into rig parts.
+
+Give exactly one of image_base64 / file_path. The image is hardened (magic-byte check, 16MP
+
+cap, EXIF stripped) and written into an authorized directory, then sliced like rig_sheet_slice.
+
+Args:
+
+image_base64: The data field of an ImageContent block (raw base64 or a data: URL).
+
+file_path: A local image the server may already read (alternative to image_base64).
+
+names: Optional {part number -> name} mapping from the numbered preview, e.g. {"1": "head"}.
+
+output_dir: Directory for the PNGs and manifest (defaults to the first granted root).
+
+filename: Base name for the written sheet when image_base64 is used.
+
+mime_type: Declared mime type of the uploaded block (informational).
+
+reconstruct: Best-effort occlusion fill of enclosed gaps in each part.
+
+Returns: {sheet, parts: [{index, name, file, bbox, role, parent, pivot, z, transparency,
+
+confidence}], manifest, rig_compatibility, reconstruction, requires_approval, preview_base64}.
+
+Gotcha: Look at preview_base64 first, then call again with names to label the parts by body role.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `image_base64` | `any` | No | - |
+| `file_path` | `any` | No | - |
+| `names` | `any` | No | - |
+| `output_dir` | `any` | No | - |
+| `filename` | `string` | No | - |
+| `mime_type` | `any` | No | - |
+| `min_area` | `any` | No | - |
+| `merge_gap` | `integer` | No | - |
+| `bg_tolerance` | `integer` | No | - |
+| `reconstruct` | `boolean` | No | - |
+| `preview` | `boolean` | No | - |
 
 ---
 

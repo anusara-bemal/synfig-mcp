@@ -129,6 +129,7 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "selection_set": {"rig", "all"},
     # Cut-out Characters & Storyboards (Phase A4)
     "rig_sheet_slice": {"rig", "assets", "all"},
+    "rig_sheet_from_image": {"rig", "assets", "all"},
     "scene_auto_build": {"rig", "all"},
     "character_rig_from_parts": {"rig", "all"},
     "rig_bone_add": {"rig", "all"},
@@ -1216,6 +1217,64 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             tip_width=tip_width,
             parent_index=parent_index,
         )
+
+    @tool_for("rig_sheet_from_image", annotations=MUTATING)
+    async def rig_sheet_from_image(
+        image_base64: str | None = None,
+        file_path: str | None = None,
+        names: dict[str, str] | None = None,
+        output_dir: str | None = None,
+        filename: str = "reference",
+        mime_type: str | None = None,
+        min_area: int | None = None,
+        merge_gap: int = 6,
+        bg_tolerance: int = 28,
+        reconstruct: bool = True,
+        preview: bool = True,
+    ) -> dict[str, Any]:
+        """Ingest an uploaded image (MCP ImageContent base64, or a local path) and slice it into rig parts.
+        Give exactly one of image_base64 / file_path. The image is hardened (magic-byte check, 16MP
+        cap, EXIF stripped) and written into an authorized directory, then sliced like rig_sheet_slice.
+        Args:
+            image_base64: The data field of an ImageContent block (raw base64 or a data: URL).
+            file_path: A local image the server may already read (alternative to image_base64).
+            names: Optional {part number -> name} mapping from the numbered preview, e.g. {"1": "head"}.
+            output_dir: Directory for the PNGs and manifest (defaults to the first granted root).
+            filename: Base name for the written sheet when image_base64 is used.
+            mime_type: Declared mime type of the uploaded block (informational).
+            reconstruct: Best-effort occlusion fill of enclosed gaps in each part.
+        Returns: {sheet, parts: [{index, name, file, bbox, role, parent, pivot, z, transparency,
+            confidence}], manifest, rig_compatibility, reconstruction, requires_approval, preview_base64}.
+        Gotcha: Look at preview_base64 first, then call again with names to label the parts by body role.
+        """
+        from synfig_mcp.characters.image_input import (
+            require_authorized_output_dir,
+            resolve_image_input,
+        )
+        from synfig_mcp.characters.sheet import slice_rig_sheet
+
+        target_dir = require_authorized_output_dir(output_dir)
+        resolved = resolve_image_input(
+            target_dir,
+            image_base64=image_base64,
+            file_path=file_path,
+            filename=filename,
+            mime_type=mime_type,
+        )
+        parts_dir = Path(resolved["path"]).parent / f"{Path(resolved['path']).stem}_parts"
+        res = slice_rig_sheet(
+            Path(resolved["path"]),
+            parts_dir,
+            names=names,
+            min_area=min_area,
+            merge_gap=merge_gap,
+            bg_tolerance=bg_tolerance,
+            reconstruct=reconstruct,
+            preview=preview,
+            source=str(resolved["source"]),
+        )
+        res["ingested"] = resolved
+        return wrap_untrusted(res)
 
     @tool_for("rig_sheet_slice", annotations=IDEMPOTENT)
     async def rig_sheet_slice(
