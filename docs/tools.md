@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 104 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 105 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (22 tools)
+- [Other](#other) (23 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -25,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 104 tools.**
+**Total: 105 tools.**
 
 ## Animation & Keyframes
 
@@ -1354,6 +1354,38 @@ Dry-run the production pipeline: report the stages and layer counts without buil
 brief: same shape as produce_anime_project (see synfig_help('production')).
 
 Returns: the ProductionReport for the dry run; no document is created.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+
+---
+
+### `story_bible`
+
+*Profiles: all*
+
+Derive the continuity story bible (characters, locations, props, scenes, timeline)
+
+and the screenplay view for a brief, without building anything.
+
+brief: same shape as produce_anime_project. If the brief already contains a 'story'
+
+(an authored bible), it is validated and returned unchanged; otherwise the server
+
+derives a structural bible from the brief's own shots/characters/assets.
+
+Returns: {authored, bible, screenplay, issues[]}. 'issues' lists continuity problems
+
+(unknown ids, timeline drift); an empty list means the bible is consistent.
+
+Honesty: the server has no language model, so a derived bible is a structural summary,
+
+not creative writing. To author one, call this tool, edit 'bible', and pass it back as
+
+ProductionBrief.story - the pipeline then validates and consumes it.
 
 #### Parameters
 

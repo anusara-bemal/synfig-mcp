@@ -143,6 +143,7 @@ async def test_dry_run_reports_every_stage_without_building(tmp_path: Path) -> N
     assert report.doc_id is None
     assert {s.name for s in report.stages} >= {
         "document",
+        "story",
         "storyboard",
         "characters",
         "assets",

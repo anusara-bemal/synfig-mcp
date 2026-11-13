@@ -140,6 +140,11 @@ class ProductionBrief(BaseModel):
         description="Camera keys [{time, zoom, center: {x, y}}]; a gentle default is used when empty.",
     )
     render: RenderOptions = Field(default_factory=RenderOptions)
+    story: Any | None = Field(
+        default=None,
+        description="Optional authored StoryBible (see the story_bible tool). When set, the "
+        "pipeline validates and consumes it instead of deriving one from the brief.",
+    )
     save_path: str | None = Field(
         default=None, description="Where to write the .sif/.sifz. Defaults under the workspace."
     )

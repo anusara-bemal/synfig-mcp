@@ -139,6 +139,7 @@ TOOL_PROFILES: dict[str, set[str]] = {
     # Anime Production Pipeline (Step 0-5)
     "produce_anime_project": {"all"},
     "production_plan": {"all"},
+    "story_bible": {"all"},
     "character_model_sheet": {"rig", "all"},
     "procedural_asset_list": {"assets", "all"},
     "procedural_asset_generate": {"assets", "all"},
@@ -1878,6 +1879,40 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
         report = await AnimeProductionPipeline(backend=backend).run(brief, dry_run=True)
         return wrap_untrusted(report.model_dump())
+
+    @tool_for("story_bible", annotations=READ_ONLY)
+    async def story_bible(brief: dict[str, Any]) -> dict[str, Any]:
+        """Derive the continuity story bible (characters, locations, props, scenes, timeline)
+        and the screenplay view for a brief, without building anything.
+
+        brief: same shape as produce_anime_project. If the brief already contains a 'story'
+        (an authored bible), it is validated and returned unchanged; otherwise the server
+        derives a structural bible from the brief's own shots/characters/assets.
+        Returns: {authored, bible, screenplay, issues[]}. 'issues' lists continuity problems
+        (unknown ids, timeline drift); an empty list means the bible is consistent.
+        Honesty: the server has no language model, so a derived bible is a structural summary,
+        not creative writing. To author one, call this tool, edit 'bible', and pass it back as
+        ProductionBrief.story - the pipeline then validates and consumes it.
+        """
+        from synfig_mcp.production.models import ProductionBrief
+        from synfig_mcp.production.story import (
+            build_screenplay,
+            compile_story,
+            validate_story,
+        )
+
+        validated = ProductionBrief.model_validate(brief)
+        bible = compile_story(validated)
+        issues = validate_story(validated, bible)
+        screenplay = build_screenplay(validated, bible)
+        return wrap_untrusted(
+            {
+                "authored": bible.authored,
+                "bible": bible.model_dump(),
+                "screenplay": screenplay.model_dump(),
+                "issues": issues,
+            }
+        )
 
     @tool_for("character_model_sheet", annotations=MUTATING)
     async def character_model_sheet(

@@ -174,8 +174,8 @@ The defaults are estimates. Look at the preview, then override per part:
 """,
     "production": """# Anime Production Pipeline (produce_anime_project)
 
-One brief in, one renderable project out. The pipeline runs seven stages:
-document -> storyboard -> characters -> assets -> scene_build -> style -> render -> review.
+One brief in, one renderable project out. The pipeline runs eight stages:
+document -> story -> storyboard -> characters -> assets -> scene_build -> style -> render -> review.
 
 ## Brief shape
 ```json
@@ -195,6 +195,7 @@ document -> storyboard -> characters -> assets -> scene_build -> style -> render
   "camera": [{"time": 0.0, "zoom": 1.0, "center": {"x": 640, "y": 360}}],
   "render": {"video": true, "video_format": "mp4", "contact_sheet": true,
              "review": true, "preview_frames": 4},
+  "story": null,
   "output_dir": "out", "save_path": "out/reel.sif"
 }
 ```
@@ -207,6 +208,15 @@ document -> storyboard -> characters -> assets -> scene_build -> style -> render
   `search: {query, provider, license}` (opt-in network fetch; every asset is license-checked).
 - Styles: shonen_action, dark_fantasy, supernatural_noir, cyber_mecha, retro_anime.
 
+## Story bible (pre-production)
+- The `story` stage derives a continuity bible (characters, locations, props, scenes, timeline)
+  and writes `story_bible.json` into the output directory; the report lists it as an artifact.
+- `story_bible(brief)`: derive and inspect the bible + screenplay for a brief without building.
+- Honesty: the server has no language model, so a derived bible is a structural summary of the
+  brief's own shots/characters/assets (`authored: false`), not creative writing. To author one,
+  call `story_bible`, edit `bible`, and pass it back as `brief.story`; the pipeline then validates
+  it (`authored: true`) and consumes it unchanged. An inconsistent bible fails the `story` stage.
+
 ## Resuming a run
 - Every run writes `pipeline_state.json` into the output directory and saves the document at each
   checkpoint (after storyboard and after style).
@@ -218,10 +228,12 @@ document -> storyboard -> characters -> assets -> scene_build -> style -> render
 
 ## Other entry points
 - `production_plan(brief)`: dry-run; reports stages and layer counts without building.
+- `story_bible(brief)`: derive the continuity bible + screenplay without building.
 - `character_model_sheet(descriptor)`: labeled front/three-quarter/side sheet in its own document.
 - `procedural_asset_list()` / `procedural_asset_generate(...)`: the IP-safe vector generators.
 - `sprite_slice(source, output_dir, strategy)`: slice a sprite sheet into rig-ready part PNGs.
-- CLI: `synfig-mcp produce brief.json [--dry-run] [--json] [--output-dir DIR] [--no-resume]`.
+- CLI: `synfig-mcp produce brief.json [--dry-run] [--json] [--output-dir DIR] [--no-resume]`,
+  and `synfig-mcp story brief.json [--json]` to inspect the bible without building.
 
 ## Limits
 - Rendering needs the Synfig CLI on PATH; without it the document is still saved and the

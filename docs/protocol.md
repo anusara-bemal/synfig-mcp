@@ -131,7 +131,6 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `param.list` | `doc_id`, `layer_id`, `canvas_path?` | `layer->get_param_list()` | Verified |
 | `param.set` | `doc_id`, `layer_id`, `param_name`, `value` | `Action::LayerParamSet::create()` or `canvas_interface->change_value()` | Verified |
 | `param.link` | `doc_id`, `layer_id`, `param_name`, `link_id`| `Action::LayerParamConnect::create()` | Verified |
-| `rig.bone_add` | `doc_id`, `layer_id`, `time?`, `origin_x?`, `origin_y?`, `angle?`, `width?`, `tipwidth?`, `parent_index?` | `Action::ValueNodeStaticListInsert` (root bone) / `Action::ValueDescCreateChildBone` (child bone) | Verified |
 | `param.convert` | `doc_id`, `layer_id`, `param_name`, `type` | `synfigapp::Action::ValueDescConvert::create()` | Verified |
 | `param.export` | `doc_id`, `layer_id`, `param_name`, `name` | `synfigapp::Action::ValueDescExport::create()` | Verified |
 | `param.unexport` | `doc_id`, `name` | `synfigapp::Action::ValueNodeRemove::create()` | Verified |

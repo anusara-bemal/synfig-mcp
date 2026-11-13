@@ -57,9 +57,32 @@ def _documented_methods() -> dict[str, str]:
     return documented
 
 
+def _documented_method_rows() -> list[str]:
+    """Every method name in the method table, in order and with duplicates kept."""
+    content = PROTOCOL_DOC.read_text(encoding="utf-8")
+    rows: list[str] = []
+    for line in content.splitlines():
+        match = re.match(r"\|\s*`([a-z_.]+)`\s*\|.*\|\s*([^|]+)\|\s*$", line)
+        if match:
+            rows.append(match.group(1))
+    return rows
+
+
 def test_protocol_doc_exists() -> None:
     assert PROTOCOL_DOC.is_file(), "docs/protocol.md is missing"
     assert HANDLERS.is_file(), "the bridge dispatcher is missing"
+
+
+def test_no_duplicate_method_rows() -> None:
+    """A method must be documented once; a duplicate silently hides a stale row."""
+    rows = _documented_method_rows()
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for name in rows:
+        if name in seen:
+            duplicates.add(name)
+        seen.add(name)
+    assert not duplicates, f"Duplicate method rows in docs/protocol.md: {sorted(duplicates)}"
 
 
 def test_documented_methods_exist_in_the_bridge() -> None:
