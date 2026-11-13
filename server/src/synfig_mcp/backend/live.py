@@ -158,7 +158,9 @@ class LiveBackend(BackendBase):
     async def doc_save(self, doc_id: str, file_path: str | None = None) -> str:
         safe_path_str: str | None = None
         if file_path:
-            safe_path = validate_path(file_path, allowed_extensions={".sif", ".sifz", ".sfg"})
+            safe_path = validate_path(
+                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, for_write=True
+            )
             safe_path_str = str(safe_path)
         client = await self._ensure_client()
         params: dict[str, Any] = {"doc_id": doc_id}
@@ -767,7 +769,9 @@ class LiveBackend(BackendBase):
         target: str = "png",
     ) -> bool:
         normalized_target = require_frame_target(target)
-        safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
+        safe_output = validate_path(
+            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, for_write=True
+        )
         client = await self._ensure_client()
         p: dict[str, Any] = {
             "doc_id": doc_id,
@@ -803,7 +807,7 @@ class LiveBackend(BackendBase):
         progress_cb: Any = None,
         cancel_token: Any = None,
     ) -> list[str]:
-        safe_dir = validate_path(output_dir)
+        safe_dir = validate_path(output_dir, for_write=True)
         res = await self.pipeline.render_sequence(
             doc_id=doc_id,
             output_dir=str(safe_dir),
@@ -833,6 +837,7 @@ class LiveBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
+            for_write=True,
         )
         ok = await self.pipeline.render_video(
             doc_id=doc_id,
@@ -859,6 +864,7 @@ class LiveBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".png", ".jpg", ".jpeg"},
+            for_write=True,
         )
         ok = await self.pipeline.render_contact_sheet(
             doc_id=doc_id,

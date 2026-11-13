@@ -154,7 +154,9 @@ class HeadlessBackend(BackendBase):
 
         target: Path
         if file_path:
-            target = validate_path(file_path, allowed_extensions={".sif", ".sifz", ".sfg"})
+            target = validate_path(
+                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, for_write=True
+            )
         elif doc_id in self._doc_paths:
             target = self._doc_paths[doc_id]
         else:
@@ -1055,7 +1057,9 @@ class HeadlessBackend(BackendBase):
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
 
         normalized_target = require_frame_target(target)
-        safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
+        safe_output = validate_path(
+            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, for_write=True
+        )
 
         doc = self._documents[doc_id]
         # Write to temporary .sif file for CLI render
@@ -1098,7 +1102,7 @@ class HeadlessBackend(BackendBase):
         progress_cb: Any = None,
         cancel_token: Any = None,
     ) -> list[str]:
-        safe_dir = validate_path(output_dir)
+        safe_dir = validate_path(output_dir, for_write=True)
         res = await self.pipeline.render_sequence(
             doc_id=doc_id,
             output_dir=str(safe_dir),
@@ -1128,6 +1132,7 @@ class HeadlessBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
+            for_write=True,
         )
         ok = await self.pipeline.render_video(
             doc_id=doc_id,
@@ -1154,6 +1159,7 @@ class HeadlessBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".png", ".jpg", ".jpeg"},
+            for_write=True,
         )
         ok = await self.pipeline.render_contact_sheet(
             doc_id=doc_id,

@@ -8,19 +8,26 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 
+from synfig_mcp.security.sandbox import safe_write_bytes
 from synfig_mcp.sif.parser import SifDocument
 
 
 def save_sif(doc: SifDocument, target_path: Path) -> None:
-    """Save SifDocument to disk, automatically applying format based on file extension."""
+    """Save SifDocument to disk, automatically applying format based on file extension.
+
+    Every write is atomic (temp file + ``os.replace``) and keeps a ``.bak`` of
+    the previous contents, so an interrupted save never corrupts the document.
+    """
     target_path = Path(target_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     xml_data = doc.to_xml_bytes()
     ext = target_path.suffix.lower()
 
     if ext == ".sifz":
-        with gzip.open(target_path, "wb") as gz:
+        buf = BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode="wb") as gz:
             gz.write(xml_data)
+        safe_write_bytes(target_path, buf.getvalue())
     elif ext == ".sfg":
         # ZIP container
         existing_assets: dict[str, bytes] = dict(doc._container_assets)
@@ -38,7 +45,7 @@ def save_sif(doc: SifDocument, target_path: Path) -> None:
             for asset_name, asset_bytes in existing_assets.items():
                 zf.writestr(asset_name, asset_bytes)
 
-        target_path.write_bytes(buf.getvalue())
+        safe_write_bytes(target_path, buf.getvalue())
     else:
         # Default to raw .sif
-        target_path.write_bytes(xml_data)
+        safe_write_bytes(target_path, xml_data)
