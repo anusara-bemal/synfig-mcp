@@ -51,8 +51,10 @@ When an LLM operates on untrusted or third-party animation files, an adversary c
 2. **Zero Code Execution**:
    - The MCP server cannot execute shell commands, launch arbitrary binaries, or load unverified shared libraries.
    - Actions are constrained to predefined Synfig DOM and timeline modifications.
-3. **Workspace Filesystem Sandboxing**:
-   - Even if prompt injection persuades the model to attempt writing outside the project (e.g., `../../etc/passwd` or system binaries), the sandbox layer immediately canonicalizes the path, detects the traversal out of `workspace_roots`, and aborts with `SecuritySandboxError`.
+3. **User-Granted Filesystem Permissions**:
+   - The server only touches files inside directory roots the user has explicitly *granted*. Even if prompt injection persuades the model to attempt writing outside the project (e.g., `../../etc/passwd` or system binaries), the path validator immediately canonicalizes the path, detects the traversal out of every granted root, and aborts with `SecuritySandboxError`.
+   - Roots come from `SYNFIG_MCP_WORKSPACE_ROOTS` and the default `~/Documents/SynfigMCP` project folder, and can be widened at runtime with the `permission_grant` tool (and narrowed with `permission_revoke`); `permission_list` shows the current grants. Grants carry read/write flags, so a folder can be shared read-only.
+   - Overly broad grants (drive roots, system folders, the user home root directly) are rejected.
 4. **Loopback-Only Binding & Constant-Time Authentication**:
    - Neither the TCP bridge nor the Streamable HTTP transport can be accessed across public networks by default.
    - HTTP transport enforces constant-time bearer token validation (`secrets.compare_digest`) and refuses to start on non-loopback addresses without explicit `--allow-remote` and an explicit token.
@@ -70,7 +72,11 @@ All strings extracted from SIF XML or live Studio instances (including canvas na
 
 ## 6. Directory Junction & Symlink Escape Prevention
 
-The filesystem sandbox canonicalizes all paths and resolves directory junctions (NTFS reparse points) and POSIX symlinks before checking allowed boundaries:
-- Any path attempting to escape configured workspace roots through a directory junction or symlink pointing outside is rejected with `SecuritySandboxError`.
+The filesystem path validator canonicalizes all paths and resolves directory junctions (NTFS reparse points) and POSIX symlinks before checking allowed boundaries:
+- Any path attempting to escape every granted root through a directory junction or symlink pointing outside is rejected with `SecuritySandboxError`.
 - Validated for both read operations (`doc_open`, `import_asset`) and write operations (`render_frame`, `render_sequence`, `doc_save`).
-- Default workspace roots are strictly confined to `~/Documents/SynfigMCP`. Working directory (`cwd`), user home directories, drive roots (`C:\`), and system folders are explicitly rejected as overly broad.
+- Default granted roots are strictly confined to `~/Documents/SynfigMCP` (or the user's `SYNFIG_MCP_WORKSPACE_ROOTS`). Working directory (`cwd`), user home directories, drive roots (`C:\`), and system folders are explicitly rejected as overly broad. Additional roots are added only by explicit user action through `permission_grant`.
+
+### 6.1 Atomic, Backup-Safe Writes
+
+Document and asset writes go through `safe_write_bytes`, which writes to a sibling temp file, `fsync`s it, and `os.replace`s it over the destination, keeping the previous contents as `<name>.bak`. A crash or a full disk mid-write therefore never leaves a truncated `.sif`/`.sifz`/`.sfg` behind, and a read-only target raises a typed `SecuritySandboxError` instead of a bare `OSError`.

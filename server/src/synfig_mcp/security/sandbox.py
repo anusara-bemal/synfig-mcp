@@ -1,11 +1,18 @@
 """
-Filesystem sandbox validator preventing directory traversal and unauthorized path access.
+Filesystem path validator for the user-granted permission model.
+
+Paths must resolve inside a directory root the user has *granted* (see
+:mod:`synfig_mcp.security.permissions`).  Traversal (``..``), symlink and NTFS
+junction escapes, extension restrictions and existence checks are all enforced
+here; the grant model only decides *which* roots count.
 """
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -53,11 +60,16 @@ def is_overly_broad_root(path: Path | str) -> tuple[bool, str]:
 
 
 def get_default_allowed_roots() -> list[Path]:
-    """Return default allowed workspace roots, ensuring roots are narrow and secure."""
-    from synfig_mcp.config import settings
+    """Return the currently granted roots, ensuring roots are narrow and secure.
+
+    Roots are the user's granted directories (config/env defaults plus anything
+    added at runtime with ``permission_grant``).  Overly broad roots are still
+    filtered out defensively.
+    """
+    from synfig_mcp.security.permissions import permissions
 
     roots: list[Path] = []
-    for r in settings.workspace_roots:
+    for r in permissions.roots():
         resolved = r.resolve()
         broad, _ = is_overly_broad_root(resolved)
         if not broad:
@@ -110,14 +122,19 @@ def validate_path(
     allowed_roots: list[Path] | None = None,
     allowed_extensions: set[str] | None = None,
     must_exist: bool = False,
+    for_write: bool = False,
 ) -> Path:
     """
-    Ensure target_path resolves inside one of the allowed_roots, has an allowed extension,
+    Ensure target_path resolves inside a granted root, has an allowed extension,
     and resolves symlinks / parent traversal ('..') safely.
 
+    ``for_write=True`` additionally requires the containing grant to be writable;
+    use it for every path the server will create or overwrite.
+
     Raises:
-        SecuritySandboxError: If path attempts to escape sandbox or has forbidden extension.
-        FileNotFoundError: If must_exist is True and path does not exist.
+        SecuritySandboxError: If the path escapes every granted root or has a
+            forbidden extension, or a write is attempted in a read-only grant.
+        FileNotFoundError: If must_exist is True and the path does not exist.
     """
     path_obj = Path(target_path)
     # Canonicalize and resolve all symlinks and '..' components
@@ -138,9 +155,14 @@ def validate_path(
 
     if not in_sandbox:
         raise SecuritySandboxError(
-            f"Access to path '{target_path}' is denied by workspace sandbox. "
-            f"Path must reside within configured workspace roots: {[str(r) for r in roots]}"
+            f"Access to path '{target_path}' is denied by the workspace permission model. "
+            f"Path must reside within a granted root: {[str(r) for r in roots]}. "
+            f"Grant access with permission_grant(path=...)."
         )
+
+    # When the caller only supplied explicit roots, treat them as writable.
+    if for_write and allowed_roots is None:
+        _require_writable(resolved_target, target_path)
 
     # Restrict file extensions if provided
     if allowed_extensions is not None:
@@ -156,3 +178,55 @@ def validate_path(
         raise FileNotFoundError(f"File not found: {resolved_target}")
 
     return resolved_target
+
+
+def _require_writable(resolved_target: Path, original: Path | str) -> None:
+    """Raise unless the grant covering ``resolved_target`` is writable."""
+    from synfig_mcp.security.permissions import permissions
+
+    for grant in permissions.grants():
+        if resolved_target == grant.path or grant.path in resolved_target.parents:
+            if not grant.write:
+                raise SecuritySandboxError(
+                    f"Write to '{original}' is denied: the grant for '{grant.path}' is read-only."
+                )
+            return
+    # Not covered by a user grant (e.g. the implicit temp dir) - allowed.
+
+
+def safe_write_bytes(target: Path | str, data: bytes, *, backup: bool = True) -> Path:
+    """Atomically write ``data`` to ``target``, optionally keeping a ``.bak`` copy.
+
+    The write goes to a sibling temp file that is flushed and ``fsync``-ed, then
+    ``os.replace``-d over the destination, so a crash mid-write can never leave a
+    truncated document behind.  When ``backup`` is set and the file already
+    exists, the previous contents are preserved as ``<name>.bak``.
+
+    Permission errors (read-only file/directory) surface as a typed
+    :class:`SecuritySandboxError` rather than a bare ``OSError``.
+    """
+    target_path = Path(target)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if backup and target_path.exists():
+        with contextlib.suppress(OSError):
+            shutil.copy2(target_path, target_path.with_name(target_path.name + ".bak"))
+
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(target_path.parent), prefix=f".{target_path.name}.", suffix=".tmp"
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, target_path)
+    except PermissionError as err:
+        raise SecuritySandboxError(
+            f"Cannot write '{target_path}': the file or directory is not writable ({err})."
+        ) from err
+    finally:
+        with contextlib.suppress(OSError):
+            tmp_path.unlink()
+    return target_path

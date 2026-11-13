@@ -3,7 +3,9 @@
 Three calls take a character sheet and a background to a moving shot.
 
 1. `rig_sheet_slice(file_path)` - finds every part on the sheet and returns a numbered
-   preview. Look at `preview_base64` and decide what each number is.
+   preview. Look at `preview_base64` and decide what each number is. Each part already
+   carries its rig metadata (role, parent, pivot, z), a confidence score and a
+   `rig_compatibility` report; enclosed gaps are reconstructed best-effort.
 2. `rig_sheet_slice(file_path, names={"1": "head", "2": "torso", ...})` - writes one
    transparent PNG per named part and a `manifest.json`. Unnamed numbers (captions,
    stray marks) are left out.
@@ -41,7 +43,11 @@ The defaults are estimates. Look at the preview, then override per part:
 - `layout: "in_place"` keeps the sheet positions (for parts exported in place).
 
 ## Animating
-- Motions: walk, run, idle, talk (loop), wave, jump, nod, punch (once), rest, pose, move.
+- Motions that loop until `end`: `idle`, `walk`, `run`, `talk`, `breath`, `crouch`, `shake`.
+- Motions that play once: `wave`, `jump`, `nod`, `kick`, `block`, `dodge`, `fall`, `land`,
+  `turn`, `react`, `stomp`, plus `punch` (built from the pose presets).
+- Special: `rest` (return to the rest pose), `pose` (`angles={part or role: degrees}`),
+  `move` (`move_to={x, y}` only).
 - Angles are degrees from the rest pose, counter-clockwise; `flip: true` mirrors a character.
 - `character_motion_apply` and `character_pose_apply(angles={"upper_arm_r": 120})` refine a
   built character; the joint layers are `<id>_<part>_rot`, the position layer `<id>_pos`.

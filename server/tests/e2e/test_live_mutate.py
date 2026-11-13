@@ -1116,7 +1116,7 @@ async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_
     sandbox_root.mkdir()
 
     # 1. doc_open: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         await backend.doc_open("C:/Windows/System32/drivers/etc/hosts.sif")
 
     # 2. doc_open: forbidden extension
@@ -1126,7 +1126,7 @@ async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_
         await backend.doc_open(str(dummy_file))
 
     # 3. doc_save: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         await backend.doc_save("doc_0", "C:/Windows/System32/hacked.sif")
 
     # 4. doc_save: forbidden extension
@@ -1138,11 +1138,11 @@ async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_
         await backend.render_frame("doc_0", output_path=str(sandbox_root / "evil.ps1"))
 
     # 6. render_frame: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         await backend.render_frame("doc_0", output_path="C:/Windows/System32/evil.png")
 
     # 7. render_sequence: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         await backend.render_sequence("doc_0", output_dir="C:/Windows/System32/evil_seq")
 
     # 8. render_video: forbidden extension

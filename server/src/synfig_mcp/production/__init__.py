@@ -25,6 +25,19 @@ from synfig_mcp.production.models import (
     StageReport,
 )
 from synfig_mcp.production.pipeline import AnimeProductionPipeline
+from synfig_mcp.production.story import (
+    Screenplay,
+    StoryBible,
+    StoryCharacter,
+    StoryLocation,
+    StoryProp,
+    StoryRelationship,
+    StoryScene,
+    TimelineBeat,
+    build_screenplay,
+    compile_story,
+    validate_story,
+)
 
 __all__ = [
     "AnimeProductionPipeline",
@@ -33,5 +46,16 @@ __all__ = [
     "ProductionBrief",
     "ProductionReport",
     "RenderOptions",
+    "Screenplay",
     "StageReport",
+    "StoryBible",
+    "StoryCharacter",
+    "StoryLocation",
+    "StoryProp",
+    "StoryRelationship",
+    "StoryScene",
+    "TimelineBeat",
+    "build_screenplay",
+    "compile_story",
+    "validate_story",
 ]

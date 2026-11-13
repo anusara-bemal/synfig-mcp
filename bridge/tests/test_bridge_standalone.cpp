@@ -97,6 +97,37 @@ int main() {
     assert(info_res.contains("result"));
     assert(info_res["result"]["width"] == 1920);
     assert(info_res["result"]["height"] == 1080);
+
+    // Phase 6 GUI/view methods reach their standalone handlers.
+    nlohmann::json view_req = {
+        {"jsonrpc", "2.0"},
+        {"id", 5},
+        {"method", "view.zoom"},
+        {"params", {{"doc_id", "doc_0"}, {"zoom", 2.0}}}
+    };
+    nlohmann::json view_res = mcp_bridge::dispatch_request(view_req, authenticated);
+    assert(view_res.contains("result"));
+    assert(view_res["result"].contains("zoom"));
+
+    nlohmann::json vis_req = {
+        {"jsonrpc", "2.0"},
+        {"id", 6},
+        {"method", "layer.set_visibility"},
+        {"params", {{"doc_id", "doc_0"}, {"layer_id", "Circle001"}, {"visible", false}}}
+    };
+    nlohmann::json vis_res = mcp_bridge::dispatch_request(vis_req, authenticated);
+    assert(vis_res.contains("result"));
+    assert(vis_res["result"]["visible"] == false);
+
+    nlohmann::json align_req = {
+        {"jsonrpc", "2.0"},
+        {"id", 7},
+        {"method", "layer.align"},
+        {"params", {{"doc_id", "doc_0"}, {"layer_ids", {"Circle001"}}, {"edge", "left"}}}
+    };
+    nlohmann::json align_res = mcp_bridge::dispatch_request(align_req, authenticated);
+    assert(align_res.contains("result"));
+    assert(align_res["result"]["edge"] == "left");
     std::cout << "✓ Dispatch and handler tests passed" << std::endl;
 
     std::cout << "=== ALL STANDALONE C++ TESTS PASSED ===" << std::endl;
