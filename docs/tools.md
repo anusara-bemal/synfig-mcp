@@ -1371,21 +1371,21 @@ Derive the continuity story bible (characters, locations, props, scenes, timelin
 
 and the screenplay view for a brief, without building anything.
 
-brief: same shape as produce_anime_project. If the brief already contains a 'story'
+brief: same shape as produce_anime_project. A 'story' already in the brief is validated
 
-(an authored bible), it is validated and returned unchanged; otherwise the server
+and returned unchanged; otherwise the server derives a structural bible from the brief's
 
-derives a structural bible from the brief's own shots/characters/assets.
+own shots/characters/assets.
 
-Returns: {authored, bible, screenplay, issues[]}. 'issues' lists continuity problems
+Returns: {authored, bible, screenplay, issues[]}; 'issues' lists continuity problems
 
-(unknown ids, timeline drift); an empty list means the bible is consistent.
+(unknown ids, timeline drift), empty when consistent.
 
-Honesty: the server has no language model, so a derived bible is a structural summary,
+Honesty: the server has no LLM, so a derived bible is a structural summary, not creative
 
-not creative writing. To author one, call this tool, edit 'bible', and pass it back as
+writing. To author one, call this tool, edit 'bible', and pass it back as
 
-ProductionBrief.story - the pipeline then validates and consumes it.
+ProductionBrief.story; the pipeline validates and consumes it.
 
 #### Parameters
 

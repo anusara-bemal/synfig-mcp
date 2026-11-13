@@ -6,13 +6,13 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 103 tools, 97,416 bytes, **26,609 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 105 tools, 101,831 bytes, **27,781 tokens** (`cl100k_base`).
 - **Minimal Profile (`core`)**: 20 tools, 17,294 bytes, **4,603 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **26,609 tokens** to **4,603 tokens**.
+> from **27,781 tokens** to **4,603 tokens**.
 
 ### Profile Allocations & Measured Counts
 
@@ -21,10 +21,10 @@
 | `core` | 20 | **4,603** | 4,626 | ✅ Pass (< 5000) |
 | `anim` | 28 | **6,742** | 6,765 | ❌ Exceeds (4500) |
 | `fx` | 32 | **7,472** | 7,496 | ❌ Exceeds (4500) |
-| `rig` | 34 | **9,043** | 9,077 | ❌ Exceeds (3000) |
-| `assets` | 23 | **5,735** | 5,753 | ❌ Exceeds (2000) |
+| `rig` | 35 | **9,839** | 9,872 | ❌ Exceeds (3000) |
+| `assets` | 24 | **6,466** | 6,485 | ❌ Exceeds (2000) |
 | `review` | 25 | **6,497** | 6,525 | ❌ Exceeds (4000) |
-| `all` | 103 | **26,609** | 26,679 | ✅ Pass (< 28000) |
+| `all` | 105 | **27,781** | 27,848 | ✅ Pass (< 28000) |
 
 ---
 
@@ -46,7 +46,7 @@ Measured against real server output in headless mode:
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 103 | **40** | 39 | < 200 |
+| `render_frame(160x120)` | 103 | **43** | 43 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
 | `schema_get_layer(circle)` | 2662 | **720** | 719 | < 1440 |
 
@@ -80,21 +80,21 @@ Vision model consumption per single preview or contact-sheet image:
 
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
+| `rig_sheet_from_image` | 2,661 | **731** | 732 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `scene_auto_build` | 1,695 | **483** | 483 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `rig_sheet_slice` | 1,638 | **464** | 466 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `scene_auto_build` | 1,597 | **451** | 452 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `produce_anime_project` | 1,750 | **455** | 455 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_sequence` | 1,520 | **442** | 442 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `character_motion_apply` | 1,525 | **436** | 436 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `sprite_slice` | 1,461 | **416** | 417 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `canvas_set_properties` | 1,444 | **410** | 410 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `character_motion_apply` | 1,417 | **403** | 404 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `doc_set_properties` | 1,356 | **402** | 402 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `rig_bone_add` | 1,276 | **389** | 389 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `produce_anime_project` | 1,460 | **389** | 389 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `procedural_asset_generate` | 1,372 | **389** | 386 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_start` | 1,327 | **387** | 387 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_contact_sheet` | 1,308 | **377** | 377 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_video` | 1,274 | **374** | 374 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `character_pose_apply` | 1,250 | **347** | 348 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_waypoint_set` | 1,204 | **335** | 333 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 

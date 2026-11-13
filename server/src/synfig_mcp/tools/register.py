@@ -1885,14 +1885,14 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         """Derive the continuity story bible (characters, locations, props, scenes, timeline)
         and the screenplay view for a brief, without building anything.
 
-        brief: same shape as produce_anime_project. If the brief already contains a 'story'
-        (an authored bible), it is validated and returned unchanged; otherwise the server
-        derives a structural bible from the brief's own shots/characters/assets.
-        Returns: {authored, bible, screenplay, issues[]}. 'issues' lists continuity problems
-        (unknown ids, timeline drift); an empty list means the bible is consistent.
-        Honesty: the server has no language model, so a derived bible is a structural summary,
-        not creative writing. To author one, call this tool, edit 'bible', and pass it back as
-        ProductionBrief.story - the pipeline then validates and consumes it.
+        brief: same shape as produce_anime_project. A 'story' already in the brief is validated
+        and returned unchanged; otherwise the server derives a structural bible from the brief's
+        own shots/characters/assets.
+        Returns: {authored, bible, screenplay, issues[]}; 'issues' lists continuity problems
+        (unknown ids, timeline drift), empty when consistent.
+        Honesty: the server has no LLM, so a derived bible is a structural summary, not creative
+        writing. To author one, call this tool, edit 'bible', and pass it back as
+        ProductionBrief.story; the pipeline validates and consumes it.
         """
         from synfig_mcp.production.models import ProductionBrief
         from synfig_mcp.production.story import (
