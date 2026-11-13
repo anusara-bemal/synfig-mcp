@@ -23,6 +23,7 @@
 #include <gui/app.h>
 #include <gui/instance.h>
 #include <gui/canvasview.h>
+#include <gui/workarea.h>
 #include <synfigapp/action.h>
 #include <synfigapp/action_system.h>
 #include <synfigapp/canvasinterface.h>
