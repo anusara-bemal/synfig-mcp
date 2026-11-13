@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 105 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 111 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -14,8 +14,9 @@
 - [Document Management](#document-management) (8 tools)
 - [Effect Recipes](#effect-recipes) (3 tools)
 - [History & Undo](#history-undo) (3 tools)
-- [Layer Manipulation](#layer-manipulation) (9 tools)
+- [Layer Manipulation](#layer-manipulation) (12 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
+- [Live Studio View](#live-studio-view) (3 tools)
 - [Other](#other) (23 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
@@ -25,7 +26,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 105 tools.**
+**Total: 111 tools.**
 
 ## Animation & Keyframes
 
@@ -1054,6 +1055,79 @@ Gotcha: Verify document ID before invoking.
 
 ---
 
+### `layer_set_visibility`
+
+*Profiles: all, fx*
+
+Show or hide a layer (the Synfig 'active' flag), as a single undo step.
+
+Returns: {doc_id, layer_id, visible, diff}.
+
+Gotcha: A hidden layer still exists and renders nothing; it is not removed.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_id` | `string` | No | - |
+| `visible` | `boolean` | No | - |
+
+---
+
+### `layer_set_blend`
+
+*Profiles: all, fx*
+
+Set a composite layer's opacity and/or blend method.
+
+Args:
+
+amount: Opacity 0.0 (transparent) to 1.0 (opaque).
+
+blend_method: Composite blend index (0 = normal; see the Synfig enum).
+
+Returns: {doc_id, layer_id, amount, blend_method, diff}.
+
+Gotcha: Only composite layers have amount/blend_method; others are rejected, not faked.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_id` | `string` | No | - |
+| `amount` | `any` | No | - |
+| `blend_method` | `any` | No | - |
+
+---
+
+### `layer_align`
+
+*Profiles: all, fx*
+
+Translate layers so they share a common edge or axis.
+
+Args:
+
+layer_ids: Layers to align (at least one).
+
+edge: 'left', 'right', 'top', 'bottom', 'center', 'horizontal', or 'vertical'.
+
+Returns: {doc_id, edge, moved: [{layer_id, dx, dy}], diff}.
+
+Gotcha: Alignment moves each layer's origin; it is one undo step, not per-layer undos.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_ids` | `any` | No | - |
+| `edge` | `string` | No | - |
+
+---
+
 ## Licensed Assets
 
 ### `asset_search`
@@ -1134,6 +1208,85 @@ Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'publ
 | `title` | `string` | No | - |
 | `creator` | `string` | No | - |
 | `license_code` | `string` | No | - |
+
+---
+
+## Live Studio View
+
+### `view_get`
+
+*Profiles: all, fx*
+
+Read the live canvas viewport (zoom and pan focus).
+
+Returns: {zoom, focus: {x, y}, gui}. gui is false in headless mode.
+
+Gotcha: Only a running Studio reports a real zoom; headless returns a nominal 1.0.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+
+---
+
+### `view_set`
+
+*Profiles: all, fx*
+
+Drive the live Studio viewport so the artist sees the same frame as the model.
+
+Args:
+
+doc_id: Target document.
+
+mode: 'in', 'out', 'fit', or 'normal'. Use zoom for an exact value.
+
+zoom: Explicit zoom factor (1.0 = 100%). Wins over mode.
+
+x: Pan focus X in Synfig units (pans when given).
+
+y: Pan focus Y in Synfig units.
+
+Returns: {zoom, focus: {x, y}, gui}.
+
+Gotcha: Requires a live Studio backend; the headless engine has no viewport.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `mode` | `any` | No | - |
+| `zoom` | `any` | No | - |
+| `x` | `any` | No | - |
+| `y` | `any` | No | - |
+
+---
+
+### `studio_events`
+
+*Profiles: all, fx*
+
+Poll recent Studio notifications (manual artist edits) and the state version.
+
+Args:
+
+doc_id: Only return events for this document.
+
+limit: Maximum number of most-recent events to return.
+
+Returns: {events: [{method, params, state_version}], state_version, doc_id}.
+
+Gotcha: Compare state_version across calls to detect external changes; headless reports 'headless'.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `limit` | `integer` | No | - |
 
 ---
 
@@ -1319,9 +1472,13 @@ assets, assembled scene, style stack, render and review.
 
 brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
 
-assets[], background, camera[], render{}, output_dir, save_path}. Call
+assets[], background, camera[], transitions[], audio[], render{}, output_dir,
 
-synfig_help('production') for the full brief shape, styles and motion names.
+save_path}. Call synfig_help('production') for the full brief shape, styles and
+
+motion names. transitions[] are {type: 'fade'|'dissolve', time, duration}; audio[]
+
+are {file, time, volume} sound cues.
 
 Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
 

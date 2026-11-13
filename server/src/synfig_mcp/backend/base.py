@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from synfig_mcp.errors import SynfigError
 from synfig_mcp.protocol.models import SynfigValue
 
 
@@ -436,6 +437,74 @@ class BackendBase(ABC):
     async def selection_set(self, doc_id: str, layer_ids: list[str]) -> list[str]:
         """Set the layer selection and return the ids that are now selected."""
         ...
+
+    # -----------------------------------------------------------------------
+    # GUI View & Layer Appearance (Phase 6)
+    # -----------------------------------------------------------------------
+
+    async def view_get(self, doc_id: str) -> dict[str, Any]:  # noqa: ARG002
+        """Return the canvas view state: ``{zoom, focus: {x, y}, gui}``.
+
+        The headless engine has no viewport, so ``gui`` is False and the zoom is
+        a nominal 1.0; only a live Studio reports a real value.
+        """
+        return {"zoom": 1.0, "focus": {"x": 0.0, "y": 0.0}, "gui": False}
+
+    async def view_set(
+        self,
+        doc_id: str,  # noqa: ARG002
+        mode: str | None = None,  # noqa: ARG002
+        zoom: float | None = None,  # noqa: ARG002
+        x: float | None = None,  # noqa: ARG002
+        y: float | None = None,  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """Adjust the canvas view (zoom in/out/fit/normal/set, or pan)."""
+        raise SynfigError("view control requires a live Synfig Studio backend")
+
+    async def layer_set_visibility(
+        self,
+        doc_id: str,  # noqa: ARG002
+        layer_id: str,  # noqa: ARG002
+        visible: bool,  # noqa: ARG002
+        canvas_path: str = "",  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """Show or hide a layer (the Synfig ``active`` flag)."""
+        raise SynfigError("layer visibility requires a backend that supports it")
+
+    async def layer_set_blend(
+        self,
+        doc_id: str,  # noqa: ARG002
+        layer_id: str,  # noqa: ARG002
+        amount: float | None = None,  # noqa: ARG002
+        blend_method: int | None = None,  # noqa: ARG002
+        canvas_path: str = "",  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """Set a composite layer's opacity (``amount``) and/or ``blend_method``."""
+        raise SynfigError("layer blend requires a backend that supports it")
+
+    async def layer_align(
+        self,
+        doc_id: str,  # noqa: ARG002
+        layer_ids: list[str],  # noqa: ARG002
+        edge: str = "center",  # noqa: ARG002
+        canvas_path: str = "",  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """Translate layers so they share a common edge (left/right/top/bottom/center)."""
+        raise SynfigError("layer alignment requires a backend that supports it")
+
+    # -----------------------------------------------------------------------
+    # Event Sync (Phase 6)
+    # -----------------------------------------------------------------------
+
+    async def recent_events(self, doc_id: str | None = None, limit: int = 20) -> dict[str, Any]:
+        """Return recent bridge notifications and the current state version.
+
+        The headless engine emits no events, so it always reports an empty list
+        and version ``"headless"``.  A live backend returns the notifications the
+        running Studio broadcast (manual edits included) plus a monotonically
+        increasing version a caller can compare to detect external changes.
+        """
+        return {"events": [], "state_version": "headless", "doc_id": doc_id, "limit": limit}
 
     # -----------------------------------------------------------------------
     # Rendering Operations

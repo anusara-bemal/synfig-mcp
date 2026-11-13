@@ -612,6 +612,58 @@ class FakeBridgeServer:
                 "result": {"selected_layers": params.get("layer_ids", [])},
             }
 
+        if method in ("view.get", "view.zoom", "view.pan", "view.fit"):
+            mode = params.get("mode")
+            zoom = params.get("zoom")
+            if zoom is None:
+                zoom = {"in": 2.0, "out": 0.5, "fit": 1.0, "normal": 1.0}.get(mode, 1.0)
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "zoom": float(zoom),
+                    "focus": {
+                        "x": float(params.get("x", 0.0)),
+                        "y": float(params.get("y", 0.0)),
+                    },
+                },
+            }
+
+        if method == "layer.set_visibility":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", ""),
+                    "visible": bool(params.get("visible", True)),
+                },
+            }
+
+        if method == "layer.set_blend":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "layer_id": params.get("layer_id", ""),
+                    "amount": params.get("amount"),
+                    "blend_method": params.get("blend_method"),
+                },
+            }
+
+        if method == "layer.align":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": params.get("doc_id", "doc_0"),
+                    "edge": params.get("edge", "center"),
+                    "moved": [],
+                },
+            }
+
         if method in ("history.undo", "history.redo"):
             return {
                 "jsonrpc": "2.0",

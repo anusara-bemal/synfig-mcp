@@ -68,10 +68,11 @@ async def test_tools_list_token_ceiling() -> None:
     dumped = json.dumps(tools_raw)
     tokens = count_tokens(dumped)
 
-    # Full studio ceiling.  Raised to 28,000 when the capability meta-tools
-    # (capability_search/inspect/execute/discover) joined the default surface.
+    # Full studio ceiling.  Raised to 32,000 when the Phase 6 live-view tools
+    # (view_get/view_set/studio_events/layer_set_visibility/layer_set_blend/
+    # layer_align) joined the default surface.
 
-    assert tokens <= 28000, f"tools/list token bloat detected: {tokens} > 28000"
+    assert tokens <= 32000, f"tools/list token bloat detected: {tokens} > 32000"
 
 
 @pytest.mark.asyncio

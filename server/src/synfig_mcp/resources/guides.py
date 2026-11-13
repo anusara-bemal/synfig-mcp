@@ -193,12 +193,18 @@ document -> story -> storyboard -> characters -> assets -> scene_build -> style 
               "position": {"x": 300, "y": 660}, "height": 180}],
   "background": {"generator": "landscape"},
   "camera": [{"time": 0.0, "zoom": 1.0, "center": {"x": 640, "y": 360}}],
+  "transitions": [{"type": "fade", "time": 0.0, "duration": 0.4}],
+  "audio": [{"file": "music/bed.wav", "time": 0.0, "volume": 0.7}],
   "render": {"video": true, "video_format": "mp4", "contact_sheet": true,
              "review": true, "preview_frames": 4},
   "story": null,
   "output_dir": "out", "save_path": "out/reel.sif"
 }
 ```
+- `transitions`: `{type: 'fade'|'dissolve', time, duration, direction: 'in'|'out'}`. Left empty,
+  a fade-in at 0s and a fade-out at the end are added so the edit reads cleanly; a fade is a
+  full-canvas layer whose opacity is keyed.
+- `audio`: `{file, time, volume}` sound cues placed on the timeline (wav/ogg/mp3/flac).
 - `archetype`: `humanoid` or `chibi`. `facing`: `left` or `right`.
 - Motions that loop: idle, walk, run, talk, breath, crouch, shake. Motions that play once:
   wave, jump, nod, kick, block, dodge, fall, land, turn, react, stomp, punch. Special: rest,

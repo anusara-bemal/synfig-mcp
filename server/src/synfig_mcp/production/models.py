@@ -27,6 +27,14 @@ class RenderOptions(BaseModel):
     preview_frames: int = Field(default=6, ge=2, le=9, description="Frames in the review loop.")
 
 
+class AudioCue(BaseModel):
+    """One sound file placed on the production timeline."""
+
+    file: str = Field(description="Path to a sound file (wav, ogg, mp3, flac, ...).")
+    time: float = Field(default=0.0, ge=0.0, description="Start offset in seconds.")
+    volume: float = Field(default=1.0, ge=0.0, le=4.0)
+
+
 class CharacterDescriptor(BaseModel):
     """A high-level character brief that expands into rig-ready parts.
 
@@ -139,6 +147,15 @@ class ProductionBrief(BaseModel):
         default_factory=list,
         description="Camera keys [{time, zoom, center: {x, y}}]; a gentle default is used when empty.",
     )
+    transitions: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Shot-boundary transitions [{type: 'fade'|'dissolve', duration, time?}]. When "
+        "empty, a fade-in at 0s and a fade-out at the end are used so the edit reads cleanly.",
+    )
+    audio: list[AudioCue] = Field(
+        default_factory=list,
+        description="Sound cues placed on the timeline, e.g. a music bed or a hit at a beat.",
+    )
     render: RenderOptions = Field(default_factory=RenderOptions)
     story: Any | None = Field(
         default=None,
@@ -180,6 +197,11 @@ class ProductionReport(BaseModel):
     )
     review: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    verification: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Final read-back checks: document loads, animated waypoints present, "
+        "and every requested artifact exists on disk.",
+    )
     dry_run: bool = False
 
     def stage(self, name: str) -> StageReport | None:
