@@ -150,6 +150,13 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `history.list` | `doc_id` | `instance->undo_action_stack()`, `redo_action_stack()` | Verified |
 | `selection.get` | `doc_id` | `canvas_view->get_selection_manager()->get_selected_layers()` | Verified |
 | `selection.set` | `doc_id`, `layer_ids[]` | `canvas_view->get_selection_manager()->set_selected_layers()` | Verified |
+| `view.get` | `doc_id` | `WorkArea::get_zoom()`, `WorkArea::get_focus_point()` | Verified |
+| `view.zoom` | `doc_id`, `mode?` (`in`/`out`/`fit`/`normal`), `zoom?` | `WorkArea::zoom_in/out/fit/norm()`, `WorkArea::set_zoom()` (clamped 1/128–128) | Verified |
+| `view.pan` | `doc_id`, `x`, `y` | `WorkArea::set_focus_point()` | Verified |
+| `view.fit` | `doc_id` | `WorkArea::zoom_fit()` | Verified |
+| `layer.set_visibility` | `doc_id`, `layer_id`, `visible` | `Action::LayerActivate::create()` (`active` flag) | Verified |
+| `layer.set_blend` | `doc_id`, `layer_id`, `amount?`, `blend_method?` | `canvas_interface->change_value()` on the composite `amount`/`blend_method` params | Verified |
+| `layer.align` | `doc_id`, `layer_ids[]`, `edge` | `Layer::get_bounding_rect()` + `change_value()` on each layer's `origin` | Verified |
 | `rig.skeleton_create`| `doc_id`, `name` | `Action::LayerAdd::create("skeleton")` | **Not implemented** (planned) |
 | `rig.bone_add` | `doc_id`, `layer_id` (`skeleton_layer?`), `time?`, `origin_x?`, `origin_y?`, `angle?`, `width?`, `tipwidth?`, `parent_index?` | root: `Action::ValueNodeStaticListInsert::create()`; child: `Action::ValueDescCreateChildBone::create()` | Verified |
 | `rig.bone_bind` | `doc_id`, `layer_id`, `bone_id` | `Action::ValueDescBoneLink::create()` | **Not implemented** (planned) |

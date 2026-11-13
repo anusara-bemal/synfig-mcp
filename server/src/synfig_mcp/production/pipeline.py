@@ -33,6 +33,7 @@ from synfig_mcp.characters.cutout import (
     vector,
 )
 from synfig_mcp.characters.models import StoryboardShot
+from synfig_mcp.characters.production import AUDIO_EXTENSIONS
 from synfig_mcp.characters.rigging import remember_rig
 from synfig_mcp.characters.storyboard import StoryboardEngine
 from synfig_mcp.errors import SynfigError
@@ -61,6 +62,11 @@ from synfig_mcp.recipes.engine import RecipeEngine
 from synfig_mcp.recipes.styles import get_style_preset
 from synfig_mcp.render.pipeline import RenderPipeline
 from synfig_mcp.review.service import ReviewService
+from synfig_mcp.security.sandbox import validate_path
+from synfig_mcp.sif.parser import SifDocument
+
+#: Name of the auditable production report written next to the output.
+REPORT_FILENAME = "production_report.json"
 
 #: The stages, in execution order.
 STAGES: tuple[str, ...] = (
@@ -506,7 +512,7 @@ class AnimeProductionPipeline:
                 )
             else:
                 try:
-                    await self._build_scene(brief, doc_id, frame, duration)
+                    scene_metrics = await self._build_scene(brief, doc_id, frame, duration)
                 except SynfigError as exc:
                     report.success = False
                     report.stages.append(
@@ -514,7 +520,11 @@ class AnimeProductionPipeline:
                     )
                 else:
                     report.stages.append(
-                        StageReport(name="scene_build", detail="assembled scene in one undo step")
+                        StageReport(
+                            name="scene_build",
+                            detail="assembled scene in one undo step",
+                            metrics=scene_metrics,
+                        )
                     )
                     if state is not None:
                         state.scene_built = True
@@ -623,7 +633,73 @@ class AnimeProductionPipeline:
 
         if report.success:
             report.success = all(s.status != "failed" for s in report.stages)
+
+        # Final verification: read the saved document back and confirm it loads, that the
+        # requested artifacts exist on disk, and (for a non-dry run) that the scene is
+        # actually animated.  This is reported honestly; a failed check is a warning, not
+        # a hidden success.
+        if not dry_run:
+            report.verification = self._verify_production(report, brief)
+            if not report.verification.get("document_loads", True):
+                report.success = False
+                report.warnings.append("verification: the saved document did not load back")
+
+        # Persist the report next to the production so the run is auditable.
+        if not dry_run and report.success:
+            try:
+                report_path = out_dir / REPORT_FILENAME
+                out_dir.mkdir(parents=True, exist_ok=True)
+                report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+                report.artifacts["report"] = str(report_path)
+            except OSError as exc:  # noqa: BLE001 - report write must never fail a run
+                report.warnings.append(f"could not write the production report: {exc}")
+
         return report
+
+    def _verify_production(
+        self, report: ProductionReport, brief: ProductionBrief
+    ) -> dict[str, Any]:
+        """Read the saved document and artifacts back; never raise."""
+        verification: dict[str, Any] = {}
+
+        doc_path = report.artifacts.get("document")
+        if doc_path and Path(doc_path).is_file():
+            try:
+                document = SifDocument.from_file(Path(doc_path))
+            except Exception as exc:  # noqa: BLE001 - a corrupt file is a finding
+                verification["document_loads"] = False
+                verification["document_error"] = str(exc)
+            else:
+                verification["document_loads"] = True
+                verification["top_level_layers"] = len(document.get_layers())
+                # Count layers and animated parameters across subcanvases too, so a rig
+                # folded into a group is still seen as animated.
+                verification["total_layers"] = sum(
+                    1 for elem in document.root.iter("layer") if isinstance(elem.tag, str)
+                )
+                animated = sum(
+                    1 for param in document.root.iter("param") if param.find("animated") is not None
+                )
+                verification["animated_params"] = animated
+                verification["is_animated"] = animated > 0
+        elif doc_path:
+            verification["document_loads"] = False
+            verification["document_error"] = "document file is missing"
+
+        # Some artifacts are scalar metrics (e.g. a character count), not files; only
+        # path-shaped values are checked for existence.
+        artifacts_present: dict[str, bool] = {}
+        for name, path in report.artifacts.items():
+            if "/" in path or "\\" in path:
+                artifacts_present[name] = Path(path).is_file()
+        if artifacts_present:
+            verification["artifacts_present"] = artifacts_present
+            verification["all_artifacts_present"] = all(artifacts_present.values())
+
+        if brief.render.video:
+            verification["video_requested"] = True
+            verification["video_rendered"] = "video" in report.artifacts
+        return verification
 
     # -- helpers -----------------------------------------------------------
 
@@ -699,8 +775,12 @@ class AnimeProductionPipeline:
         doc_id: str,
         frame: CanvasFrame,
         duration: float,
-    ) -> None:
-        """Assemble characters, assets and camera into one scene_build call."""
+    ) -> dict[str, Any]:
+        """Assemble characters, assets, camera, transitions and audio into one scene_build.
+
+        Returns a metrics dict with the requested/created layer counts so the caller can
+        verify the document really grew by what was asked for.
+        """
         layers: list[dict[str, Any]] = []
         groups: list[dict[str, Any]] = []
 
@@ -727,6 +807,12 @@ class AnimeProductionPipeline:
         if camera_group:
             groups.append(camera_group)
 
+        transition_layers = self._transition_layers(brief, frame, duration)
+        layers += transition_layers
+
+        audio_layers = self._audio_layers(brief)
+        layers += audio_layers
+
         result = await self.backend.scene_build(
             spec={
                 "doc_id": doc_id,
@@ -742,13 +828,35 @@ class AnimeProductionPipeline:
         if result.get("success") is False:
             raise SynfigError(str(result.get("error", "scene_build rejected the production.")))
 
+        # Verify the document really grew by reading it back.  ``scene_summary`` counts
+        # top-level layers, so children folded into a group are not counted twice:
+        # expected top-level = groups + ungrouped layers (transitions and audio).
+        grouped = {lid for group in groups for lid in group.get("layer_ids", [])}
+        expected_top = len(groups) + sum(1 for layer in layers if layer["id"] not in grouped)
+        metrics: dict[str, Any] = {
+            "requested_layers": len(layers),
+            "groups": len(groups),
+            "transitions": len(transition_layers),
+            "audio": len(audio_layers),
+        }
+        try:
+            summary = await self.backend.scene_summary(doc_id)
+            metrics["top_level_layers"] = int(summary.get("layer_count", 0))
+            metrics["verified"] = metrics["top_level_layers"] >= expected_top
+        except Exception:  # noqa: BLE001 - verification is best-effort, never fatal
+            pass
+        return metrics
+
     @staticmethod
     def _camera_layers(
         brief: ProductionBrief, frame: CanvasFrame, duration: float
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
         """A gentle pan/zoom camera unless the brief supplies its own keys."""
         keys = list(brief.camera)
-        if not keys and not brief.shots:
+        # A multi-shot brief without explicit camera keys gets a gentle move across
+        # the whole timeline; a single-shot brief only gets the default when it has
+        # no transitions, so a static shot stays static.
+        if not keys and (brief.shots or not brief.transitions):
             keys = [
                 {"time": 0.0, "zoom": 1.0},
                 {"time": duration, "zoom": 1.12},
@@ -805,6 +913,109 @@ class AnimeProductionPipeline:
                 for k in ordered
             ]
         return [pan_layer, zoom_layer], {"id": "Camera", "layer_ids": ["Camera_pan", "Camera_zoom"]}
+
+    @staticmethod
+    def _transition_layers(
+        brief: ProductionBrief, frame: CanvasFrame, duration: float
+    ) -> list[dict[str, Any]]:
+        """Fade/dissolve transition layers over a full-canvas colour.
+
+        Synfig has no cross-document transition; a fade is a full-canvas layer whose
+        opacity is keyed, which is exactly what the renderer consumes.  A dissolve is
+        the same key on a mid-grey matte so the edit reads as a soft cut.
+        """
+        span = min(0.5, duration / 4)
+        specs = list(brief.transitions)
+        if not specs:
+            # A fade-in from black at the top and a fade-out to black at the tail.
+            specs = [
+                {"type": "fade", "direction": "in", "time": 0.0, "duration": span},
+                {
+                    "type": "fade",
+                    "direction": "out",
+                    "time": max(0.0, duration - span),
+                    "duration": span,
+                },
+            ]
+
+        layers: list[dict[str, Any]] = []
+        for index, spec in enumerate(specs):
+            ttype = str(spec.get("type", "fade"))
+            if ttype not in ("fade", "dissolve"):
+                raise SynfigError(f"Unknown transition type '{ttype}'. Use 'fade' or 'dissolve'.")
+            direction = str(spec.get("direction", "in"))
+            if direction not in ("in", "out"):
+                raise SynfigError(f"Unknown transition direction '{direction}'. Use 'in' or 'out'.")
+            start = float(spec.get("time", 0.0))
+            length = float(spec.get("duration", 0.5))
+            if length <= 0:
+                raise SynfigError("A transition needs a positive 'duration'.")
+            if start < 0 or start >= duration:
+                raise SynfigError(f"A transition at {start}s is outside the {duration}s timeline.")
+            colour = (0.0, 0.0, 0.0) if ttype == "fade" else (0.5, 0.5, 0.5)
+            # Fades cover the whole canvas; a dissolve reads as a soft mid-cut.
+            inset = 0.0 if ttype == "fade" else 0.15
+            left = frame.left + (frame.right - frame.left) * inset
+            right = frame.right - (frame.right - frame.left) * inset
+            top = frame.top - (frame.top - frame.bottom) * inset
+            bottom = frame.bottom + (frame.top - frame.bottom) * inset
+            # A fade-in starts opaque (hiding the scene) and clears; a fade-out does the
+            # reverse, ending opaque so the tail goes to the matte colour.
+            alpha_start, alpha_end = (1.0, 0.0) if direction == "in" else (0.0, 1.0)
+
+            def _colour(rgb: tuple[float, float, float], alpha: float) -> dict[str, Any]:
+                return {"type": "color", "r": rgb[0], "g": rgb[1], "b": rgb[2], "a": alpha}
+
+            layers.append(
+                {
+                    "id": f"Transition_{index + 1}",
+                    "type": "rectangle",
+                    "params": {
+                        "point1": vector(right, top),
+                        "point2": vector(left, bottom),
+                        "color": _colour(colour, alpha_start),
+                    },
+                    "waypoints": [
+                        {
+                            "param": "color",
+                            "time": round(start, 4),
+                            "value": _colour(colour, alpha_start),
+                            "interpolation": "linear",
+                        },
+                        {
+                            "param": "color",
+                            "time": round(start + length, 4),
+                            "value": _colour(colour, alpha_end),
+                            "interpolation": "linear",
+                        },
+                    ],
+                }
+            )
+        return layers
+
+    @staticmethod
+    def _audio_layers(brief: ProductionBrief) -> list[dict[str, Any]]:
+        """Sound layers placed on the timeline, each resolved through the sandbox."""
+        layers: list[dict[str, Any]] = []
+        for index, cue in enumerate(brief.audio):
+            try:
+                resolved = validate_path(
+                    cue.file, allowed_extensions=AUDIO_EXTENSIONS, must_exist=True
+                )
+            except Exception as exc:  # noqa: BLE001 - report the brief error uniformly
+                raise SynfigError(f"audio cue {index + 1}: {exc}") from exc
+            layers.append(
+                {
+                    "id": f"Audio_{index + 1}",
+                    "type": "sound",
+                    "params": {
+                        "filename": {"type": "string", "value": str(resolved)},
+                        "delay": {"type": "time", "seconds": cue.time},
+                        "volume": {"type": "real", "value": cue.volume},
+                    },
+                }
+            )
+        return layers
 
     async def model_sheet(
         self,

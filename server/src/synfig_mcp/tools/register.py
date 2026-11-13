@@ -127,6 +127,12 @@ TOOL_PROFILES: dict[str, set[str]] = {
     # Selection
     "selection_get": {"rig", "all"},
     "selection_set": {"rig", "all"},
+    "view_get": {"fx", "all"},
+    "view_set": {"fx", "all"},
+    "studio_events": {"fx", "all"},
+    "layer_set_visibility": {"fx", "all"},
+    "layer_set_blend": {"fx", "all"},
+    "layer_align": {"fx", "all"},
     # Cut-out Characters & Storyboards (Phase A4)
     "rig_sheet_slice": {"rig", "assets", "all"},
     "rig_sheet_from_image": {"rig", "assets", "all"},
@@ -1189,6 +1195,99 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         return {"selected_layers": selected}
 
     # -----------------------------------------------------------------------
+    # Live Studio view & appearance control (Phase 6)
+    # -----------------------------------------------------------------------
+
+    @tool_for("view_get", annotations=READ_ONLY)
+    async def view_get(doc_id: str = "doc_0") -> dict[str, Any]:
+        """Read the live canvas viewport (zoom and pan focus).
+        Returns: {zoom, focus: {x, y}, gui}. gui is false in headless mode.
+        Gotcha: Only a running Studio reports a real zoom; headless returns a nominal 1.0.
+        """
+        return wrap_untrusted(await backend.view_get(doc_id))
+
+    @tool_for("view_set", annotations=IDEMPOTENT)
+    async def view_set(
+        doc_id: str = "doc_0",
+        mode: str | None = None,
+        zoom: float | None = None,
+        x: float | None = None,
+        y: float | None = None,
+    ) -> dict[str, Any]:
+        """Drive the live Studio viewport so the artist sees the same frame as the model.
+        Args:
+            doc_id: Target document.
+            mode: 'in', 'out', 'fit', or 'normal'. Use zoom for an exact value.
+            zoom: Explicit zoom factor (1.0 = 100%). Wins over mode.
+            x: Pan focus X in Synfig units (pans when given).
+            y: Pan focus Y in Synfig units.
+        Returns: {zoom, focus: {x, y}, gui}.
+        Gotcha: Requires a live Studio backend; the headless engine has no viewport.
+        """
+        return await backend.view_set(doc_id, mode=mode, zoom=zoom, x=x, y=y)
+
+    @tool_for("studio_events", annotations=READ_ONLY)
+    async def studio_events(doc_id: str = "doc_0", limit: int = 20) -> dict[str, Any]:
+        """Poll recent Studio notifications (manual artist edits) and the state version.
+        Args:
+            doc_id: Only return events for this document.
+            limit: Maximum number of most-recent events to return.
+        Returns: {events: [{method, params, state_version}], state_version, doc_id}.
+        Gotcha: Compare state_version across calls to detect external changes; headless reports 'headless'.
+        """
+        return wrap_untrusted(await backend.recent_events(doc_id=doc_id, limit=limit))
+
+    @tool_for("layer_set_visibility", annotations=MUTATING)
+    async def layer_set_visibility(
+        doc_id: str = "doc_0", layer_id: str = "", visible: bool = True
+    ) -> dict[str, Any]:
+        """Show or hide a layer (the Synfig 'active' flag), as a single undo step.
+        Returns: {doc_id, layer_id, visible, diff}.
+        Gotcha: A hidden layer still exists and renders nothing; it is not removed.
+        """
+        if not layer_id:
+            raise ToolError("layer_set_visibility requires a layer_id")
+        return await backend.layer_set_visibility(doc_id, layer_id, visible)
+
+    @tool_for("layer_set_blend", annotations=MUTATING)
+    async def layer_set_blend(
+        doc_id: str = "doc_0",
+        layer_id: str = "",
+        amount: float | None = None,
+        blend_method: int | None = None,
+    ) -> dict[str, Any]:
+        """Set a composite layer's opacity and/or blend method.
+        Args:
+            amount: Opacity 0.0 (transparent) to 1.0 (opaque).
+            blend_method: Composite blend index (0 = normal; see the Synfig enum).
+        Returns: {doc_id, layer_id, amount, blend_method, diff}.
+        Gotcha: Only composite layers have amount/blend_method; others are rejected, not faked.
+        """
+        if not layer_id:
+            raise ToolError("layer_set_blend requires a layer_id")
+        if amount is None and blend_method is None:
+            raise ToolError("layer_set_blend requires amount and/or blend_method")
+        return await backend.layer_set_blend(
+            doc_id, layer_id, amount=amount, blend_method=blend_method
+        )
+
+    @tool_for("layer_align", annotations=MUTATING)
+    async def layer_align(
+        doc_id: str = "doc_0", layer_ids: list[str] | None = None, edge: str = "center"
+    ) -> dict[str, Any]:
+        """Translate layers so they share a common edge or axis.
+        Args:
+            layer_ids: Layers to align (at least one).
+            edge: 'left', 'right', 'top', 'bottom', 'center', 'horizontal', or 'vertical'.
+        Returns: {doc_id, edge, moved: [{layer_id, dx, dy}], diff}.
+        Gotcha: Alignment moves each layer's origin; it is one undo step, not per-layer undos.
+        """
+        ids = layer_ids or []
+        if not ids:
+            raise ToolError("layer_align requires layer_ids")
+        return await backend.layer_align(doc_id, ids, edge=edge)
+
+    # -----------------------------------------------------------------------
     # Cut-out Characters & Storyboards (Phase A4)
     # -----------------------------------------------------------------------
 
@@ -1853,8 +1952,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         assets, assembled scene, style stack, render and review.
 
         brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
-        assets[], background, camera[], render{}, output_dir, save_path}. Call
-        synfig_help('production') for the full brief shape, styles and motion names.
+        assets[], background, camera[], transitions[], audio[], render{}, output_dir,
+        save_path}. Call synfig_help('production') for the full brief shape, styles and
+        motion names. transitions[] are {type: 'fade'|'dissolve', time, duration}; audio[]
+        are {file, time, volume} sound cues.
         Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
         Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
         and the render/review stages report "skipped". A run writes pipeline_state.json into the
