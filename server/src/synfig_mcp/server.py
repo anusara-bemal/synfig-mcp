@@ -70,7 +70,7 @@ def _run_produce(parsed: argparse.Namespace) -> int:
         return 2
 
     pipeline = AnimeProductionPipeline(backend=get_backend(), output_dir=parsed.output_dir)
-    report = asyncio.run(pipeline.run(brief, dry_run=parsed.dry_run))
+    report = asyncio.run(pipeline.run(brief, dry_run=parsed.dry_run, resume=not parsed.no_resume))
 
     if parsed.json:
         print(json.dumps(report.model_dump(), indent=2, default=str))
@@ -121,6 +121,11 @@ def main(args: list[str] | None = None) -> None:
         "--output-dir",
         default=None,
         help="Directory for the .sif, video and contact sheet (default: <slug>_production)",
+    )
+    produce.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Ignore any pipeline_state.json and rebuild from scratch",
     )
     produce.add_argument(
         "--json",

@@ -46,3 +46,19 @@ From `server/`: `uv run poe check` runs `ruff format --check`, `ruff check`,
   `synfig_mcp.security.permissions.permissions` and
   `synfig_mcp.security.sandbox.get_default_allowed_roots` (see
   `tests/unit/test_permissions.py` for the canonical fixture).
+- Production runs are resumable. `production/pipeline.py` writes
+  `pipeline_state.json` into the output directory and saves the working document
+  at checkpoints; a stage is only restored when its effect is already in the
+  reopened document (`AnimeProductionPipeline.run(..., resume=True)`). Keep
+  `saved_through` monotonic and never restore a stage whose layers were not
+  saved, or a resumed run will duplicate layers.
+- The motion library lives in `characters/cutout.py` (`MOTIONS` /
+  `SPECIAL_MOTIONS`). Add a motion there and a parametrized test in
+  `tests/unit/test_cutout_rig.py`; the guide (`resources/guides.py`) and
+  `docs/characters.md` list the motions and must stay in step. A motion may only
+  name joints the cut-out rig actually has (rotate layers), so no facial or
+  IK-style motions.
+- `docs/protocol.md` is the honest bridge contract: a method marked **Not
+  implemented** must be absent from the C++ dispatcher, and vice versa
+  (`tests/unit/test_protocol_docs.py`). Do not mark a method verified without an
+  entry in `handlers.cpp`.

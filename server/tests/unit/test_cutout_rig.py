@@ -261,3 +261,66 @@ def test_motion_errors_are_actionable(parts: list[dict[str, Any]], tmp_path: Pat
     )
     with pytest.raises(SynfigError, match="has none of these parts"):
         plan_actions(compile_character(crate, FRAME), [MotionAction(motion="walk")], FRAME, 5.0)
+
+
+#: The motions added to broaden the action library.
+NEW_MOTIONS = (
+    "breath",
+    "kick",
+    "block",
+    "dodge",
+    "fall",
+    "land",
+    "turn",
+    "react",
+    "crouch",
+    "stomp",
+    "shake",
+)
+
+
+@pytest.fixture
+def full_body(tmp_path: Path) -> list[dict[str, Any]]:
+    """A rig with every joint the library addresses."""
+    names = [
+        ("torso", (100, 200)),
+        ("head", (80, 80)),
+        ("upper_arm_l", (30, 100)),
+        ("forearm_l", (26, 90)),
+        ("upper_arm_r", (30, 100)),
+        ("forearm_r", (26, 90)),
+        ("upper_leg_l", (40, 120)),
+        ("lower_leg_l", (36, 110)),
+        ("upper_leg_r", (40, 120)),
+        ("lower_leg_r", (36, 110)),
+    ]
+    return [{"name": name, "file": _png(tmp_path / f"{name}.png", size)} for name, size in names]
+
+
+def test_new_motions_are_in_the_catalog() -> None:
+    for name in NEW_MOTIONS:
+        assert name in MOTIONS, f"{name} is missing from the motion library"
+        assert MOTIONS[name].description and MOTIONS[name].period > 0
+
+
+@pytest.mark.parametrize("motion", NEW_MOTIONS)
+def test_new_motion_plans_waypoints(motion: str, full_body: list[dict[str, Any]]) -> None:
+    rig = compile_character(character(id="hero", parts=full_body), FRAME)
+    plan = plan_actions(rig, [MotionAction(motion=motion, start=1.0)], FRAME, default_end=10.0)
+    assert plan.applied == [motion]
+    assert plan.count() > 0, f"{motion} produced no waypoints"
+    # Every curve the motion names must resolve to a joint of the full-body rig.
+    assert plan.skipped_roles == [], f"{motion} could not address {plan.skipped_roles}"
+    assert plan.end_time >= 1.0
+
+
+@pytest.mark.parametrize("motion", NEW_MOTIONS)
+def test_new_one_shot_motions_use_their_own_period(
+    motion: str, full_body: list[dict[str, Any]]
+) -> None:
+    spec = MOTIONS[motion]
+    if spec.loop:
+        pytest.skip("looping motion runs until the end of its action")
+    rig = compile_character(character(id="hero", parts=full_body), FRAME)
+    plan = plan_actions(rig, [MotionAction(motion=motion, start=2.0)], FRAME, default_end=10.0)
+    assert plan.end_time == pytest.approx(2.0 + spec.period)

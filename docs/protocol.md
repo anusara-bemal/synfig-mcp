@@ -152,13 +152,17 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `selection.get` | `doc_id` | `canvas_view->get_selection_manager()->get_selected_layers()` | Verified |
 | `selection.set` | `doc_id`, `layer_ids[]` | `canvas_view->get_selection_manager()->set_selected_layers()` | Verified |
 | `rig.skeleton_create`| `doc_id`, `name` | `Action::LayerAdd::create("skeleton")` | **Not implemented** (planned) |
-| `rig.bone_add` | `doc_id`, `skeleton_layer`, `parent_bone?` | `Action::ValueDescCreateChildBone::create()` | **Not implemented** (planned) |
+| `rig.bone_add` | `doc_id`, `layer_id` (`skeleton_layer?`), `time?`, `origin_x?`, `origin_y?`, `angle?`, `width?`, `tipwidth?`, `parent_index?` | root: `Action::ValueNodeStaticListInsert::create()`; child: `Action::ValueDescCreateChildBone::create()` | Verified |
 | `rig.bone_bind` | `doc_id`, `layer_id`, `bone_id` | `Action::ValueDescBoneLink::create()` | **Not implemented** (planned) |
 | `render.frame` | `doc_id`, `time`, `width?`, `height?` | Off-thread render via CLI temp save or async renderer | Verified |
 
 > [!WARNING]
 > **Identified P3/P4 Risks**:
-> `rig.bone_add` and `rig.bone_bind`: While `ValueDescCreateChildBone` and `ValueDescBoneLink` exist in `synfigapp/actions`, their parameter dictionaries require exact internal GUID/ValueNode structure. They are therefore listed as *not implemented* until they are probed with golden project files.
+> `rig.bone_bind`: While `ValueDescBoneLink` exists in `synfigapp/actions`, its parameter
+> dictionary requires an exact internal GUID/ValueNode structure. It is therefore listed as
+> *not implemented* until it is probed with golden project files. (`rig.bone_add` is
+> implemented — root bones go in through `ValueNodeStaticListInsert`, child bones through
+> `ValueDescCreateChildBone` with `parent_index`.)
 
 > The table is checked against the C++ dispatcher by `server/tests/unit/test_protocol_docs.py`: a method that is documented but missing from the bridge (or the other way round) fails the build.
 

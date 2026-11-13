@@ -150,14 +150,19 @@ The defaults are estimates. Look at the preview, then override per part:
 - `layout: "in_place"` keeps the sheet positions (for parts exported in place).
 
 ## Animating
-- Motions: walk, run, idle, talk (loop), wave, jump, nod, punch (once), rest, pose, move.
+- Motions that loop until `end`: `idle`, `walk`, `run`, `talk`, `breath`, `crouch`, `shake`.
+- Motions that play once: `wave`, `jump`, `nod`, `kick`, `block`, `dodge`, `fall`, `land`,
+  `turn`, `react`, `stomp`, plus `punch` (built from the pose presets).
+- Special: `rest` (return to the rest pose), `pose` (`angles={part or role: degrees}`),
+  `move` (`move_to={x, y}` only).
 - Angles are degrees from the rest pose, counter-clockwise; `flip: true` mirrors a character.
 - `character_motion_apply` and `character_pose_apply(angles={"upper_arm_r": 120})` refine a
   built character; the joint layers are `<id>_<part>_rot`, the position layer `<id>_pos`.
 - Check the result with `review_sequence`, export with `render_video`.
 
 ## Limits
-- Joints are rotate layers (forward kinematics); there is no IK, mesh deformation or lip-sync.
+- Joints are rotate layers (forward kinematics); there is no IK, mesh deformation, facial
+  rig or lip-sync. Facial expression is set once per character via the eye/mouth parts.
 - Without `doc_id` a new document is created; pass `doc_id` to build into the open one.
 """,
     "review": """# Visual Review Loop & Token Efficiency
@@ -194,18 +199,29 @@ document -> storyboard -> characters -> assets -> scene_build -> style -> render
 }
 ```
 - `archetype`: `humanoid` or `chibi`. `facing`: `left` or `right`.
-- Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
+- Motions that loop: idle, walk, run, talk, breath, crouch, shake. Motions that play once:
+  wave, jump, nod, kick, block, dodge, fall, land, turn, react, stomp, punch. Special: rest,
+  pose, move.
 - Positions are canvas pixels from the top-left; a character stands with its feet on `position`.
 - `assets[].kind`: `background`, `prop` or `texture`. Sources: `procedural: {generator}` or
   `search: {query, provider, license}` (opt-in network fetch; every asset is license-checked).
 - Styles: shonen_action, dark_fantasy, supernatural_noir, cyber_mecha, retro_anime.
+
+## Resuming a run
+- Every run writes `pipeline_state.json` into the output directory and saves the document at each
+  checkpoint (after storyboard and after style).
+- Re-running the same brief reopens that document and continues from the first unfinished stage,
+  so a killed or interrupted run does not rebuild completed work. Change the brief and the stale
+  state is ignored; pass `resume=False` to force a clean run, or `resume_from="style"` to rebuild
+  from a given stage.
+- The report lists a `resume` stage describing what was restored.
 
 ## Other entry points
 - `production_plan(brief)`: dry-run; reports stages and layer counts without building.
 - `character_model_sheet(descriptor)`: labeled front/three-quarter/side sheet in its own document.
 - `procedural_asset_list()` / `procedural_asset_generate(...)`: the IP-safe vector generators.
 - `sprite_slice(source, output_dir, strategy)`: slice a sprite sheet into rig-ready part PNGs.
-- CLI: `synfig-mcp produce brief.json [--dry-run] [--json] [--output-dir DIR]`.
+- CLI: `synfig-mcp produce brief.json [--dry-run] [--json] [--output-dir DIR] [--no-resume]`.
 
 ## Limits
 - Rendering needs the Synfig CLI on PATH; without it the document is still saved and the

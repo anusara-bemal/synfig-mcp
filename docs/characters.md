@@ -43,7 +43,11 @@ The defaults are estimates. Look at the preview, then override per part:
 - `layout: "in_place"` keeps the sheet positions (for parts exported in place).
 
 ## Animating
-- Motions: walk, run, idle, talk (loop), wave, jump, nod, punch (once), rest, pose, move.
+- Motions that loop until `end`: `idle`, `walk`, `run`, `talk`, `breath`, `crouch`, `shake`.
+- Motions that play once: `wave`, `jump`, `nod`, `kick`, `block`, `dodge`, `fall`, `land`,
+  `turn`, `react`, `stomp`, plus `punch` (built from the pose presets).
+- Special: `rest` (return to the rest pose), `pose` (`angles={part or role: degrees}`),
+  `move` (`move_to={x, y}` only).
 - Angles are degrees from the rest pose, counter-clockwise; `flip: true` mirrors a character.
 - `character_motion_apply` and `character_pose_apply(angles={"upper_arm_r": 120})` refine a
   built character; the joint layers are `<id>_<part>_rot`, the position layer `<id>_pos`.

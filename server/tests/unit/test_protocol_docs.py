@@ -92,7 +92,7 @@ def test_bridge_methods_are_documented() -> None:
     assert not undocumented, f"Implemented but not documented: {undocumented}"
 
 
-@pytest.mark.parametrize("method", ["rig.skeleton_create", "rig.bone_add", "rig.bone_bind"])
+@pytest.mark.parametrize("method", ["rig.skeleton_create", "rig.bone_bind"])
 def test_planned_methods_are_marked_as_not_implemented(method: str) -> None:
     """Methods that do not exist yet must not be advertised as verified."""
     documented = _documented_methods()
@@ -100,3 +100,13 @@ def test_planned_methods_are_marked_as_not_implemented(method: str) -> None:
     assert "not implemented" in documented[method].lower(), (
         f"{method} is advertised as: {documented[method]}"
     )
+
+
+def test_implemented_rig_method_is_advertised_as_verified() -> None:
+    """``rig.bone_add`` exists in the bridge, so it must not be documented as planned."""
+    documented = _documented_methods()
+    assert "rig.bone_add" in documented
+    assert "not implemented" not in documented["rig.bone_add"].lower(), (
+        "rig.bone_add is implemented in handlers.cpp but still documented as not implemented"
+    )
+    assert "verified" in documented["rig.bone_add"].lower()
