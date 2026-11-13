@@ -1145,9 +1145,11 @@ Add a bone to a skeleton layer (cut-out rigging). Returns the created bone and d
 
 Cut a rig sheet (one image, many parts) into one transparent PNG per part. Call once without
 
-names to see preview_base64 (numbered boxes), then again with names={"1":"head",...} to export.
+names to see the numbered preview, then again with names={"1":"head",...} to export. The preview
 
-Returns parts, manifest, output_dir, preview_base64. Needs transparent/uniform background; name
+comes back as an image block (and is saved as preview_path); the JSON lists parts, manifest and
+
+output_dir. Needs transparent/uniform background; name
 
 parts by body role (head, torso, upper_arm_l, ...) so rigs auto-assemble. See synfig_help('characters').
 

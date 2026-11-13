@@ -37,6 +37,13 @@ def _data(result: Any) -> dict[str, Any]:
     return loaded
 
 
+def _text(result: Any) -> str:
+    """The JSON text of a tool result (the first content block)."""
+    first = result.content[0]
+    assert isinstance(first, TextContent)
+    return first.text
+
+
 @pytest_asyncio.fixture(params=["headless", "live_fake"])
 async def server(
     request: pytest.FixtureRequest,
@@ -57,9 +64,11 @@ async def server(
 
 
 async def _slice(client: Client, assets: dict[str, str]) -> str:
-    first = _data(await client.call_tool("rig_sheet_slice", {"file_path": assets["sheet"]}))
-    assert first["detected_parts"] == 9  # eight parts and the caption box
-    assert first["preview_base64"]
+    first = await client.call_tool("rig_sheet_slice", {"file_path": assets["sheet"]})
+    assert not first.is_error, _text(first)
+    previewed = json.loads(_text(first))
+    assert previewed["detected_parts"] == 9  # eight parts and the caption box
+    assert Path(previewed["preview_path"]).is_file()
     named = _data(
         await client.call_tool(
             "rig_sheet_slice",

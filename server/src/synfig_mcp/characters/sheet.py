@@ -13,8 +13,6 @@ is fast enough for 4K sheets without SciPy.
 
 from __future__ import annotations
 
-import base64
-import io
 import json
 import re
 from dataclasses import dataclass, field
@@ -25,6 +23,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from synfig_mcp.errors import SynfigError
+from synfig_mcp.image_payload import ImagePayload, encode_image
 
 #: Largest sheet edge that is analysed at full resolution.
 MAX_SHEET_EDGE = 8192
@@ -138,12 +137,88 @@ def label_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
 # ---------------------------------------------------------------------------
 
 
+#: Longest run (in pixels) a two-tone background may have along a border edge.
+MAX_BACKGROUND_RUN = 128
+#: Smallest share of an edge a single background tone must cover.
+MIN_BACKGROUND_SHARE = 0.2
+#: How many border edges must show the alternating pattern before it counts.
+MIN_TWO_TONE_EDGES = 2
+
+
+def _two_tones(edge: np.ndarray, tolerance: int) -> tuple[np.ndarray, np.ndarray] | None:
+    """Split one border edge into two background tones, if it really alternates.
+
+    A sheet that was exported over a checkerboard ("transparent" art saved as
+    a JPEG) has two alternating background tones.  Treating only one of them as
+    background leaves half of the squares behind as if they were parts.  The
+    split is only accepted when the tones are clearly separated and interleave
+    in short runs, so a photo with a dark and a light band is not mistaken for
+    a checkerboard.
+    """
+    luminance = edge.astype(np.float64).mean(axis=-1)
+    low = float(luminance.min())
+    high = float(luminance.max())
+    for _ in range(20):  # two-means on the luminance
+        middle = (low + high) / 2
+        dark = luminance[luminance <= middle]
+        light = luminance[luminance > middle]
+        if dark.size == 0 or light.size == 0:
+            break
+        low, high = float(dark.mean()), float(light.mean())
+    if high - low <= tolerance:
+        return None
+
+    light_mask = luminance > (low + high) / 2
+    share = float(light_mask.mean())
+    if not MIN_BACKGROUND_SHARE <= share <= 1 - MIN_BACKGROUND_SHARE:
+        return None
+
+    runs: list[int] = []
+    current = bool(light_mask[0])
+    length = 0
+    for value in light_mask:
+        if bool(value) == current:
+            length += 1
+        else:
+            runs.append(length)
+            current = bool(value)
+            length = 1
+    runs.append(length)
+    if len(runs) < 4 or float(np.median(runs)) > MAX_BACKGROUND_RUN:
+        return None
+
+    dark_colour = np.median(edge[~light_mask], axis=0)
+    light_colour = np.median(edge[light_mask], axis=0)
+    return dark_colour, light_colour
+
+
+def _background_colours(rgb: np.ndarray, tolerance: int) -> tuple[list[np.ndarray], str]:
+    """The background colours of an opaque sheet and how they were found."""
+    edges = (rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1])
+    tones: tuple[np.ndarray, np.ndarray] | None = None
+    agreeing = 0
+    for edge in edges:
+        found = _two_tones(edge, tolerance)
+        if found is None:
+            continue
+        if tones is None:
+            tones = found
+        agreeing += 1
+    if tones is not None and agreeing >= MIN_TWO_TONE_EDGES:
+        return [tones[0], tones[1]], "two_tone_border"
+
+    border = np.concatenate(list(edges))
+    return [np.median(border, axis=0)], "border_colour"
+
+
 def foreground_mask(rgba: np.ndarray, bg_tolerance: int = 28) -> tuple[np.ndarray, str]:
     """Return the foreground mask of a sheet and how the background was detected.
 
     A sheet with real transparency uses its alpha channel.  An opaque sheet uses
     the border colour: only background-coloured pixels that are *connected to
-    the border* count as background, so white eyes on a white sheet survive.
+    the border* count as background, so white eyes on a white sheet survive.  A
+    sheet exported over a checkerboard has two background tones and both are
+    removed.
     """
     alpha = rgba[..., 3]
     transparent = float((alpha < 16).mean())
@@ -151,16 +226,16 @@ def foreground_mask(rgba: np.ndarray, bg_tolerance: int = 28) -> tuple[np.ndarra
         return alpha >= 16, "alpha"
 
     rgb = rgba[..., :3].astype(np.int16)
-    border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
-    bg_colour = np.median(border, axis=0)
-    distance = np.abs(rgb - bg_colour).max(axis=-1)
-    similar = distance <= bg_tolerance
+    colours, method = _background_colours(rgb, bg_tolerance)
+    similar = np.zeros(rgb.shape[:2], dtype=bool)
+    for colour in colours:
+        similar |= np.abs(rgb - colour).max(axis=-1) <= bg_tolerance
 
     labels, _count = label_components(similar)
     edge_labels = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
     edge_labels = edge_labels[edge_labels != 0]
     background = np.isin(labels, edge_labels)
-    return ~background, "border_colour"
+    return ~background, method
 
 
 # ---------------------------------------------------------------------------
@@ -283,8 +358,8 @@ def detect_parts(
 # ---------------------------------------------------------------------------
 
 
-def _preview(image: Image.Image, parts: list[SheetPart]) -> str:
-    """Draw numbered boxes over the sheet and return a base64 PNG."""
+def _preview(image: Image.Image, parts: list[SheetPart]) -> ImagePayload:
+    """Draw numbered boxes over the sheet and return a size-budgeted image."""
     scale = min(1.0, PREVIEW_EDGE / max(image.size))
     size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
     canvas = Image.new("RGBA", size, (255, 255, 255, 255))
@@ -301,9 +376,7 @@ def _preview(image: Image.Image, parts: list[SheetPart]) -> str:
             fill=(230, 30, 60, 255),
         )
         draw.text((box[0] + 3, box[1] + 2), label, fill=(255, 255, 255, 255))
-    buffer = io.BytesIO()
-    canvas.convert("RGB").save(buffer, format="PNG", optimize=True)
-    return base64.b64encode(buffer.getvalue()).decode("ascii")
+    return encode_image(canvas.convert("RGB"))
 
 
 def slice_rig_sheet(
@@ -322,6 +395,10 @@ def slice_rig_sheet(
     example ``{"1": "head", "2": "torso"}``.  When names are given only the named
     parts are written, which is how captions and stray marks on a sheet are
     left out.  Without names every part is written as ``part_NN``.
+
+    With ``preview`` the numbered preview is returned as a size-budgeted image
+    (``preview_base64``, ``preview_mime``, ``preview_bytes``) and written to
+    ``preview_path`` next to the parts.
     """
     try:
         with Image.open(sheet_path) as source:
@@ -399,5 +476,11 @@ def slice_rig_sheet(
         "named": bool(wanted),
     }
     if preview:
-        result["preview_base64"] = _preview(image, parts)
+        payload = _preview(image, parts)
+        preview_file = output_dir / f"preview{payload.suffix}"
+        preview_file.write_bytes(payload.data)
+        result["preview_base64"] = payload.base64
+        result["preview_mime"] = payload.mime_type
+        result["preview_bytes"] = payload.size_bytes
+        result["preview_path"] = str(preview_file)
     return result

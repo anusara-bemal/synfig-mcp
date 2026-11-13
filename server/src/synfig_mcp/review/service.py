@@ -5,8 +5,6 @@ and pairs them with objective computer-vision metrics for LLM critique.
 
 from __future__ import annotations
 
-import base64
-import io
 import math
 import tempfile
 from pathlib import Path
@@ -17,6 +15,7 @@ from PIL import Image
 
 from synfig_mcp.backend.base import BackendBase
 from synfig_mcp.errors import RenderError
+from synfig_mcp.image_payload import encode_image
 from synfig_mcp.review.metrics import (
     check_empty_or_uniform,
     check_safe_areas,
@@ -29,10 +28,12 @@ from synfig_mcp.review.metrics import (
 
 
 def _image_to_base64(img: Image.Image) -> str:
-    """Helper to convert PIL Image to PNG base64 string."""
-    buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+    """Helper to convert PIL Image to a size-budgeted base64 string.
+
+    The bytes are capped so that a review result can never blow past the
+    1 MB ceiling MCP clients enforce on a single tool result.
+    """
+    return encode_image(img).base64
 
 
 class ReviewService:
