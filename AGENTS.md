@@ -52,6 +52,11 @@ From `server/`: `uv run poe check` runs `ruff format --check`, `ruff check`,
   reopened document (`AnimeProductionPipeline.run(..., resume=True)`). Keep
   `saved_through` monotonic and never restore a stage whose layers were not
   saved, or a resumed run will duplicate layers.
+- The story stage (`production/story.py`) derives a continuity bible
+  (`story_bible.json`) and a screenplay view. The server has no LLM, so a derived
+  bible is a structural summary (`authored=False`); a client authors prose by
+  editing the bible and passing it back as `ProductionBrief.story`. Validation is
+  structural (`validate_story`): an inconsistent bible fails the `story` stage.
 - The motion library lives in `characters/cutout.py` (`MOTIONS` /
   `SPECIAL_MOTIONS`). Add a motion there and a parametrized test in
   `tests/unit/test_cutout_rig.py`; the guide (`resources/guides.py`) and

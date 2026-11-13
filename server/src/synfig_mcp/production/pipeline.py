@@ -51,6 +51,12 @@ from synfig_mcp.production.state import (
     ProductionState,
     brief_fingerprint,
 )
+from synfig_mcp.production.story import (
+    STORY_FILENAME,
+    build_screenplay,
+    compile_story,
+    validate_story,
+)
 from synfig_mcp.recipes.engine import RecipeEngine
 from synfig_mcp.recipes.styles import get_style_preset
 from synfig_mcp.render.pipeline import RenderPipeline
@@ -59,6 +65,7 @@ from synfig_mcp.review.service import ReviewService
 #: The stages, in execution order.
 STAGES: tuple[str, ...] = (
     "document",
+    "story",
     "storyboard",
     "characters",
     "assets",
@@ -202,6 +209,10 @@ class AnimeProductionPipeline:
             saved = saved_rank.get(state.saved_through or "", -1)
             if name == "document":
                 return saved >= 0
+            if name == "story":
+                # The bible is a JSON artifact, not a document change: it is
+                # restorable only while the file the previous run wrote still exists.
+                return state.completed(name) is not None and (out_dir / STORY_FILENAME).is_file()
             if name == "storyboard":
                 return saved >= 1
             if name in ("characters", "assets"):
@@ -284,6 +295,47 @@ class AnimeProductionPipeline:
 
         await stage("document", do_document)
         await save_document("document")
+
+        # 1b. story --------------------------------------------------------
+        if not dry_run:
+            # The bible is a file artifact, so its path is known before the stage
+            # runs; recording it here keeps a resumed report complete even when the
+            # stage itself is restored instead of re-executed.
+            report.artifacts["story_bible"] = str(out_dir / STORY_FILENAME)
+
+        async def do_story() -> StageReport:
+            bible = compile_story(brief)
+            issues = validate_story(brief, bible)
+            screenplay = build_screenplay(brief, bible)
+            if issues:
+                # Do not leave a bible file (or artifact claim) for an inconsistent story.
+                report.artifacts.pop("story_bible", None)
+                return StageReport(
+                    name="story",
+                    status="failed",
+                    detail="story bible is inconsistent: " + "; ".join(issues),
+                    metrics={"issues": issues},
+                )
+            if not dry_run:
+                out_dir.mkdir(parents=True, exist_ok=True)
+                (out_dir / STORY_FILENAME).write_text(
+                    bible.model_dump_json(indent=2), encoding="utf-8"
+                )
+            source = "authored" if bible.authored else "derived from the brief"
+            return StageReport(
+                name="story",
+                detail=(
+                    f"{source}: {len(bible.characters)} character(s), "
+                    f"{len(bible.scenes)} scene(s), {screenplay.shot_count} shot(s)"
+                ),
+                metrics={
+                    "authored": bible.authored,
+                    "characters": [c.id for c in bible.characters],
+                    "scenes": len(bible.scenes),
+                },
+            )
+
+        await stage("story", do_story)
 
         # 2. storyboard ----------------------------------------------------
         async def do_storyboard() -> StageReport:

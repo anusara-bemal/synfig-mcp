@@ -147,16 +147,20 @@ Steps:
 
 1. Run `production_plan` first to see the stages, shot list and layer counts
    without building anything. Confirm the plan with the user if it looks large.
-2. List the available IP-safe procedural assets with `procedural_asset_list`,
+2. Run `story_bible` to derive the continuity bible and screenplay. The server
+   cannot write prose, so if the user wants a real logline, character bios or
+   scene breaks, author them here and pass the edited bible back as `brief.story`.
+3. List the available IP-safe procedural assets with `procedural_asset_list`,
    then generate what you need with `procedural_asset_generate`.
-3. Optionally create a labelled turnaround with `character_model_sheet`, and
+4. Optionally create a labelled turnaround with `character_model_sheet`, and
    slice sprite sheets with `sprite_slice`.
-4. Run the full pipeline with `produce_anime_project`. It writes the .sif, a
+5. Run the full pipeline with `produce_anime_project`. It writes the .sif, a
    render and a contact sheet, and reports per-stage status.
-5. Report each stage's status honestly. Render/review stages report "skipped"
+6. Report each stage's status honestly. Render/review stages report "skipped"
    when no Synfig engine is on PATH - never present that as a successful render.
 
-The equivalent CLI command is `synfig-mcp produce brief.json`."""
+The equivalent CLI commands are `synfig-mcp story brief.json` and
+`synfig-mcp produce brief.json`."""
         )
     ]
 
