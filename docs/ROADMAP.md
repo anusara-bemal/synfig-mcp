@@ -1,4 +1,10 @@
-# synfig-mcp Roadmap & Implementation Status (v0.6.0)
+# synfig-mcp Roadmap & Implementation Status
+
+> **Current release:** `0.8.0-rc2` (server), branch `v1.0.0`. The MCP surface now
+> exposes **89 tools** across the `core`, `anim`, `fx`, `rig`, `assets`, `review`
+> and `all` profiles, plus 5 prompts and a resource library. Counts quoted in the
+> phase history below (47, 73, 52) are the totals at the time each phase shipped.
+> See `docs/TOKEN_BUDGET.md` for the live per-profile token measurements.
 
 ## Master Plan Phases
 
