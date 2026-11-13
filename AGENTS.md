@@ -31,6 +31,16 @@ not on this branch; do not expect it here.
 From `server/`: `uv run poe check` runs `ruff format --check`, `ruff check`,
 `mypy` and `pytest` (excluding `real_studio`). Keep it green before pushing.
 
+## Bridge compilation
+
+The standalone bridge test compiles with `-DMCP_BRIDGE_STANDALONE`, which
+excludes every `#ifndef MCP_BRIDGE_STANDALONE` block in `handlers.cpp`. Studio
+GUI code (e.g. the `view.*` handlers calling `studio::WorkArea`) lives only in
+those blocks, so a standalone build can pass while a real Studio build fails on
+a missing header or a forward-declared-only type. After touching GUI code, run a
+`-fsyntax-only` compile of `handlers.cpp` against the pinned Synfig headers
+(`bridge/PINNED_COMMIT`) — a green standalone test is not proof.
+
 ## Conventions
 
 - README and the website both lead with zero-install `uvx synfig-mcp`; keep the
