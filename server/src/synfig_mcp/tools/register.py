@@ -4,6 +4,7 @@ Exposes typed, categorized tools over BackendBase with ToolAnnotations and LLM-o
 """
 
 import contextlib
+import tempfile
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
@@ -14,6 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from synfig_mcp.backend.base import BackendBase
+from synfig_mcp.capabilities import CapabilityRegistry, WorkflowRunner, build_capabilities
 from synfig_mcp.errors import (
     BridgeConnectionError,
     DocumentNotFoundError,
@@ -169,6 +171,21 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "schema_list_renderers": {"all"},
     "schema_list_targets": {"all"},
     "schema_list_valuenodes": {"all"},
+    # Capability Registry & Meta-Tools
+    # The four essential meta-tools are available in every profile so any
+    # client can discover and invoke the rest of the surface compactly; the
+    # remainder are only exposed in the full 'all' profile.
+    "capability_search": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_inspect": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_execute": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_discover": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_list": {"all"},
+    "capability_batch_execute": {"all"},
+    "capability_validate": {"all"},
+    "capability_load_profile": {"all"},
+    "capability_unload_profile": {"all"},
+    "capability_workflow_execute": {"all"},
+    "capability_workflow_resume": {"all"},
 }
 
 
@@ -177,6 +194,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     from synfig_mcp.config import settings
 
     active_profile = (profile or settings.profile).lower()
+
+    #: Tool functions defined during this registration, so profiles can be
+    #: loaded/unloaded at runtime by the capability_* meta-tools.
+    _TOOL_FUNCTIONS: dict[str, tuple[Callable[..., Any], ToolAnnotations | None]] = {}
 
     def diagnostic(exc: SynfigError) -> str:
         """Return an actionable message for common tool failures."""
@@ -198,27 +219,29 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     def tool_for(name: str, annotations: ToolAnnotations | None = None) -> Callable[[F], F]:
         def decorator(fn: F) -> F:
             allowed = TOOL_PROFILES.get(name, {"all"})
+
+            @wraps(fn)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await fn(*args, **kwargs)
+                except SynfigError as exc:
+                    # Return clear structured error with tool name and actionable hint
+                    raise ToolError(f"[{name}] {diagnostic(exc)}") from exc
+                except FileNotFoundError as exc:
+                    raise ToolError(f"[{name}] File not found: {exc}") from exc
+                except Exception as exc:
+                    # Catch Pydantic or any internal exception and return explicit diagnostic
+                    # rather than generic MCP SDK 'Error executing tool <name>'
+                    raise ToolError(f"[{name}] Failed with {type(exc).__name__}: {exc}") from exc
+
+            # Every tool function is retained so profiles can be loaded/unloaded
+            # at runtime (see capability_load_profile); only the active profile
+            # is registered with the MCP server up front.
+            _TOOL_FUNCTIONS[name] = (cast(F, wrapper), annotations)
+
             if active_profile == "all" or active_profile in allowed:
-
-                @wraps(fn)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    try:
-                        return await fn(*args, **kwargs)
-                    except SynfigError as exc:
-                        # Return clear structured error with tool name and actionable hint
-                        raise ToolError(f"[{name}] {diagnostic(exc)}") from exc
-                    except FileNotFoundError as exc:
-                        raise ToolError(f"[{name}] File not found: {exc}") from exc
-                    except Exception as exc:
-                        # Catch Pydantic or any internal exception and return explicit diagnostic
-                        # rather than generic MCP SDK 'Error executing tool <name>'
-                        raise ToolError(
-                            f"[{name}] Failed with {type(exc).__name__}: {exc}"
-                        ) from exc
-
                 mcp.tool(name=name, annotations=annotations)(wrapper)
-                return cast(F, wrapper)
-            return fn
+            return cast(F, wrapper)
 
         return decorator
 
@@ -1928,10 +1951,240 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         )
         return wrap_untrusted(result)
 
+    # -----------------------------------------------------------------------
+    # Capability Registry & Meta-Tools
+    # -----------------------------------------------------------------------
+
+    def _capabilities() -> CapabilityRegistry:
+        return CapabilityRegistry(build_capabilities(mcp))
+
+    def _workflow_runner() -> WorkflowRunner:
+        state_dir = Path(tempfile.gettempdir()) / "synfig_mcp_workflows"
+        return WorkflowRunner(_capabilities(), mcp, state_dir)
+
+    @tool_for("capability_search", annotations=READ_ONLY)
+    async def capability_search(
+        query: str, domain: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        """Search the capability registry (server tools + bridge methods) by keyword.
+        Args:
+            query: Free-text query, e.g. 'render', 'bone', 'layer add'.
+            domain: Optional domain filter, e.g. 'rendering', 'animation', 'layer_operations'.
+            limit: Maximum results (default 20).
+        Returns: {count, capabilities: [{id, domain, summary, required, permission}]}.
+        Gotcha: Prefer this over reading all tool schemas; then call capability_inspect for the one you need.
+        """
+        caps = _capabilities().search(query, domain=domain, limit=limit)
+        registry = _capabilities()
+        return {"count": len(caps), "capabilities": [registry.compact(c) for c in caps]}
+
+    @tool_for("capability_list", annotations=READ_ONLY)
+    async def capability_list(domain: str | None = None) -> dict[str, Any]:
+        """List every capability, optionally filtered to one domain, as compact summaries.
+        Returns: {count, domains: [...], capabilities: [{id, domain, summary, required, permission}]}.
+        Gotcha: The full surface is large; use capability_search when you already know roughly what you want.
+        """
+        registry = _capabilities()
+        caps = [c for c in registry.all() if domain is None or c.domain == domain]
+        domains = sorted({c.domain for c in registry.all()})
+        return {
+            "count": len(caps),
+            "domains": domains,
+            "capabilities": [registry.compact(c) for c in caps],
+        }
+
+    @tool_for("capability_inspect", annotations=READ_ONLY)
+    async def capability_inspect(capability_id: str) -> dict[str, Any]:
+        """Return the full descriptor (params, schemas, permission, error codes, undo, verification) for one capability.
+        Args:
+            capability_id: The capability id, e.g. 'render_frame' or a bridge method like 'rig.bone_add'.
+        Returns: The complete Capability object, or {error} if unknown.
+        """
+        cap = _capabilities().get(capability_id)
+        if cap is None:
+            return {
+                "error": f"Unknown capability '{capability_id}'",
+                "hint": "Try capability_search.",
+            }
+        return cap.model_dump()
+
+    @tool_for("capability_validate", annotations=READ_ONLY)
+    async def capability_validate(capability_id: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Validate arguments against a capability's input schema without executing it.
+        Args:
+            capability_id: The capability id to validate against.
+            args: The arguments you intend to pass.
+        Returns: {valid, missing, unexpected, error?}.
+        Gotcha: Cheap pre-flight check to avoid a failed capability_execute round-trip.
+        """
+        cap = _capabilities().get(capability_id)
+        if cap is None:
+            return {"valid": False, "error": f"Unknown capability '{capability_id}'"}
+        props = cap.input_schema.get("properties", {})
+        missing = [p for p in cap.required_params if p not in args]
+        unexpected = [p for p in args if props and p not in props]
+        return {
+            "valid": not missing and not unexpected,
+            "missing": missing,
+            "unexpected": unexpected,
+        }
+
+    @tool_for("capability_execute", annotations=MUTATING)
+    async def capability_execute(
+        capability_id: str, args: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Invoke any registered capability by id with keyword arguments (the compact alternative to per-tool calls).
+        Args:
+            capability_id: The capability id to run, e.g. 'doc_new'.
+            args: Keyword arguments for the capability (see capability_inspect).
+        Returns: {capability, result} on success.
+        Gotcha: Only server tools (kind 'tool') are executable; bridge methods are introspected, not dispatched here.
+        """
+        from synfig_mcp.capabilities import _call_result_to_data
+
+        if capability_id not in _TOOL_FUNCTIONS:
+            return {
+                "error": f"Capability '{capability_id}' is not executable",
+                "hint": "Use capability_search.",
+            }
+        result = await mcp.call_tool(capability_id, args or {})
+        return {"capability": capability_id, "result": _call_result_to_data(result)}
+
+    @tool_for("capability_batch_execute", annotations=MUTATING)
+    async def capability_batch_execute(
+        operations: list[dict[str, Any]], stop_on_error: bool = True
+    ) -> dict[str, Any]:
+        """Run several capabilities in sequence, stopping early on the first failure unless disabled.
+        Args:
+            operations: List of {capability, args} objects.
+            stop_on_error: Stop at the first error (default True).
+        Returns: {completed, failed, results: [{capability, ok, result|error}]}.
+        Gotcha: Steps share no implicit state; thread ids through explicitly.
+        """
+        from synfig_mcp.capabilities import _call_result_to_data
+
+        results: list[dict[str, Any]] = []
+        for op in operations:
+            name = op.get("capability", "")
+            if name not in _TOOL_FUNCTIONS:
+                results.append({"capability": name, "ok": False, "error": "not executable"})
+                if stop_on_error:
+                    break
+                continue
+            try:
+                out = await mcp.call_tool(name, op.get("args") or {})
+                results.append(
+                    {"capability": name, "ok": True, "result": _call_result_to_data(out)}
+                )
+            except Exception as exc:  # noqa: BLE001 - surfaced to the caller
+                results.append({"capability": name, "ok": False, "error": str(exc)})
+                if stop_on_error:
+                    break
+        failed = [r for r in results if not r["ok"]]
+        return {"completed": len(results) - len(failed), "failed": len(failed), "results": results}
+
+    @tool_for("capability_discover", annotations=READ_ONLY)
+    async def capability_discover() -> dict[str, Any]:
+        """Report what the server can currently do: live backend, domains, counts, and ready-made workflows.
+        Returns: {backend, domains, tool_count, protocol_count, workflows: [{id, name, description}]}.
+        Gotcha: Call this first in a fresh session to see the real (honest) surface before planning.
+        """
+        from synfig_mcp.capabilities import BUILTIN_WORKFLOWS
+
+        registry = _capabilities()
+        caps = registry.all()
+        status = await backend.health_check()
+        return {
+            "backend": status.model_dump().get("backend", "unknown"),
+            "domains": sorted({c.domain for c in caps}),
+            "tool_count": sum(1 for c in caps if c.kind == "tool"),
+            "protocol_count": sum(1 for c in caps if c.kind == "protocol"),
+            "workflows": [w.model_dump() for w in BUILTIN_WORKFLOWS],
+        }
+
+    @tool_for("capability_load_profile", annotations=MUTATING)
+    async def capability_load_profile(profile: str) -> dict[str, Any]:
+        """Register additional tools for a profile at runtime, on top of those already active.
+        Args:
+            profile: One of core, anim, fx, rig, assets, review, all.
+        Returns: {profile, added: [...], already_active: [...], active_count}.
+        Gotcha: Loading 'all' exposes the full surface and raises the tools/list token cost.
+        """
+        if profile not in ("core", "anim", "fx", "rig", "assets", "review", "all"):
+            return {"error": f"Unknown profile '{profile}'"}
+        added, already = [], []
+        for name, (fn, annotations) in _TOOL_FUNCTIONS.items():
+            allowed = TOOL_PROFILES.get(name, {"all"})
+            wanted = profile == "all" or profile in allowed
+            if not wanted:
+                continue
+            if mcp._tool_manager.get_tool(name) is None:
+                mcp.tool(name=name, annotations=annotations)(fn)
+                added.append(name)
+            else:
+                already.append(name)
+        return {
+            "profile": profile,
+            "added": added,
+            "already_active": already,
+            "active_count": len(mcp._tool_manager.list_tools()),
+        }
+
+    @tool_for("capability_unload_profile", annotations=MUTATING)
+    async def capability_unload_profile(profile: str) -> dict[str, Any]:
+        """Unregister tools that belong to a profile, shrinking the active surface.
+        Args:
+            profile: One of core, anim, fx, rig, assets, review, all.
+        Returns: {profile, removed: [...], active_count}.
+        Gotcha: Never removes the capability_* meta-tools themselves.
+        """
+        if profile not in ("core", "anim", "fx", "rig", "assets", "review", "all"):
+            return {"error": f"Unknown profile '{profile}'"}
+        removed = []
+        for name in list(_TOOL_FUNCTIONS):
+            if name.startswith("capability_"):
+                continue
+            allowed = TOOL_PROFILES.get(name, {"all"})
+            in_profile = profile == "all" or profile in allowed
+            if in_profile and mcp._tool_manager.get_tool(name) is not None:
+                mcp.remove_tool(name)
+                removed.append(name)
+        return {
+            "profile": profile,
+            "removed": removed,
+            "active_count": len(mcp._tool_manager.list_tools()),
+        }
+
+    @tool_for("capability_workflow_execute", annotations=MUTATING)
+    async def capability_workflow_execute(
+        workflow_id: str, run_id: str | None = None
+    ) -> dict[str, Any]:
+        """Run a built-in multi-step workflow by id (see capability_discover for the list).
+        Args:
+            workflow_id: The workflow id, e.g. 'new_document' or 'build_scene'.
+            run_id: Optional run id for later resume (defaults to the workflow id).
+        Returns: {status, run_id, context, results} or a failure with the failing step.
+        """
+        from synfig_mcp.capabilities import BUILTIN_WORKFLOWS
+
+        workflow = next((w for w in BUILTIN_WORKFLOWS if w.id == workflow_id), None)
+        if workflow is None:
+            return {"error": f"Unknown workflow '{workflow_id}'"}
+        return await _workflow_runner().execute(workflow, run_id=run_id)
+
+    @tool_for("capability_workflow_resume", annotations=MUTATING)
+    async def capability_workflow_resume(run_id: str) -> dict[str, Any]:
+        """Resume a previously failed workflow run from its last saved step.
+        Args:
+            run_id: The run id returned by capability_workflow_execute.
+        Returns: {status, run_id, context, results}.
+        Gotcha: Requires that the earlier run persisted state (it does on any failure).
+        """
+        return await _workflow_runner().resume(run_id)
+
     async def _document_frame(
         backend: BackendBase, doc_id: str
     ) -> tuple[float, float, float, float]:
-        """The canvas frame of a document in Synfig units, for asset generators."""
         from synfig_mcp.characters.cutout import CanvasFrame
 
         info = await backend.doc_info(doc_id)

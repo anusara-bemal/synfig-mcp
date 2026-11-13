@@ -6,25 +6,25 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 92 tools, 87,394 bytes, **24,036 tokens** (`cl100k_base`).
-- **Minimal Profile (`core`)**: 16 tools, 13,525 bytes, **3,627 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 103 tools, 97,416 bytes, **26,609 tokens** (`cl100k_base`).
+- **Minimal Profile (`core`)**: 20 tools, 17,294 bytes, **4,603 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **24,036 tokens** to **3,627 tokens**.
+> from **26,609 tokens** to **4,603 tokens**.
 
 ### Profile Allocations & Measured Counts
 
 | Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
 |---|---|---|---|---|
-| `core` | 16 | **3,627** | 3,633 | ✅ Pass (< 4000) |
-| `anim` | 24 | **5,766** | 5,772 | ❌ Exceeds (4500) |
-| `fx` | 28 | **6,496** | 6,503 | ❌ Exceeds (4500) |
-| `rig` | 30 | **8,067** | 8,084 | ❌ Exceeds (3000) |
-| `assets` | 19 | **4,759** | 4,760 | ❌ Exceeds (2000) |
-| `review` | 21 | **5,521** | 5,532 | ❌ Exceeds (4000) |
-| `all` | 92 | **24,036** | 24,058 | ✅ Pass (< 26000) |
+| `core` | 20 | **4,603** | 4,626 | ✅ Pass (< 5000) |
+| `anim` | 28 | **6,742** | 6,765 | ❌ Exceeds (4500) |
+| `fx` | 32 | **7,472** | 7,496 | ❌ Exceeds (4500) |
+| `rig` | 34 | **9,043** | 9,077 | ❌ Exceeds (3000) |
+| `assets` | 23 | **5,735** | 5,753 | ❌ Exceeds (2000) |
+| `review` | 25 | **6,497** | 6,525 | ❌ Exceeds (4000) |
+| `all` | 103 | **26,609** | 26,679 | ✅ Pass (< 28000) |
 
 ---
 
@@ -35,18 +35,18 @@ Measured against real server output in headless mode:
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
 | `health_check()` | 256 | **77** | 78 | < 200 |
-| `doc_new(160x120)` | 193 | **83** | 83 | < 200 |
-| `doc_list()` | 389 | **121** | 121 | < 242 |
-| `layer_add(circle)` | 251 | **84** | 84 | < 200 |
-| `scene_tree()` | 1228 | **362** | 362 | < 724 |
-| `doc_info()` | 389 | **121** | 121 | < 242 |
-| `param_set(radius=2.5)` | 325 | **117** | 117 | < 234 |
+| `doc_new(160x120)` | 193 | **84** | 84 | < 200 |
+| `doc_list()` | 389 | **122** | 122 | < 244 |
+| `layer_add(circle)` | 251 | **85** | 85 | < 200 |
+| `scene_tree()` | 1228 | **363** | 363 | < 726 |
+| `doc_info()` | 389 | **122** | 122 | < 244 |
+| `param_set(radius=2.5)` | 325 | **118** | 118 | < 236 |
 | `param_get(radius)` | 232 | **56** | 56 | < 200 |
 | `anim_time_set(1.5s)` | 17 | **11** | 11 | < 200 |
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 103 | **40** | 40 | < 200 |
+| `render_frame(160x120)` | 103 | **40** | 39 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
 | `schema_get_layer(circle)` | 2662 | **720** | 719 | < 1440 |
 

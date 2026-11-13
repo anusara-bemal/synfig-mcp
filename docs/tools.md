@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 92 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 103 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (10 tools)
+- [Other](#other) (21 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -25,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 92 tools.**
+**Total: 103 tools.**
 
 ## Animation & Keyframes
 
@@ -1366,6 +1366,252 @@ Returns: {success, detected_parts, parts: [{name, file, bbox}], output_dir}.
 | `bg_tolerance` | `integer` | No | - |
 | `padding` | `integer` | No | - |
 | `dry_run` | `boolean` | No | - |
+
+---
+
+### `capability_search`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Search the capability registry (server tools + bridge methods) by keyword.
+
+Args:
+
+query: Free-text query, e.g. 'render', 'bone', 'layer add'.
+
+domain: Optional domain filter, e.g. 'rendering', 'animation', 'layer_operations'.
+
+limit: Maximum results (default 20).
+
+Returns: {count, capabilities: [{id, domain, summary, required, permission}]}.
+
+Gotcha: Prefer this over reading all tool schemas; then call capability_inspect for the one you need.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `query` | `string` | Yes | - |
+| `domain` | `any` | No | - |
+| `limit` | `integer` | No | - |
+
+---
+
+### `capability_list`
+
+*Profiles: all*
+
+List every capability, optionally filtered to one domain, as compact summaries.
+
+Returns: {count, domains: [...], capabilities: [{id, domain, summary, required, permission}]}.
+
+Gotcha: The full surface is large; use capability_search when you already know roughly what you want.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `domain` | `any` | No | - |
+
+---
+
+### `capability_inspect`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Return the full descriptor (params, schemas, permission, error codes, undo, verification) for one capability.
+
+Args:
+
+capability_id: The capability id, e.g. 'render_frame' or a bridge method like 'rig.bone_add'.
+
+Returns: The complete Capability object, or {error} if unknown.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `capability_id` | `string` | Yes | - |
+
+---
+
+### `capability_validate`
+
+*Profiles: all*
+
+Validate arguments against a capability's input schema without executing it.
+
+Args:
+
+capability_id: The capability id to validate against.
+
+args: The arguments you intend to pass.
+
+Returns: {valid, missing, unexpected, error?}.
+
+Gotcha: Cheap pre-flight check to avoid a failed capability_execute round-trip.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `capability_id` | `string` | Yes | - |
+| `args` | `object` | Yes | - |
+
+---
+
+### `capability_execute`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Invoke any registered capability by id with keyword arguments (the compact alternative to per-tool calls).
+
+Args:
+
+capability_id: The capability id to run, e.g. 'doc_new'.
+
+args: Keyword arguments for the capability (see capability_inspect).
+
+Returns: {capability, result} on success.
+
+Gotcha: Only server tools (kind 'tool') are executable; bridge methods are introspected, not dispatched here.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `capability_id` | `string` | Yes | - |
+| `args` | `any` | No | - |
+
+---
+
+### `capability_batch_execute`
+
+*Profiles: all*
+
+Run several capabilities in sequence, stopping early on the first failure unless disabled.
+
+Args:
+
+operations: List of {capability, args} objects.
+
+stop_on_error: Stop at the first error (default True).
+
+Returns: {completed, failed, results: [{capability, ok, result|error}]}.
+
+Gotcha: Steps share no implicit state; thread ids through explicitly.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `operations` | `array` | Yes | - |
+| `stop_on_error` | `boolean` | No | - |
+
+---
+
+### `capability_discover`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Report what the server can currently do: live backend, domains, counts, and ready-made workflows.
+
+Returns: {backend, domains, tool_count, protocol_count, workflows: [{id, name, description}]}.
+
+Gotcha: Call this first in a fresh session to see the real (honest) surface before planning.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `capability_load_profile`
+
+*Profiles: all*
+
+Register additional tools for a profile at runtime, on top of those already active.
+
+Args:
+
+profile: One of core, anim, fx, rig, assets, review, all.
+
+Returns: {profile, added: [...], already_active: [...], active_count}.
+
+Gotcha: Loading 'all' exposes the full surface and raises the tools/list token cost.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `profile` | `string` | Yes | - |
+
+---
+
+### `capability_unload_profile`
+
+*Profiles: all*
+
+Unregister tools that belong to a profile, shrinking the active surface.
+
+Args:
+
+profile: One of core, anim, fx, rig, assets, review, all.
+
+Returns: {profile, removed: [...], active_count}.
+
+Gotcha: Never removes the capability_* meta-tools themselves.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `profile` | `string` | Yes | - |
+
+---
+
+### `capability_workflow_execute`
+
+*Profiles: all*
+
+Run a built-in multi-step workflow by id (see capability_discover for the list).
+
+Args:
+
+workflow_id: The workflow id, e.g. 'new_document' or 'build_scene'.
+
+run_id: Optional run id for later resume (defaults to the workflow id).
+
+Returns: {status, run_id, context, results} or a failure with the failing step.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `workflow_id` | `string` | Yes | - |
+| `run_id` | `any` | No | - |
+
+---
+
+### `capability_workflow_resume`
+
+*Profiles: all*
+
+Resume a previously failed workflow run from its last saved step.
+
+Args:
+
+run_id: The run id returned by capability_workflow_execute.
+
+Returns: {status, run_id, context, results}.
+
+Gotcha: Requires that the earlier run persisted state (it does on any failure).
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `run_id` | `string` | Yes | - |
 
 ---
 
