@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Measure token baseline for synfig-mcp:
-1. tools/list per profile (current 52 tools + projected Phase A1 profiles)
+1. tools/list per profile (current 89 tools across the core/anim/fx/rig/assets/review/all profiles)
 2. Response sizes and token counts for 15 most common tool calls
 3. Vision model image tokens per preview resolution
 Outputs docs/TOKEN_BUDGET.md.
