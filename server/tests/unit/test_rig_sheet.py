@@ -103,3 +103,63 @@ def test_bad_names_and_empty_sheets_are_rejected(tmp_path: Path) -> None:
     Image.new("RGBA", (64, 64), (255, 255, 255, 255)).save(empty)
     with pytest.raises(SynfigError, match="No parts"):
         slice_rig_sheet(empty, tmp_path / "none")
+
+
+def _body_sheet(path: Path) -> Path:
+    """A small but riggable sheet: torso with an enclosed gap, plus a head."""
+    img = Image.new("RGBA", (240, 160), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((20, 20, 100, 100), fill=(240, 200, 160, 255))  # 1: head
+    draw.rectangle((140, 20, 220, 140), fill=(40, 90, 200, 255))  # 2: torso
+    draw.rectangle((170, 60, 200, 90), fill=(0, 0, 0, 0))  # enclosed 30x30 gap
+    img.save(path)
+    return path
+
+
+def test_manifest_carries_rig_metadata(tmp_path: Path) -> None:
+    sheet = _body_sheet(tmp_path / "body.png")
+    result = slice_rig_sheet(sheet, tmp_path / "parts", names={"1": "head", "2": "torso"})
+
+    by_name = {p["name"]: p for p in result["parts"]}
+    assert by_name["head"]["role"] == "head"
+    assert by_name["head"]["parent"] == "torso"
+    assert by_name["head"]["pivot"] == {"fx": 0.5, "fy": 0.9}
+    assert by_name["torso"]["parent"] is None
+    assert by_name["head"]["confidence"] > 0.5
+    assert result["rig_compatibility"]["level"] == "high"
+    assert result["rig_compatibility"]["issues"] == []
+
+    manifest = json.loads(Path(result["manifest"]).read_text())
+    assert manifest["version"] == 2
+    assert manifest["source"] == "file_path"
+    assert manifest["rig_compatibility"]["level"] == "high"
+    assert manifest["parts"][0]["role"] is not None
+
+
+def test_enclosed_gap_is_reconstructed(tmp_path: Path) -> None:
+    sheet = _body_sheet(tmp_path / "body.png")
+    result = slice_rig_sheet(sheet, tmp_path / "parts", names={"1": "head", "2": "torso"})
+
+    assert result["reconstruction"]["pixels"] > 0
+    torso = next(p for p in result["parts"] if p["name"] == "torso")
+    assert torso["reconstructed_pixels"] > 0
+    # The gap is now opaque: no transparent pixel left inside the torso.
+    img = Image.open(torso["file"]).convert("RGBA")
+    assert img.getpixel((img.width // 2, img.height // 2))[3] == 255
+
+
+def test_reconstruct_can_be_disabled(tmp_path: Path) -> None:
+    sheet = _body_sheet(tmp_path / "body.png")
+    result = slice_rig_sheet(
+        sheet, tmp_path / "parts", names={"1": "head", "2": "torso"}, reconstruct=False
+    )
+    assert result["reconstruction"]["applied"] is False
+    assert result["reconstruction"]["pixels"] == 0
+
+
+def test_unnamed_sheet_warns_and_flags_unknown_rig(tmp_path: Path) -> None:
+    sheet = _body_sheet(tmp_path / "body.png")
+    result = slice_rig_sheet(sheet, tmp_path / "parts", preview=False)
+    assert result["named"] is False
+    assert any("unnamed" in w for w in result["warnings"])
+    assert result["rig_compatibility"]["level"] == "unknown"

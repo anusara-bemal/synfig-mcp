@@ -23,6 +23,7 @@
 #include <gui/app.h>
 #include <gui/instance.h>
 #include <gui/canvasview.h>
+#include <gui/workarea.h>
 #include <synfigapp/action.h>
 #include <synfigapp/action_system.h>
 #include <synfigapp/canvasinterface.h>
@@ -3067,6 +3068,263 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
+    // --- 7b. GUI VIEW METHODS (zoom / pan / fit) ---
+    // These drive the running Studio's WorkArea through its own stable methods
+    // (``WorkArea::set_zoom``, ``set_focus_point``) so the canvas the artist sees
+    // matches the tool's view.  They are cosmetic only and never touch the
+    // document, so they are not undoable.
+    if (method == "view.zoom" || method == "view.pan" || method == "view.fit" || method == "view.get") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string mode = (method == "view.zoom") ? params.value("mode", "set") : "";
+        double zoom = params.value("zoom", 0.0);
+        double x = params.value("x", 0.0);
+        double y = params.value("y", 0.0);
+
+        return run_on_main_thread([&, doc_id, method, mode, zoom, x, y]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            etl::handle<studio::CanvasView> cv = inst->find_canvas_view(inst->get_canvas());
+            if (!cv) {
+                cv = studio::App::get_selected_canvas_view();
+            }
+            if (!cv || !cv->get_work_area()) {
+                r["error"] = {{"code", -32000}, {"message", "No canvas view is open for " + doc_id}};
+                return r;
+            }
+
+            studio::WorkArea* wa = cv->get_work_area();
+
+            if (method == "view.zoom") {
+                if (mode == "in") {
+                    wa->zoom_in();
+                } else if (mode == "out") {
+                    wa->zoom_out();
+                } else if (mode == "fit") {
+                    wa->zoom_fit();
+                } else if (mode == "normal") {
+                    wa->zoom_norm();
+                } else {
+                    if (zoom <= 0.0) {
+                        r["error"] = {{"code", -32602}, {"message", "view.zoom requires zoom > 0"}};
+                        return r;
+                    }
+                    wa->set_zoom(static_cast<float>(zoom));
+                }
+            } else if (method == "view.pan") {
+                wa->set_focus_point(synfig::Point(x, y));
+            } else if (method == "view.fit") {
+                wa->zoom_fit();
+            }
+
+            synfig::Point focus = wa->get_focus_point();
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"zoom", wa->get_zoom()},
+                {"focus", {{"x", focus[0]}, {"y", focus[1]}}}
+            };
+            return r;
+        });
+    }
+
+    // --- 7c. LAYER VISIBILITY / BLEND (GUI-visible state) ---
+    // ``layer.set_visibility`` toggles the ``active`` flag through the undoable
+    // ``LayerActivate`` action.  ``layer.set_blend`` writes the standard composite
+    // ``amount`` (opacity 0..1) and ``blend_method`` parameters, which exist on
+    // every composite layer (layer_composite.cpp); a non-composite layer rejects
+    // them, and that rejection is reported rather than hidden.
+    if (method == "layer.set_visibility" || method == "layer.set_blend") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string layer_id = params.value("layer_id", "");
+        bool visible = params.value("visible", true);
+        double amount = params.value("amount", 1.0);
+        int blend_method = params.value("blend_method", 0);
+        bool has_amount = params.contains("amount");
+        bool has_blend = params.contains("blend_method");
+
+        nlohmann::json early;
+        if (reject_empty_identifiers(req, layer_id, std::string("layer"), early)) {
+            return early;
+        }
+
+        return run_on_main_thread([&, doc_id, layer_id, visible, amount, blend_method, has_amount, has_blend, method]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+
+            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
+            if (!layer) {
+                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+
+            if (method == "layer.set_visibility") {
+                synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: layer.set_visibility");
+                synfigapp::Action::Handle action = synfigapp::Action::create("LayerActivate");
+                if (!action) {
+                    grouper.cancel();
+                    r["error"] = {{"code", 1301}, {"message", "LayerActivate action unavailable"}};
+                    return r;
+                }
+                action->set_param("canvas", layer->get_canvas());
+                action->set_param("canvas_interface", ci);
+                action->set_param("layer", layer);
+                action->set_param("new_status", visible);
+                if (!inst->perform_action(action)) {
+                    grouper.cancel();
+                    r["error"] = {{"code", 1301}, {"message", "LayerActivate failed for " + layer_id}};
+                    return r;
+                }
+                grouper.finish();
+                r["result"] = {
+                    {"doc_id", doc_id},
+                    {"layer_id", layer_id},
+                    {"visible", layer->active()},
+                    {"diff", make_diff("layer.set_visibility", {}, {layer_id}, {})}
+                };
+                return r;
+            }
+
+            // layer.set_blend: only composite layers carry amount/blend_method.
+            bool ok = true;
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: layer.set_blend");
+            if (has_amount) {
+                ok = ci->change_value(synfigapp::ValueDesc(layer, "amount"), synfig::ValueBase(static_cast<synfig::Real>(amount))) && ok;
+            }
+            if (has_blend) {
+                ok = ci->change_value(synfigapp::ValueDesc(layer, "blend_method"), synfig::ValueBase(static_cast<int>(blend_method))) && ok;
+            }
+            if (!ok) {
+                grouper.cancel();
+                r["error"] = {{"code", 1301},
+                              {"message", "Layer '" + layer_id + "' has no amount/blend_method (not a composite layer)"}};
+                return r;
+            }
+            grouper.finish();
+
+            nlohmann::json after_amount = nullptr;
+            nlohmann::json after_blend = nullptr;
+            synfig::ValueBase va = layer->get_param("amount");
+            if (va.is_valid()) after_amount = valuebase_to_json(va);
+            synfig::ValueBase vb = layer->get_param("blend_method");
+            if (vb.is_valid()) after_blend = valuebase_to_json(vb);
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"layer_id", layer_id},
+                {"amount", after_amount},
+                {"blend_method", after_blend},
+                {"diff", make_diff("layer.set_blend", {}, {layer_id}, {})}
+            };
+            return r;
+        });
+    }
+
+    // --- 7d. ALIGN LAYERS (translate each selected layer to a shared edge) ---
+    // Synfig has no single Align action; alignment is a translate per layer.  This
+    // reads each layer's rendered bounding box (``Layer::get_bounding_rect``) at the
+    // current time and emits one ``translate`` ``origin`` change per layer, grouped
+    // into a single undo step.  Only the ``origin`` parameter is touched, so the
+    // transform is additive and reversible.
+    if (method == "layer.align") {
+        std::string doc_id = params.value("doc_id", "doc_0");
+        std::string edge = params.value("edge", "center");
+        std::vector<std::string> layer_ids = params.value("layer_ids", std::vector<std::string>());
+
+        return run_on_main_thread([&, doc_id, edge, layer_ids]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
+            if (!inst || !inst->get_canvas()) {
+                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
+                return r;
+            }
+            if (layer_ids.empty()) {
+                r["error"] = {{"code", -32602}, {"message", "layer.align requires layer_ids"}};
+                return r;
+            }
+
+            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
+            synfig::RendDesc rd = inst->get_canvas()->rend_desc();
+            double left = rd.get_tl()[0], top = rd.get_tl()[1], right = rd.get_br()[0], bottom = rd.get_br()[1];
+
+            std::vector<synfig::Layer::Handle> layers;
+            std::vector<synfig::Rect> boxes;
+            double ref_left = 1e30, ref_right = -1e30, ref_top = 1e30, ref_bottom = -1e30;
+            for (const auto& lid : layer_ids) {
+                synfig::Layer::Handle l = find_layer_in_canvas(inst->get_canvas(), lid);
+                if (!l) continue;
+                synfig::Rect box = l->get_bounding_rect();
+                layers.push_back(l);
+                boxes.push_back(box);
+                if (box.minx < ref_left) ref_left = box.minx;
+                if (box.maxx > ref_right) ref_right = box.maxx;
+                if (box.miny < ref_top) ref_top = box.miny;
+                if (box.maxy > ref_bottom) ref_bottom = box.maxy;
+            }
+            if (layers.empty()) {
+                r["error"] = {{"code", 2002}, {"message", "None of the given layer_ids exist"}};
+                return r;
+            }
+
+            double target_x = (edge == "left") ? left : (edge == "right") ? right : (left + right) / 2.0;
+            double target_y = (edge == "top") ? top : (edge == "bottom") ? bottom : (top + bottom) / 2.0;
+            double ref_cx = (ref_left + ref_right) / 2.0;
+            double ref_cy = (ref_top + ref_bottom) / 2.0;
+
+            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: layer.align");
+            nlohmann::json moved = nlohmann::json::array();
+            for (size_t i = 0; i < layers.size(); ++i) {
+                double cx = (boxes[i].minx + boxes[i].maxx) / 2.0;
+                double cy = (boxes[i].miny + boxes[i].maxy) / 2.0;
+                double dx = 0.0, dy = 0.0;
+                if (edge == "left") dx = ref_left - boxes[i].minx;
+                else if (edge == "right") dx = ref_right - boxes[i].maxx;
+                else if (edge == "top") dy = ref_top - boxes[i].miny;
+                else if (edge == "bottom") dy = ref_bottom - boxes[i].maxy;
+                else if (edge == "horizontal") { dx = ref_cx - cx; }
+                else if (edge == "vertical") { dy = ref_cy - cy; }
+                else { dx = target_x - cx; dy = target_y - cy; }
+                if (dx == 0.0 && dy == 0.0) continue;
+
+                synfig::ValueBase origin = layers[i]->get_param("origin");
+                synfig::Point p(0, 0);
+                if (origin.is_valid()) p = origin.get(synfig::Point());
+                synfig::Point np(p[0] + dx, p[1] + dy);
+                ci->change_value(synfigapp::ValueDesc(layers[i], "origin"), synfig::ValueBase(np));
+                moved.push_back({
+                    {"layer_id", layers[i]->get_description().empty() ? layers[i]->get_name() : layers[i]->get_description()},
+                    {"dx", dx}, {"dy", dy}
+                });
+            }
+            grouper.finish();
+
+            r["result"] = {
+                {"doc_id", doc_id},
+                {"edge", edge},
+                {"moved", moved},
+                {"diff", make_diff("layer.align", {}, {}, {})}
+            };
+            return r;
+        });
+    }
+
     // --- 8. HISTORY METHODS ---
     if (method == "history.undo" || method == "history.redo") {
         std::string doc_id = params.value("doc_id", "doc_0");
@@ -3259,6 +3517,42 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             {"success", true},
             {"closed", true},
             {"diff", make_diff(method, {"mock_id"}, {}, {})}
+        };
+        return res;
+    }
+    if (method == "view.zoom" || method == "view.pan" || method == "view.fit" || method == "view.get") {
+        res["result"] = {
+            {"doc_id", params.value("doc_id", "doc_0")},
+            {"zoom", params.value("zoom", 1.0)},
+            {"focus", {{"x", params.value("x", 0.0)}, {"y", params.value("y", 0.0)}}}
+        };
+        return res;
+    }
+    if (method == "layer.set_visibility") {
+        res["result"] = {
+            {"doc_id", params.value("doc_id", "doc_0")},
+            {"layer_id", params.value("layer_id", "")},
+            {"visible", params.value("visible", true)},
+            {"diff", make_diff("layer.set_visibility", {}, {params.value("layer_id", "")}, {})}
+        };
+        return res;
+    }
+    if (method == "layer.set_blend") {
+        res["result"] = {
+            {"doc_id", params.value("doc_id", "doc_0")},
+            {"layer_id", params.value("layer_id", "")},
+            {"amount", params.value("amount", 1.0)},
+            {"blend_method", params.value("blend_method", 0)},
+            {"diff", make_diff("layer.set_blend", {}, {params.value("layer_id", "")}, {})}
+        };
+        return res;
+    }
+    if (method == "layer.align") {
+        res["result"] = {
+            {"doc_id", params.value("doc_id", "doc_0")},
+            {"edge", params.value("edge", "center")},
+            {"moved", nlohmann::json::array()},
+            {"diff", make_diff("layer.align", {}, {}, {})}
         };
         return res;
     }

@@ -6,31 +6,25 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 89 tools, 84,831 bytes, **23,356 tokens** (`cl100k_base`).
-- **Minimal Profile (`core`)**: 13 tools, 10,962 bytes, **2,947 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 111 tools, 107,916 bytes, **29,533 tokens** (`cl100k_base`).
+- **Minimal Profile (`core`)**: 20 tools, 17,294 bytes, **4,603 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **23,356 tokens** to **2,947 tokens**.
->
-> The anime production pipeline added six tools (`produce_anime_project`, `production_plan`,
-> `character_model_sheet`, `procedural_asset_list`, `procedural_asset_generate`,
-> `sprite_slice`). Their verbose brief schema lives in the `synfig://guide/production`
-> resource instead of the tool docstrings, keeping the added footprint to ~1.9k tokens.
+> from **29,533 tokens** to **4,603 tokens**.
 
 ### Profile Allocations & Measured Counts
 
 | Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
 |---|---|---|---|---|
-| `core` | 13 | **2,947** | 2,954 | ✅ Pass (< 3000) |
-| `anim` | 21 | **5,097** | 5,103 | ❌ Exceeds (4500) |
-| `fx` | 25 | **5,827** | 5,834 | ❌ Exceeds (4500) |
-| `rig` | 27 | **7,398** | 7,415 | ❌ Exceeds (3000) |
-| `assets` | 16 | **4,090** | 4,091 | ❌ Exceeds (2000) |
-| `review` | 18 | **4,852** | 4,863 | ❌ Exceeds (4000) |
-| `all` | 89 | **23,356** | 23,379 | ❌ Exceeds (16000) |
-
+| `core` | 20 | **4,603** | 4,626 | ✅ Pass (< 5000) |
+| `anim` | 28 | **6,742** | 6,765 | ❌ Exceeds (4500) |
+| `fx` | 38 | **9,186** | 9,213 | ❌ Exceeds (4500) |
+| `rig` | 35 | **9,839** | 9,872 | ❌ Exceeds (3000) |
+| `assets` | 24 | **6,466** | 6,485 | ❌ Exceeds (2000) |
+| `review` | 25 | **6,497** | 6,525 | ❌ Exceeds (4000) |
+| `all` | 111 | **29,533** | 29,603 | ❌ Exceeds (28000) |
 
 ---
 
@@ -40,7 +34,7 @@ Measured against real server output in headless mode:
 
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
-| `health_check()` | 298 | **96** | 97 | < 200 |
+| `health_check()` | 430 | **122** | 123 | < 244 |
 | `doc_new(160x120)` | 193 | **82** | 82 | < 200 |
 | `doc_list()` | 389 | **120** | 120 | < 240 |
 | `layer_add(circle)` | 251 | **83** | 83 | < 200 |
@@ -52,9 +46,9 @@ Measured against real server output in headless mode:
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 138 | **53** | 53 | < 200 |
+| `render_frame(160x120)` | 103 | **40** | 39 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
-| `schema_get_layer(circle)` | 1683 | **454** | 453 | < 908 |
+| `schema_get_layer(circle)` | 2709 | **720** | 720 | < 1440 |
 
 ---
 
@@ -86,21 +80,21 @@ Vision model consumption per single preview or contact-sheet image:
 
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
-| `render_sequence` | 1,544 | **445** | 445 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `canvas_set_properties` | 1,468 | **413** | 413 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `doc_set_properties` | 1,380 | **405** | 405 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `rig_bone_add` | 1,300 | **392** | 392 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_start` | 1,351 | **390** | 390 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_contact_sheet` | 1,332 | **380** | 380 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_video` | 1,298 | **377** | 377 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_waypoint_set` | 1,228 | **338** | 336 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_frame` | 1,174 | **335** | 336 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `layer_add` | 1,195 | **332** | 332 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `review_compare` | 1,152 | **328** | 330 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `review_frame` | 1,126 | **324** | 324 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `review_sequence` | 1,139 | **319** | 319 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `param_convert` | 1,133 | **312** | 314 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `recipe_apply` | 1,147 | **309** | 310 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `rig_sheet_from_image` | 2,661 | **731** | 732 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `produce_anime_project` | 1,882 | **493** | 493 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `scene_auto_build` | 1,695 | **483** | 483 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `rig_sheet_slice` | 1,638 | **464** | 466 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_sequence` | 1,520 | **442** | 442 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `character_motion_apply` | 1,525 | **436** | 436 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `sprite_slice` | 1,461 | **416** | 417 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `canvas_set_properties` | 1,444 | **410** | 410 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `doc_set_properties` | 1,356 | **402** | 402 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `view_set` | 1,305 | **399** | 399 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `rig_bone_add` | 1,276 | **389** | 389 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `procedural_asset_generate` | 1,372 | **389** | 386 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_start` | 1,327 | **387** | 387 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_contact_sheet` | 1,308 | **377** | 377 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_video` | 1,274 | **374** | 374 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 

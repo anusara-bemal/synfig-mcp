@@ -32,7 +32,7 @@ def test_sandbox_rejects_escape(tmp_path: Path) -> None:
     outside_file = tmp_path / "secret.txt"
     outside_file.write_text("secret", encoding="utf-8")
 
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         validate_path(outside_file, [root])
 
 
@@ -41,7 +41,7 @@ def test_sandbox_rejects_dotdot_traversal(tmp_path: Path) -> None:
     root.mkdir()
     traversal_path = root / ".." / "secret.sif"
 
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         validate_path(traversal_path, [root])
 
 
@@ -159,10 +159,10 @@ def test_sandbox_rejects_junction_escape(tmp_path: Path) -> None:
         os.symlink(str(outside_dir), str(junction_path))
 
     path_through_junction = junction_path / "target.sif"
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         validate_path(path_through_junction, [root])
 
     # Write target through junction
     write_target = junction_path / "payload.png"
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied by the workspace permission model"):
         validate_path(write_target, [root], allowed_extensions={".png"})

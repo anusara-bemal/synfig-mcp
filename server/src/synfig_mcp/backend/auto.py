@@ -476,6 +476,62 @@ class AutoBackend(BackendBase):
         """Delegate to the active backend."""
         return await self._current().selection_set(doc_id=doc_id, layer_ids=layer_ids)
 
+    async def view_get(self, doc_id: str) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().view_get(doc_id=doc_id)
+
+    async def view_set(
+        self,
+        doc_id: str,
+        mode: str | None = None,
+        zoom: float | None = None,
+        x: float | None = None,
+        y: float | None = None,
+    ) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().view_set(doc_id=doc_id, mode=mode, zoom=zoom, x=x, y=y)
+
+    async def layer_set_visibility(
+        self, doc_id: str, layer_id: str, visible: bool, canvas_path: str = ""
+    ) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().layer_set_visibility(
+            doc_id=doc_id, layer_id=layer_id, visible=visible, canvas_path=canvas_path
+        )
+
+    async def layer_set_blend(
+        self,
+        doc_id: str,
+        layer_id: str,
+        amount: float | None = None,
+        blend_method: int | None = None,
+        canvas_path: str = "",
+    ) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().layer_set_blend(
+            doc_id=doc_id,
+            layer_id=layer_id,
+            amount=amount,
+            blend_method=blend_method,
+            canvas_path=canvas_path,
+        )
+
+    async def layer_align(
+        self,
+        doc_id: str,
+        layer_ids: list[str],
+        edge: str = "center",
+        canvas_path: str = "",
+    ) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().layer_align(
+            doc_id=doc_id, layer_ids=layer_ids, edge=edge, canvas_path=canvas_path
+        )
+
+    async def recent_events(self, doc_id: str | None = None, limit: int = 20) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().recent_events(doc_id=doc_id, limit=limit)
+
     async def render_frame(
         self,
         doc_id: str,

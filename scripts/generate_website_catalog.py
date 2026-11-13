@@ -126,10 +126,16 @@ def _replace_block(text: str, start: str, end: str, block: str) -> str:
     return pattern.sub(lambda _m: block, text, count=1)
 
 
-def _replace_all(text: str, replacements: dict[str, str]) -> str:
-    for old, new in replacements.items():
-        if old in text:
-            text = text.replace(old, new)
+def _replace_patterns(text: str, replacements: dict[str, str]) -> str:
+    """Substitute count placeholders regardless of the value they currently hold.
+
+    The site carries the tool count in prose ("Tools (89)"), in a hero stat, and
+    in profile-filter buttons. Matching the *shape* rather than a fixed literal
+    (e.g. "81") keeps the generator correct as the count changes; a literal
+    match silently no-ops once the committed number drifts.
+    """
+    for pattern, new in replacements.items():
+        text = re.sub(pattern, new, text)
     return text
 
 
@@ -144,22 +150,24 @@ def build(repo_root: Path) -> dict[Path, str]:
 
     html_path = repo_root / "website" / "index.html"
     html = html_path.read_text(encoding="utf-8")
-    html = _replace_all(
+    html = _replace_patterns(
         html,
         {
-            "Tools (81)": f"Tools ({total})",
-            "Tools API (81)": f"Tools API ({total})",
-            "81 typed tools": f"{total} typed tools",
-            ">81 Typed MCP Tools<": f">{total} Typed MCP Tools<",
-            ">81 Tools<": f">{total} Tools<",
-            '<span class="stat-number">81</span>': f'<span class="stat-number">{total}</span>',
-            "All (81)": f"All ({total})",
-            "core (13)": f"core ({counts['core']})",
-            "anim (21)": f"anim ({counts['anim']})",
-            "fx (25)": f"fx ({counts['fx']})",
-            "rig (23)": f"rig ({counts['rig']})",
-            "assets (12)": f"assets ({counts['assets']})",
-            "review (18)": f"review ({counts['review']})",
+            r"Tools \(\d+\)": f"Tools ({total})",
+            r"Tools API \(\d+\)": f"Tools API ({total})",
+            r"\d+ typed tools": f"{total} typed tools",
+            r">\d+ Typed MCP Tools<": f">{total} Typed MCP Tools<",
+            r">\d+ Tools<": f">{total} Tools<",
+            r'<span class="stat-number">\d+</span>(\s*<span class="stat-label">MCP Tools</span>)': (
+                f'<span class="stat-number">{total}</span>' + r"\1"
+            ),
+            r"All \(\d+\)": f"All ({total})",
+            r"core \(\d+\)": f"core ({counts['core']})",
+            r"anim \(\d+\)": f"anim ({counts['anim']})",
+            r"fx \(\d+\)": f"fx ({counts['fx']})",
+            r"rig \(\d+\)": f"rig ({counts['rig']})",
+            r"assets \(\d+\)": f"assets ({counts['assets']})",
+            r"review \(\d+\)": f"review ({counts['review']})",
         },
     )
 
