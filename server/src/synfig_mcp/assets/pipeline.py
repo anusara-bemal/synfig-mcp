@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from PIL import Image
 
 from synfig_mcp.assets.models import AssetManifest, AssetMetadata, LicensePolicy
 from synfig_mcp.assets.providers.base import BaseAssetProvider
@@ -19,11 +22,29 @@ from synfig_mcp.assets.security.raster_hardening import harden_raster_image
 from synfig_mcp.assets.security.svg_sanitizer import sanitize_svg
 from synfig_mcp.assets.security.url_validator import validate_asset_url
 from synfig_mcp.errors import SynfigError
+from synfig_mcp.image_payload import MAX_IMAGE_BYTES, encode_image
 from synfig_mcp.security.access import get_staging_root
 from synfig_mcp.security.sandbox import validate_path
 
 #: Largest local file that may be registered as an asset (25 MB, same as downloads).
 MAX_LOCAL_ASSET_BYTES = 25 * 1024 * 1024
+
+
+def _budgeted_base64(raw_bytes: bytes) -> str:
+    """Base64 for a thumbnail, re-encoded so it stays inside the result budget.
+
+    A provider thumbnail is usually small, but nothing guarantees it: an
+    oversized thumbnail would push the tool result past the 1 MB ceiling MCP
+    clients enforce.  Images are therefore re-encoded under the budget, and
+    bytes that are not a readable image are passed through untouched.
+    """
+    if len(raw_bytes) <= MAX_IMAGE_BYTES:
+        return base64.b64encode(raw_bytes).decode("utf-8")
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as handle:
+            return encode_image(handle.convert("RGBA")).base64
+    except Exception:
+        return base64.b64encode(raw_bytes[:MAX_IMAGE_BYTES]).decode("utf-8")
 
 
 class AssetPipeline:
@@ -102,7 +123,7 @@ class AssetPipeline:
         return {
             "success": True,
             "asset_id": asset_id,
-            "thumbnail_base64": base64.b64encode(raw_bytes).decode("utf-8"),
+            "thumbnail_base64": _budgeted_base64(raw_bytes),
         }
 
     async def download_asset(

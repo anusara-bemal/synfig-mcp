@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ from synfig_mcp.characters.sheet import (
     slice_rig_sheet,
 )
 from synfig_mcp.errors import SynfigError
+from synfig_mcp.image_payload import MAX_IMAGE_BYTES
 
 
 def _sheet(path: Path, background: tuple[int, int, int, int]) -> Path:
@@ -84,12 +86,86 @@ def test_names_select_and_name_the_parts(tmp_path: Path) -> None:
     assert [p["name"] for p in manifest["parts"]] == ["head", "upper_leg_l"]
 
 
+def test_preview_stays_inside_the_result_budget(tmp_path: Path) -> None:
+    """A detailed 2K sheet must not produce a tool result clients reject."""
+    sheet = tmp_path / "sheet.png"
+    image = Image.new("RGB", (2048, 2048), (250, 250, 250))
+    draw = ImageDraw.Draw(image)
+    for index in range(8):
+        draw.ellipse(
+            (
+                60 + (index % 4) * 480,
+                60 + (index // 4) * 900,
+                420 + (index % 4) * 480,
+                840 + (index // 4) * 900,
+            ),
+            fill=(180 + index * 7, 90, 160),
+        )
+    pixels = image.load()
+    rng = random.Random(7)
+    for _ in range(300_000):
+        pixels[rng.randrange(2048), rng.randrange(2048)] = (
+            rng.randrange(256),
+            rng.randrange(256),
+            rng.randrange(256),
+        )
+    image.save(sheet)
+
+    result = slice_rig_sheet(sheet, tmp_path / "parts")
+
+    assert result["preview_bytes"] <= MAX_IMAGE_BYTES
+    assert result["preview_mime"] in {"image/png", "image/jpeg"}
+    assert len(result["preview_base64"]) <= MAX_IMAGE_BYTES * 4 // 3 + 4
+    preview_file = Path(result["preview_path"])
+    assert preview_file.is_file()
+    assert preview_file.stat().st_size == result["preview_bytes"]
+
+
 def test_detail_next_to_a_part_is_merged_into_it(tmp_path: Path) -> None:
     sheet = _sheet(tmp_path / "sheet.png", (0, 0, 0, 0))
     mask, _ = foreground_mask(np.asarray(Image.open(sheet).convert("RGBA")))
     _labels, parts = detect_parts(mask)
     leg = parts[2]
     assert leg.bbox[2] > 41, "the detached detail was not merged into the leg"
+
+
+def test_checkerboard_background_is_not_sliced_into_parts(tmp_path: Path) -> None:
+    """Art exported over a checkerboard has two background tones."""
+    image = Image.new("RGB", (400, 400), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    for row in range(8):
+        for col in range(8):
+            if (row + col) % 2:
+                draw.rectangle(
+                    (col * 50, row * 50, col * 50 + 50, row * 50 + 50), fill=(190, 190, 190)
+                )
+    draw.ellipse((120, 120, 280, 280), fill=(40, 90, 200))
+    sheet = tmp_path / "checker.png"
+    image.save(sheet)
+
+    mask, method = foreground_mask(np.asarray(image.convert("RGBA")))
+    _labels, parts = detect_parts(mask)
+
+    assert method == "two_tone_border"
+    assert len(parts) == 1, "the checkerboard squares were counted as parts"
+    assert parts[0].area > 10000
+
+
+def test_a_banded_photo_is_not_mistaken_for_a_checkerboard() -> None:
+    """A dark and a light band along the border is not a two-tone background."""
+    image = Image.new("RGB", (400, 400), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, 400, 40), fill=(20, 20, 20))
+    draw.rectangle((0, 360, 400, 400), fill=(240, 240, 240))
+    draw.ellipse((120, 120, 280, 280), fill=(40, 90, 200))
+
+    mask, method = foreground_mask(np.asarray(image.convert("RGBA")))
+    _labels, parts = detect_parts(mask)
+
+    assert method == "border_colour"
+    # The dark band stays a part: only a checkerboard is a two-tone background.
+    assert len(parts) == 2
+    assert any(part.bbox[0] == 0 and part.bbox[3] <= 41 for part in parts)
 
 
 def test_bad_names_and_empty_sheets_are_rejected(tmp_path: Path) -> None:

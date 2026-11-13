@@ -56,6 +56,12 @@ a missing header or a forward-declared-only type. After touching GUI code, run a
   `synfig_mcp.security.permissions.permissions` and
   `synfig_mcp.security.sandbox.get_default_allowed_roots` (see
   `tests/unit/test_permissions.py` for the canonical fixture).
+- Tool results must stay inside the 1 MB ceiling MCP clients enforce (OpenCode
+  rejects a larger result outright, so the agent gets nothing at all). Images
+  a tool hands back go through `synfig_mcp.image_payload.encode_image` (a
+  budgeted PNG/JPEG) and travel as an MCP `ImageContent` block, never as
+  base64 inside the JSON: base64 in the result text is both huge and
+  unreadable for the model. `rig_sheet_slice` is the reference implementation.
 - Production runs are resumable. `production/pipeline.py` writes
   `pipeline_state.json` into the output directory and saves the working document
   at checkpoints; a stage is only restored when its effect is already in the

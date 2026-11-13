@@ -4,6 +4,7 @@ Exposes typed, categorized tools over BackendBase with ToolAnnotations and LLM-o
 """
 
 import contextlib
+import json
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar, cast
@@ -46,6 +47,30 @@ def wrap_untrusted[T](data: T) -> T:
     elif isinstance(data, list):
         return cast(T, [wrap_untrusted(x) if isinstance(x, (dict, list)) else x for x in data])
     return data
+
+
+def with_image_preview(result: dict[str, Any]) -> Any:
+    """Move a base64 preview out of the JSON and into an MCP image block.
+
+    A preview embedded as base64 in the result text is both huge (a 2k sheet
+    preview is around a megabyte of base64, which MCP clients reject outright)
+    and unreadable for the model.  The image travels as an ``ImageContent``
+    block instead, the file stays on disk as ``preview_path``, and the JSON
+    keeps only the metadata.
+    """
+    data = result.pop("preview_base64", None)
+    if not data:
+        return result
+
+    from mcp.types import CallToolResult, ImageContent, TextContent
+
+    image = ImageContent(
+        type="image",
+        data=data,
+        mime_type=str(result.get("preview_mime", "image/png")),
+    )
+    text = TextContent(type="text", text=json.dumps(result, indent=2, default=str))
+    return CallToolResult(content=[text, image], structured_content=result)
 
 
 # Active background render job tokens for cancellation
@@ -1180,8 +1205,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         preview: bool = True,
     ) -> dict[str, Any]:
         """Cut a rig sheet (one image, many parts) into one transparent PNG per part. Call once without
-        names to see preview_base64 (numbered boxes), then again with names={"1":"head",...} to export.
-        Returns parts, manifest, output_dir, preview_base64. Needs transparent/uniform background; name
+        names to see the numbered preview, then again with names={"1":"head",...} to export. The preview
+        comes back as an image block (and is saved as preview_path); the JSON lists parts, manifest and
+        output_dir. Needs transparent/uniform background; name
         parts by body role (head, torso, upper_arm_l, ...) so rigs auto-assemble. See synfig_help('characters').
         """
         from pathlib import Path
@@ -1205,7 +1231,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             bg_tolerance=bg_tolerance,
             preview=preview,
         )
-        return wrap_untrusted(res)
+        # The preview travels as an MCP image block next to the JSON, so the
+        # result stays small enough for a client to accept.
+        return cast("dict[str, Any]", with_image_preview(wrap_untrusted(res)))
 
     @tool_for("scene_auto_build", annotations=MUTATING)
     async def scene_auto_build(

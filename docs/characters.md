@@ -3,7 +3,10 @@
 Three calls take a character sheet and a background to a moving shot.
 
 1. `rig_sheet_slice(file_path)` - finds every part on the sheet and returns a numbered
-   preview. Look at `preview_base64` and decide what each number is.
+   preview as an image (also saved as `preview_path` next to the parts). Look at the
+   preview image and decide what each number is. A sheet exported over a checkerboard
+   ("transparent" art saved as a JPEG) is detected and sliced as well: the squares are
+   treated as background, not as parts.
 2. `rig_sheet_slice(file_path, names={"1": "head", "2": "torso", ...})` - writes one
    transparent PNG per named part and a `manifest.json`. Unnamed numbers (captions,
    stray marks) are left out.
