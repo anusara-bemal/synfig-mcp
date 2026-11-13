@@ -1325,7 +1325,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
           props: [{id, file, position, height, rotation, z, actions}],
           camera: [{time, zoom, center: {x, y}}], audio: {file, delay}, save_path, preview}.
         Positions are canvas pixels from the top-left (coords: "units" for Synfig units); a character
-        stands with its feet on 'position'. Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
+        stands with its feet on 'position'. Motions: idle, walk, run, talk, breath, crouch,
+        shake (loop); wave, jump, nod, kick, block, dodge, fall, land, turn, react, stomp,
+        punch (once); rest, pose, move.
         Returns: {doc_id, characters, props, warnings, saved_to, preview: {contact_sheet_base64, ...}}.
         Gotcha: Parts named by body role get default joints; other parts need parent + attach.
         """
@@ -1383,8 +1385,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         speed: float = 1.0,
         move_to: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Animate a rigged character: walk, run, idle, talk (loop until end_time), wave, jump, nod,
-        punch (play once), rest, move. move_to={x, y} (canvas pixels) travels there by end_time.
+        """Animate a rigged character. Looping motions (run until end_time): idle, walk, run,
+        talk, breath, crouch, shake. One-shot motions: wave, jump, nod, kick, block, dodge,
+        fall, land, turn, react, stomp, punch. Special: rest, move.
+        move_to={x, y} (canvas pixels) travels there by end_time.
         Returns: Keyframe times, waypoint count, animated layers and skipped joints.
         Gotcha: The character must have been built by character_rig_from_parts or scene_auto_build.
         """
@@ -1842,6 +1846,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         dry_run: bool = False,
         stages: list[str] | None = None,
         resume_from: str | None = None,
+        resume: bool = True,
     ) -> dict[str, Any]:
         """Build a whole anime-style project from one brief: storyboard, rigged characters,
         assets, assembled scene, style stack, render and review.
@@ -1851,12 +1856,14 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         synfig_help('production') for the full brief shape, styles and motion names.
         Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
         Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
-        and the render/review stages report "skipped".
+        and the render/review stages report "skipped". A run writes pipeline_state.json into the
+        output directory; re-running the same brief (resume=True) reopens the saved document and
+        continues from where it stopped instead of rebuilding. Pass resume=False for a clean run.
         """
         from synfig_mcp.production.pipeline import AnimeProductionPipeline
 
         report = await AnimeProductionPipeline(backend=backend).run(
-            brief, dry_run=dry_run, stages=stages, resume_from=resume_from
+            brief, dry_run=dry_run, stages=stages, resume_from=resume_from, resume=resume
         )
         return wrap_untrusted(report.model_dump())
 

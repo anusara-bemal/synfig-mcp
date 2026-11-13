@@ -16,6 +16,7 @@ what succeeded and why the rest did not.  ``dry_run`` builds nothing;
 
 from __future__ import annotations
 
+import contextlib
 import math
 import re
 from pathlib import Path
@@ -45,6 +46,11 @@ from synfig_mcp.production.models import (
     StageReport,
 )
 from synfig_mcp.production.rig_sheet import RigSheetGenerator
+from synfig_mcp.production.state import (
+    STATE_FILENAME,
+    ProductionState,
+    brief_fingerprint,
+)
 from synfig_mcp.recipes.engine import RecipeEngine
 from synfig_mcp.recipes.styles import get_style_preset
 from synfig_mcp.render.pipeline import RenderPipeline
@@ -90,8 +96,16 @@ class AnimeProductionPipeline:
         dry_run: bool = False,
         stages: list[str] | None = None,
         resume_from: str | None = None,
+        resume: bool = True,
     ) -> ProductionReport:
-        """Execute the pipeline and return the structured report."""
+        """Execute the pipeline and return the structured report.
+
+        ``resume`` (the default) reuses a matching ``pipeline_state.json`` in the
+        output directory: completed stages are restored from disk instead of
+        rebuilt, and a partially built document is reopened.  Pass ``resume=False``
+        to force a clean run.  ``resume_from`` still works and forces a rebuild
+        from that stage onward.
+        """
         if isinstance(brief, dict):
             brief = ProductionBrief.model_validate(brief)
 
@@ -115,6 +129,25 @@ class AnimeProductionPipeline:
 
         slug = _slug(brief.title)
         out_dir = self._resolve_output_dir(brief, slug)
+        state_path = out_dir / STATE_FILENAME
+        document_path = brief.save_path or str(out_dir / f"{slug}.sif")
+
+        # Resume: reopen a matching previous run instead of rebuilding.  A stage is
+        # only restored when the reopened document already contains its effect, so a
+        # resumed run never duplicates layers.  ``resume_from`` forces a rebuild.
+        state: ProductionState | None = None
+        if not dry_run:
+            loaded = ProductionState.load(state_path) if (resume and resume_from is None) else None
+            if loaded is not None and loaded.matches(brief):
+                state = loaded
+                report.stages.append(loaded.report())
+            else:
+                state = ProductionState(
+                    title=brief.title,
+                    style=brief.style,
+                    fingerprint=brief_fingerprint(brief),
+                    output_dir=str(out_dir),
+                )
 
         shots = brief.shots or [
             StoryboardShot(
@@ -127,6 +160,20 @@ class AnimeProductionPipeline:
 
         doc_id: str | None = None
         frame: CanvasFrame | None = None
+        # Reopen the document a previous run saved, so downstream stages address it.
+        if state is not None and state.document_path:
+            try:
+                info = await self.backend.doc_open(state.document_path)
+                doc_id = info.id
+                view_box = await self.backend.doc_view_box(doc_id)
+                frame = CanvasFrame.for_document(
+                    brief.width, brief.height, view_box, coords="pixels"
+                )
+                report.doc_id = doc_id
+            except Exception:  # noqa: BLE001 - a stale/moved document is not fatal
+                state.scene_built = False
+                state.saved_through = None
+                state.document_path = None
 
         render_available = True
         if not dry_run:
@@ -135,6 +182,33 @@ class AnimeProductionPipeline:
                 render_available = bool(health.details.get("cli_available", True))
             except Exception:  # noqa: BLE001 - an unknown backend is assumed capable
                 render_available = True
+
+        def persist() -> None:
+            if dry_run or state is None:
+                return
+            with contextlib.suppress(OSError):
+                state.save(state_path)
+
+        def restorable(name: str) -> bool:
+            """Whether a completed stage's effect is present in the reopened document.
+
+            Only stages whose effect lives in the saved document are restored; the
+            render and review stages always re-run (their outputs are cheap to detect
+            and their report carries the artifact paths the caller reads back).
+            """
+            if state is None or state.completed(name) is None:
+                return False
+            saved_rank = {"document": 0, "storyboard": 1, "style": 2}
+            saved = saved_rank.get(state.saved_through or "", -1)
+            if name == "document":
+                return saved >= 0
+            if name == "storyboard":
+                return saved >= 1
+            if name in ("characters", "assets"):
+                return state.scene_built
+            if name == "style":
+                return saved >= 2
+            return False
 
         async def stage(name: str, coro_factory: Any) -> None:
             if name not in requested:
@@ -146,6 +220,9 @@ class AnimeProductionPipeline:
                 report.stages.append(
                     StageReport(name=name, status="skipped", detail=f"resumed from '{resume_from}'")
                 )
+                return
+            if state is not None and restorable(name):
+                report.stages.append(state.stages[name].report)
                 return
             try:
                 result = await coro_factory()
@@ -160,6 +237,28 @@ class AnimeProductionPipeline:
                 )
                 return
             report.stages.append(result)
+            if state is not None and result.status != "failed":
+                state.record(result)
+                persist()
+
+        async def save_document(through: str | None) -> None:
+            """Save the working document so a later run can resume from it."""
+            if dry_run or state is None or doc_id is None:
+                return
+            try:
+                saved = await self.backend.doc_save(doc_id, document_path)
+            except Exception:  # noqa: BLE001 - an intermediate save is best-effort
+                return
+            state.doc_id = doc_id
+            state.document_path = saved
+            # Never move ``saved_through`` backwards: a resumed run re-saves the
+            # reopened document at the early stages without undoing later ones.
+            ranks = {"document": 0, "storyboard": 1, "style": 2}
+            if through is not None and ranks.get(through, -1) >= ranks.get(
+                state.saved_through or "", -1
+            ):
+                state.saved_through = through
+            persist()
 
         # 1. document ------------------------------------------------------
         async def do_document() -> StageReport:
@@ -184,6 +283,7 @@ class AnimeProductionPipeline:
             )
 
         await stage("document", do_document)
+        await save_document("document")
 
         # 2. storyboard ----------------------------------------------------
         async def do_storyboard() -> StageReport:
@@ -224,6 +324,7 @@ class AnimeProductionPipeline:
             )
 
         await stage("storyboard", do_storyboard)
+        await save_document("storyboard")
 
         # 3. characters ----------------------------------------------------
         async def do_characters() -> StageReport:
@@ -347,17 +448,25 @@ class AnimeProductionPipeline:
 
         # Main build (characters + assets + camera) as one atomic scene_build.
         if not dry_run and doc_id is not None and frame is not None:
-            try:
-                await self._build_scene(brief, doc_id, frame, duration)
-            except SynfigError as exc:
-                report.success = False
+            if state is not None and state.scene_built:
                 report.stages.append(
-                    StageReport(name="scene_build", status="failed", detail=exc.message)
+                    StageReport(name="scene_build", detail="restored the assembled scene")
                 )
             else:
-                report.stages.append(
-                    StageReport(name="scene_build", detail="assembled scene in one undo step")
-                )
+                try:
+                    await self._build_scene(brief, doc_id, frame, duration)
+                except SynfigError as exc:
+                    report.success = False
+                    report.stages.append(
+                        StageReport(name="scene_build", status="failed", detail=exc.message)
+                    )
+                else:
+                    report.stages.append(
+                        StageReport(name="scene_build", detail="assembled scene in one undo step")
+                    )
+                    if state is not None:
+                        state.scene_built = True
+                    await save_document("storyboard")
 
         # 5. style ---------------------------------------------------------
         async def do_style() -> StageReport:
@@ -374,6 +483,8 @@ class AnimeProductionPipeline:
             )
 
         await stage("style", do_style)
+        if state is not None and state.completed("style") and not restorable("style"):
+            await save_document("style")
 
         # 6. render --------------------------------------------------------
         async def do_render() -> StageReport:
