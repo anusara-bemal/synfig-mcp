@@ -80,6 +80,7 @@ class LiveBackend(BackendBase):
     async def health_check(self) -> HealthStatus:
         """Probe the live bridge socket and report capabilities."""
         import platform
+
         from synfig_mcp.security.sandbox import get_default_allowed_roots, get_path_mappings
 
         fs_info = {
@@ -923,20 +924,19 @@ class LiveBackend(BackendBase):
                 else:
                     norm_params[k] = v
 
-            if lyr.type in ("import", "sound"):
-                if "filename" in norm_params:
-                    fn_p = norm_params["filename"]
-                    fn_val = fn_p.get("value") if isinstance(fn_p, dict) else fn_p
-                    if fn_val:
-                        try:
-                            resolved_fn = validate_path(fn_val, must_exist=True)
-                            resolved_str = str(resolved_fn)
-                            if isinstance(norm_params["filename"], dict):
-                                norm_params["filename"]["value"] = resolved_str
-                            else:
-                                norm_params["filename"] = {"type": "string", "value": resolved_str}
-                        except Exception as err:
-                            file_errors.append(f"Layer '{lyr.id}' (type '{lyr.type}'): {err}")
+            if lyr.type in ("import", "sound") and "filename" in norm_params:
+                fn_p = norm_params["filename"]
+                fn_val = fn_p.get("value") if isinstance(fn_p, dict) else fn_p
+                if fn_val:
+                    try:
+                        resolved_fn = validate_path(fn_val, must_exist=True)
+                        resolved_str = str(resolved_fn)
+                        if isinstance(norm_params["filename"], dict):
+                            norm_params["filename"]["value"] = resolved_str
+                        else:
+                            norm_params["filename"] = {"type": "string", "value": resolved_str}
+                    except Exception as err:
+                        file_errors.append(f"Layer '{lyr.id}' (type '{lyr.type}'): {err}")
 
             lyr_dict["params"] = norm_params
             normalized_layers.append(lyr_dict)
