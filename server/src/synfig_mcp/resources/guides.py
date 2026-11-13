@@ -21,12 +21,11 @@ GUIDE_TOPICS: dict[str, str] = {
     "profiles": """# Synfig MCP Tool Profiles
 
 Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
-- `all` (default): The complete suite - all 89 tools: documents, canvases, scene
+- `all` (default): The complete suite - all 93 tools: documents, canvases, scene
   building, layers, parameters and value nodes, animation, selection, history,
-  effect recipes, style presets, character rigging, storyboards, licensed assets, the anime
-  production pipeline,
-  rendering (frame, sequence, video, contact sheet, async jobs), visual review
-  and schema introspection.
+  effect recipes, style presets, character rigging, storyboards, production
+  orchestration, licensed assets, rendering (frame, sequence, video, contact
+  sheet, async jobs), visual review and schema introspection.
 - `core`: Minimal set for document lifecycle, declarative build, inspection, undo
   (< 3,000 tokens).
 - `anim`: Waypoint and keyframe animation tools, time controls, interpolation modes.
@@ -77,6 +76,31 @@ Call `schema_list_layers()` for the exact list of the installed Synfig build and
 `schema_get_layer("<type>")` for the parameters, their value types and whether
 they are writable.
 """,
+    "scene": """# End-to-End Scene Workflow (connect -> build -> animate -> render -> save)
+
+Execute, do not just describe. Ordered tool sequence for a request like
+"blue sky, green ground, red sun moving left->right, a walking character, easing,
+render a preview, save":
+
+1. `studio_info()` — check `bridge.reachable`. If false, `studio_launch()` and
+   re-check. Never claim success while the bridge is unreachable.
+2. `doc_new(width, height, fps, duration)` — create the project.
+3. `doc_set_time_range(doc_id, start_time, end_time, fps)` — set the timeline
+   (e.g. 0..5s for a 5-second move).
+4. Build geometry in ONE undo step with `scene_build` (see
+   `synfig_help('declarative_build')`): a `solid_color` sky, a `rectangle`/
+   `solid_color` ground, a `circle` sun, and basic-shape character parts.
+   Use `layer_add` only for single incremental layers.
+5. Animate with `anim_animate_param` (batch waypoints, one undo step): sun
+   `origin` from left to right across the time range; character `origin` for the
+   walk. Set `interpolation` (e.g. "clamped"/"ease") for easing.
+6. `render_frame(doc_id, time, ...)` — render a preview PNG and inspect it.
+7. `doc_save(doc_id, file_path)` — persist the .sif. Verify the file exists.
+
+Coordinates: origin is canvas centre, +Y up, 60 px per Synfig unit. Colors are
+normalized `[0,1]` tagged unions. Confirm each step's returned state before the
+next; on failure read the error code and correct, do not silently continue.
+""",
     "animation": """# Synfig MCP Animation System
 
 ## Waypoint Interpolation Modes
@@ -110,9 +134,7 @@ accepted as well.
 Three calls take a character sheet and a background to a moving shot.
 
 1. `rig_sheet_slice(file_path)` - finds every part on the sheet and returns a numbered
-   preview. Look at `preview_base64` and decide what each number is. Each part already
-   carries its rig metadata (role, parent, pivot, z), a confidence score and a
-   `rig_compatibility` report; enclosed gaps are reconstructed best-effort.
+   preview. Look at `preview_base64` and decide what each number is.
 2. `rig_sheet_slice(file_path, names={"1": "head", "2": "torso", ...})` - writes one
    transparent PNG per named part and a `manifest.json`. Unnamed numbers (captions,
    stray marks) are left out.
@@ -150,20 +172,69 @@ The defaults are estimates. Look at the preview, then override per part:
 - `layout: "in_place"` keeps the sheet positions (for parts exported in place).
 
 ## Animating
-- Motions that loop until `end`: `idle`, `walk`, `run`, `talk`, `breath`, `crouch`, `shake`.
-- Motions that play once: `wave`, `jump`, `nod`, `kick`, `block`, `dodge`, `fall`, `land`,
-  `turn`, `react`, `stomp`, plus `punch` (built from the pose presets).
-- Special: `rest` (return to the rest pose), `pose` (`angles={part or role: degrees}`),
-  `move` (`move_to={x, y}` only).
+- Motions: walk, run, idle, talk (loop), wave, jump, nod, punch (once), rest, pose, move.
 - Angles are degrees from the rest pose, counter-clockwise; `flip: true` mirrors a character.
 - `character_motion_apply` and `character_pose_apply(angles={"upper_arm_r": 120})` refine a
   built character; the joint layers are `<id>_<part>_rot`, the position layer `<id>_pos`.
 - Check the result with `review_sequence`, export with `render_video`.
 
 ## Limits
-- Joints are rotate layers (forward kinematics); there is no IK, mesh deformation, facial
-  rig or lip-sync. Facial expression is set once per character via the eye/mouth parts.
+- Joints are rotate layers (forward kinematics); there is no IK, mesh deformation or lip-sync.
 - Without `doc_id` a new document is created; pass `doc_id` to build into the open one.
+""",
+    "production": """# AI Production Orchestration
+
+`production_run` turns a structured brief into a dependency-ordered, resumable task
+graph and executes it against the backend: create document -> build characters,
+backgrounds, props and rigs -> lay out / camera / animate / effects per shot ->
+validate -> render preview (and final when `render_final`) -> write manifest and
+report. Every task is verified before it is reported done, and the run state is
+saved after each task, so an interrupted run resumes exactly where it stopped.
+
+## Brief schema
+```json
+{
+  "title": "My Short", "slug": "my-short", "logline": "...",
+  "width": 1920, "height": 1080, "fps": 24, "style": "shonen_action",
+  "characters": [{
+    "id": "hero", "manifest": "parts/manifest.json",
+    "position": {"x": 300, "y": 950}, "height": 600,
+    "actions": [{"motion": "walk", "start": 0, "end": 4}]
+  }],
+  "backgrounds": [{"id": "sky", "file": "bg.png"}],
+  "props": [], "rigs": [],
+  "episodes": [{"id": "ep1", "sequences": [{"id": "sq1", "shots": [{
+    "id": "sh010", "title": "Hero enters", "duration": 4,
+    "characters": ["hero"], "background": "sky",
+    "effects": [{"name": "vignette", "params": {"opacity": 0.4}}],
+    "camera": [{"time": 0, "zoom": 1}, {"time": 4, "zoom": 1.2}]
+  }]}]}],
+  "render_profiles": [{"name": "hd", "width": 1920, "height": 1080}],
+  "checkpoints": ["layout", "animation"],
+  "root": "C:/Users/me/Documents/SynfigMCP", "render_final": false
+}
+```
+A character uses `manifest` (from `rig_sheet_slice`) or inline `parts` (same shape
+as `scene_auto_build`). Backgrounds use `file` or `color`. Shots reference
+characters/backgrounds by id.
+
+## Human-approval checkpoints
+Stages named in `checkpoints` (e.g. `layout`, `animation`, `render`) pause the run
+with status `awaiting_approval`. Inspect with `production_status`, approve with
+`production_approve(slug, checkpoint)`, then `production_resume(slug)` to continue.
+Resume never bypasses an unapproved gate.
+
+## On-disk layout
+`<root>/projects/<slug>/` holds `project.json` (manifest: assets with sha256 and
+license, versions, shots), `shots/*.sif`, `renders/<shot>/preview.png` and
+`final/`, `checkpoints/state.json` (resumable state), `logs/events.jsonl`, and
+`reports/production-report.{md,json}`.
+
+## Tools
+- `production_run(brief, dry_run)` - start; `dry_run=true` returns the plan only.
+- `production_resume(slug, root, max_attempts)` - continue an interrupted run.
+- `production_approve(slug, checkpoint, root)` - approve a gate.
+- `production_status(slug, root)` - read-only manifest, task states, approvals.
 """,
     "review": """# Visual Review Loop & Token Efficiency
 
@@ -171,80 +242,6 @@ The defaults are estimates. Look at the preview, then override per part:
 - For quick alignment and critique: render at `320x240` (only ~103 Claude tokens / ~258 Gemini tokens).
 - For multi-frame animation checks: use `render_contact_sheet` to composite multiple frames into one compact grid.
 - Objective metrics flag luminance clipping, safe-area boundary violations, and strobe hazards without consuming vision tokens.
-""",
-    "production": """# Anime Production Pipeline (produce_anime_project)
-
-One brief in, one renderable project out. The pipeline runs eight stages:
-document -> story -> storyboard -> characters -> assets -> scene_build -> style -> render -> review.
-
-## Brief shape
-```json
-{
-  "title": "Skyline Run",
-  "style": "shonen_action",
-  "width": 1280, "height": 720, "fps": 24.0, "duration": 6.0, "seed": 7,
-  "shots": [{"shot_id": "shot_01", "description": "rooftop chase", "duration_seconds": 3.0,
-             "camera_movement": "pan_right", "characters_present": ["hero"]}],
-  "characters": [{"id": "hero", "archetype": "humanoid", "height": 420.0,
-    "palette": ["#2b3a55", "#ff5c5c", "#f2e8cf", "#6fa8dc"],
-    "facing": "right", "position": {"x": 200, "y": 660}, "z": 10,
-    "actions": [{"motion": "run", "start": 0.0, "end": 6.0, "move_to": {"x": 1000, "y": 660}}]}],
-  "assets": [{"id": "tree1", "kind": "prop", "procedural": {"generator": "tree"},
-              "position": {"x": 300, "y": 660}, "height": 180}],
-  "background": {"generator": "landscape"},
-  "camera": [{"time": 0.0, "zoom": 1.0, "center": {"x": 640, "y": 360}}],
-  "transitions": [{"type": "fade", "time": 0.0, "duration": 0.4}],
-  "audio": [{"file": "music/bed.wav", "time": 0.0, "volume": 0.7}],
-  "render": {"video": true, "video_format": "mp4", "contact_sheet": true,
-             "review": true, "preview_frames": 4},
-  "story": null,
-  "output_dir": "out", "save_path": "out/reel.sif"
-}
-```
-- `transitions`: `{type: 'fade'|'dissolve', time, duration, direction: 'in'|'out'}`. Left empty,
-  a fade-in at 0s and a fade-out at the end are added so the edit reads cleanly; a fade is a
-  full-canvas layer whose opacity is keyed.
-- `audio`: `{file, time, volume}` sound cues placed on the timeline (wav/ogg/mp3/flac).
-- `archetype`: `humanoid` or `chibi`. `facing`: `left` or `right`.
-- Motions that loop: idle, walk, run, talk, breath, crouch, shake. Motions that play once:
-  wave, jump, nod, kick, block, dodge, fall, land, turn, react, stomp, punch. Special: rest,
-  pose, move.
-- Positions are canvas pixels from the top-left; a character stands with its feet on `position`.
-- `assets[].kind`: `background`, `prop` or `texture`. Sources: `procedural: {generator}` or
-  `search: {query, provider, license}` (opt-in network fetch; every asset is license-checked).
-- Styles: shonen_action, dark_fantasy, supernatural_noir, cyber_mecha, retro_anime.
-
-## Story bible (pre-production)
-- The `story` stage derives a continuity bible (characters, locations, props, scenes, timeline)
-  and writes `story_bible.json` into the output directory; the report lists it as an artifact.
-- `story_bible(brief)`: derive and inspect the bible + screenplay for a brief without building.
-- Honesty: the server has no language model, so a derived bible is a structural summary of the
-  brief's own shots/characters/assets (`authored: false`), not creative writing. To author one,
-  call `story_bible`, edit `bible`, and pass it back as `brief.story`; the pipeline then validates
-  it (`authored: true`) and consumes it unchanged. An inconsistent bible fails the `story` stage.
-
-## Resuming a run
-- Every run writes `pipeline_state.json` into the output directory and saves the document at each
-  checkpoint (after storyboard and after style).
-- Re-running the same brief reopens that document and continues from the first unfinished stage,
-  so a killed or interrupted run does not rebuild completed work. Change the brief and the stale
-  state is ignored; pass `resume=False` to force a clean run, or `resume_from="style"` to rebuild
-  from a given stage.
-- The report lists a `resume` stage describing what was restored.
-
-## Other entry points
-- `production_plan(brief)`: dry-run; reports stages and layer counts without building.
-- `story_bible(brief)`: derive the continuity bible + screenplay without building.
-- `character_model_sheet(descriptor)`: labeled front/three-quarter/side sheet in its own document.
-- `procedural_asset_list()` / `procedural_asset_generate(...)`: the IP-safe vector generators.
-- `sprite_slice(source, output_dir, strategy)`: slice a sprite sheet into rig-ready part PNGs.
-- CLI: `synfig-mcp produce brief.json [--dry-run] [--json] [--output-dir DIR] [--no-resume]`,
-  and `synfig-mcp story brief.json [--json]` to inspect the bible without building.
-
-## Limits
-- Rendering needs the Synfig CLI on PATH; without it the document is still saved and the
-  render/review stages report "skipped" rather than failing.
-- Characters are cut-out (vector) rigs driven by forward-kinematic rotations; no IK or mesh deform.
 """,
 }
 

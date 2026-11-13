@@ -132,7 +132,10 @@ class HeadlessBackend(BackendBase):
     async def doc_open(self, file_path: str) -> DocumentInfo:
         """Open a .sif/.sifz/.sfg document from disk."""
         path = validate_path(
-            file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, must_exist=True
+            file_path,
+            allowed_extensions={".sif", ".sifz", ".sfg"},
+            must_exist=True,
+            user_intent=True,
         )
 
         doc_id = f"doc_{uuid.uuid4().hex[:8]}"
@@ -145,7 +148,38 @@ class HeadlessBackend(BackendBase):
         self._current_time[doc_id] = 0.0
         self._dirty[doc_id] = False
 
+        self._register_project_access(doc_id)
         return self._sync_doc_info(doc_id)
+
+    def _register_project_access(self, doc_id: str) -> None:
+        """Let the open project authorise its directory and imported assets."""
+        from synfig_mcp.security.access import collect_asset_paths, get_access_controller
+
+        controller = get_access_controller()
+        path = self._doc_paths.get(doc_id)
+        if path is not None:
+            controller.register_project(path)
+        doc = self._documents.get(doc_id)
+        if doc is not None:
+            try:
+                tree = doc.get_scene_tree("")
+                controller.register_project_assets(collect_asset_paths(tree))
+            except Exception:
+                pass
+
+    async def refresh_project_access(self) -> dict[str, Any]:
+        """Re-register every loaded document's directory and imported assets."""
+        from synfig_mcp.security.access import get_access_controller
+
+        for doc_id in list(self._documents):
+            self._register_project_access(doc_id)
+        controller = get_access_controller()
+        return {
+            "backend": "headless",
+            "registered": True,
+            "documents": len(self._documents),
+            "project_asset_count": controller.status()["project_asset_count"],
+        }
 
     async def doc_save(self, doc_id: str, file_path: str | None = None) -> str:
         """Save document to disk (.sif, .sifz, or .sfg)."""
@@ -155,17 +189,20 @@ class HeadlessBackend(BackendBase):
         target: Path
         if file_path:
             target = validate_path(
-                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, for_write=True
+                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, user_intent=True
             )
         elif doc_id in self._doc_paths:
             target = self._doc_paths[doc_id]
         else:
-            target = validate_path(Path.cwd() / f"{doc_id}.sifz")
+            from synfig_mcp.security.access import get_staging_root
+
+            target = validate_path(get_staging_root() / f"{doc_id}.sifz")
 
         save_sif(self._documents[doc_id], target)
         self._doc_paths[doc_id] = target.resolve()
         self._dirty[doc_id] = False
         self._sync_doc_info(doc_id)
+        self._register_project_access(doc_id)
         return str(target.resolve())
 
     async def doc_close(self, doc_id: str, force: bool = False) -> bool:
@@ -460,6 +497,7 @@ class HeadlessBackend(BackendBase):
                 ".au",
             },
             must_exist=True,
+            user_intent=True,
         )
         audio_extensions = {".wav", ".ogg", ".mp3", ".flac", ".au"}
         if safe_path.suffix.lower() in audio_extensions:
@@ -898,113 +936,6 @@ class HeadlessBackend(BackendBase):
         return list(layer_ids)
 
     # -----------------------------------------------------------------------
-    # GUI View & Layer Appearance (Phase 6)
-    # -----------------------------------------------------------------------
-
-    async def layer_set_visibility(
-        self, doc_id: str, layer_id: str, visible: bool, canvas_path: str = ""
-    ) -> dict[str, Any]:
-        """Toggle a layer's ``active`` flag in the headless document."""
-        if doc_id not in self._documents:
-            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
-
-        self._save_undo_state(doc_id)
-        layer = self._documents[doc_id].get_layer(layer_id, canvas_path)
-        if layer is None:
-            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
-        layer.active = visible
-        return {
-            "doc_id": doc_id,
-            "layer_id": layer_id,
-            "visible": layer.active,
-            "diff": {
-                "action": "layer.set_visibility",
-                "created": [],
-                "modified": [layer_id],
-                "deleted": [],
-            },
-        }
-
-    async def layer_set_blend(
-        self,
-        doc_id: str,
-        layer_id: str,
-        amount: float | None = None,
-        blend_method: int | None = None,
-        canvas_path: str = "",
-    ) -> dict[str, Any]:
-        """Set ``amount`` (opacity) and/or ``blend_method`` on a layer."""
-        if doc_id not in self._documents:
-            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
-
-        self._save_undo_state(doc_id)
-        layer = self._documents[doc_id].get_layer(layer_id, canvas_path)
-        if layer is None:
-            raise DocumentNotFoundError(f"Layer '{layer_id}' not found.")
-
-        available = {p["name"] for p in layer.get_param_list()}
-        if amount is not None:
-            if available and "amount" not in available:
-                raise SynfigError(f"Layer '{layer_id}' has no 'amount' (not a composite layer).")
-            layer.set_param("amount", float(amount))
-        if blend_method is not None:
-            if available and "blend_method" not in available:
-                raise SynfigError(
-                    f"Layer '{layer_id}' has no 'blend_method' (not a composite layer)."
-                )
-            layer.set_param("blend_method", int(blend_method))
-        return {
-            "doc_id": doc_id,
-            "layer_id": layer_id,
-            "amount": float(amount) if amount is not None else None,
-            "blend_method": int(blend_method) if blend_method is not None else None,
-            "diff": {
-                "action": "layer.set_blend",
-                "created": [],
-                "modified": [layer_id],
-                "deleted": [],
-            },
-        }
-
-    async def layer_align(
-        self,
-        doc_id: str,
-        layer_ids: list[str],
-        edge: str = "center",
-        canvas_path: str = "",
-    ) -> dict[str, Any]:
-        """Align layers by adjusting each layer's ``origin`` transform."""
-        if doc_id not in self._documents:
-            raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
-
-        doc = self._documents[doc_id]
-        self._save_undo_state(doc_id)
-        moved: list[dict[str, Any]] = []
-        for lid in layer_ids:
-            layer = doc.get_layer(lid, canvas_path)
-            if layer is None:
-                continue
-            # The headless engine tracks positions on the transform params when
-            # present; absent a real bounding box, alignment is a no-op recorded
-            # honestly rather than a fabricated offset.
-            moved.append({"layer_id": lid, "dx": 0.0, "dy": 0.0})
-        return {
-            "doc_id": doc_id,
-            "edge": edge,
-            "moved": moved,
-            "diff": {
-                "action": "layer.align",
-                "created": [],
-                "modified": [m["layer_id"] for m in moved],
-                "deleted": [],
-            },
-        }
-
-    async def recent_events(self, doc_id: str | None = None, limit: int = 20) -> dict[str, Any]:
-        """The headless engine emits no events; report an empty, honest result."""
-        return {"events": [], "state_version": "headless", "doc_id": doc_id, "limit": limit}
-
-    # -----------------------------------------------------------------------
     # Parameter and canvas introspection
     # -----------------------------------------------------------------------
 
@@ -1165,7 +1096,7 @@ class HeadlessBackend(BackendBase):
 
         normalized_target = require_frame_target(target)
         safe_output = validate_path(
-            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, for_write=True
+            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, user_intent=True
         )
 
         doc = self._documents[doc_id]
@@ -1209,7 +1140,7 @@ class HeadlessBackend(BackendBase):
         progress_cb: Any = None,
         cancel_token: Any = None,
     ) -> list[str]:
-        safe_dir = validate_path(output_dir, for_write=True)
+        safe_dir = validate_path(output_dir, user_intent=True)
         res = await self.pipeline.render_sequence(
             doc_id=doc_id,
             output_dir=str(safe_dir),
@@ -1239,7 +1170,7 @@ class HeadlessBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
-            for_write=True,
+            user_intent=True,
         )
         ok = await self.pipeline.render_video(
             doc_id=doc_id,
@@ -1266,7 +1197,7 @@ class HeadlessBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".png", ".jpg", ".jpeg"},
-            for_write=True,
+            user_intent=True,
         )
         ok = await self.pipeline.render_contact_sheet(
             doc_id=doc_id,
@@ -1328,7 +1259,7 @@ class HeadlessBackend(BackendBase):
                     fn_val = p.get("value") if isinstance(p, dict) else p
                 if fn_val:
                     try:
-                        resolved_fn = validate_path(fn_val, must_exist=True)
+                        resolved_fn = validate_path(fn_val, must_exist=True, user_intent=True)
                         resolved_str = str(resolved_fn)
                         if isinstance(lyr.params["filename"], dict):
                             lyr.params["filename"]["value"] = resolved_str

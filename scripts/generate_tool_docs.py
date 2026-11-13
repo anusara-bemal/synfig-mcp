@@ -45,12 +45,12 @@ def categorize_tool(name: str) -> str:
         return "Character Rigging"
     if name.startswith("storyboard_"):
         return "Storyboards"
+    if name.startswith("production_"):
+        return "Production Orchestration"
     if name.startswith("asset_"):
         return "Licensed Assets"
     if name.startswith("schema_"):
         return "Schema & Introspection"
-    if name.startswith("view_") or name == "studio_events":
-        return "Live Studio View"
     if name in ("health_check", "synfig_help"):
         return "Core & Diagnostics"
     return "Other"

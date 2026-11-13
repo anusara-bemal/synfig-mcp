@@ -52,7 +52,9 @@ def test_every_advertised_target_is_classified(synfig_binary: Path) -> None:
     unknown = [t for t in targets if t not in TARGET_CAPABILITIES]
     assert not unknown, f"targets without a classification: {unknown}"
 
-    extra = [t for t in TARGET_CAPABILITIES if t not in targets]
+    # Converter modules (ImageMagick) are optional at Synfig build time.
+    optional = {t for t, kind in TARGET_CAPABILITIES.items() if kind is TargetKind.CONVERTER}
+    extra = [t for t in TARGET_CAPABILITIES if t not in targets and t not in optional]
     assert not extra, f"classified targets the binary does not have: {extra}"
 
 

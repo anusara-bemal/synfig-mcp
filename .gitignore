@@ -38,6 +38,3 @@ $RECYCLE.BIN/
 *.log
 scratch/
 
-
-# Agent scratch space
-.agents_tmp/

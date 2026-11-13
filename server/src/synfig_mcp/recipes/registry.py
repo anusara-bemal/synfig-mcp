@@ -68,7 +68,7 @@ RECIPES: dict[str, RecipeManifest] = {
         name="impact_frame",
         category="action",
         description="Single-frame or two-frame visual shock with inverted silhouette or high-contrast flash.",
-        native_layers_used=["solid_color", "inside_out"],
+        native_layers_used=["solid_color", "invert"],
         parameters={
             "mode": RecipeParamDefinition(
                 name="mode",
@@ -311,7 +311,7 @@ RECIPES: dict[str, RecipeManifest] = {
         name="limited_animation_timing",
         category="timing",
         description="Anime-style stepped timing (holds on twos or threes with constant interpolation).",
-        native_layers_used=["timeloop"],
+        native_layers_used=["time_loop"],
         parameters={
             "interval": RecipeParamDefinition(
                 name="interval",

@@ -1,112 +1,80 @@
 """
-Filesystem path validator for the user-granted permission model.
+Project-aware path validation for Synfig MCP file operations.
 
-Paths must resolve inside a directory root the user has *granted* (see
-:mod:`synfig_mcp.security.permissions`).  Traversal (``..``), symlink and NTFS
-junction escapes, extension restrictions and existence checks are all enforced
-here; the grant model only decides *which* roots count.
+This module used to be a workspace jail: every file had to live inside
+``Documents/SynfigMCP`` or temp, which blocked legitimate assets in Downloads
+and forced users to copy files around.  It is now a thin validation layer over
+:mod:`synfig_mcp.security.access`:
+
+* paths explicitly supplied by the user (tool arguments / attachments) are
+  authorised directly,
+* the active Synfig project directory and its imported assets are authorised
+  by the native bridge,
+* explicitly approved folders (e.g. Downloads) are remembered,
+* minimal safety checks always apply: traversal, symlink/junction escapes,
+  system folders, credential folders, executables, extension allow-lists.
 """
 
 from __future__ import annotations
 
-import contextlib
 import os
 import re
-import shutil
-import tempfile
 from pathlib import Path
 
 from synfig_mcp.errors import SecuritySandboxError
+from synfig_mcp.security.access import (
+    EXECUTABLE_EXTENSIONS,
+    get_access_controller,
+    get_temp_root,
+    has_link_redirect,
+    is_credentials_path,
+    is_overly_broad_root,
+    is_system_path,
+)
 
-
-def is_overly_broad_root(path: Path | str) -> tuple[bool, str]:
-    """Check if a candidate workspace root is dangerously broad (drive root, system dir, user home root)."""
-    p = Path(path).resolve()
-
-    # 1. Drive root (e.g. C:\ or /)
-    if p == Path(p.anchor):
-        return True, "drive root is overly broad; specify a project-specific directory"
-
-    # 2. Windows system dirs
-    sys_root = os.environ.get("SYSTEMROOT", r"C:\Windows")
-    if sys_root:
-        res_sys = Path(sys_root).resolve()
-        if p == res_sys or res_sys in p.parents:
-            return True, "Windows system directory is not allowed as a workspace root"
-
-    # 3. Program Files
-    for pf_var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramData"):
-        val = os.environ.get(pf_var)
-        if val:
-            res_pf = Path(val).resolve()
-            if p == res_pf or res_pf in p.parents:
-                return True, f"{pf_var} directory is not allowed as a workspace root"
-
-    # 4. User home root directly
-    home = Path.home().resolve()
-    if p == home:
-        return (
-            True,
-            "User home directory directly is overly broad; specify a dedicated project subfolder",
-        )
-    if p == home.parent:
-        return True, "User profiles directory is overly broad"
-
-    # 5. POSIX system dirs
-    if str(p) in {"/", "/root", "/home", "/Users", "/etc", "/usr", "/bin", "/sbin", "/var"}:
-        return True, "system directory is overly broad"
-
-    return False, ""
+__all__ = [
+    "get_default_allowed_roots",
+    "get_path_mappings",
+    "is_overly_broad_root",
+    "resolve_client_path",
+    "validate_path",
+]
 
 
 def get_default_allowed_roots() -> list[Path]:
-    """Return the currently granted roots, ensuring roots are narrow and secure.
+    """Folder-level roots granted by configuration, approvals and the project.
 
-    Roots are the user's granted directories (config/env defaults plus anything
-    added at runtime with ``permission_grant``).  Overly broad roots are still
-    filtered out defensively.
+    Kept for diagnostics and staging; it is no longer a gate that every file
+    must pass through.
     """
-    from synfig_mcp.security.permissions import permissions
+    from synfig_mcp.config import settings
 
-    roots: list[Path] = []
-    for r in permissions.roots():
-        resolved = r.resolve()
-        broad, _ = is_overly_broad_root(resolved)
-        if not broad:
-            roots.append(resolved)
-
-    # Scoped user temp directory (e.g. AppData/Local/Temp or /tmp)
-    temp_dir = Path(tempfile.gettempdir()).resolve()
+    roots: list[Path] = [r.resolve() for r in settings.workspace_roots]
+    roots.extend(get_access_controller().allowed_roots())
+    temp_dir = get_temp_root()
     if temp_dir not in roots:
         roots.append(temp_dir)
     return roots
 
 
 def get_path_mappings() -> list[tuple[str, Path]]:
-    """Parse SYNFIG_MCP_PATH_MAPPING into (client prefix, host root) pairs.
-
-    Informational only: it lets diagnostics report how client/container paths map
-    to host paths. It never widens the sandbox - validate_path still enforces the
-    allowed roots.
-    """
+    """Parse SYNFIG_MCP_PATH_MAPPING env var into prefix mappings (containers)."""
     raw = os.environ.get("SYNFIG_MCP_PATH_MAPPING", "").strip()
     mappings: list[tuple[str, Path]] = []
     if not raw:
         return mappings
 
-    # JSON object form: {"C:/client/dir": "/host/dir"}
     if raw.startswith("{") and raw.endswith("}"):
         try:
             import json
 
             data = json.loads(raw)
             for k, v in data.items():
-                mappings.append((str(k).replace("\\", "/").rstrip("/"), Path(v).resolve()))
+                mappings.append((k.replace("\\", "/").rstrip("/"), Path(v).resolve()))
             return mappings
         except Exception:
             pass
 
-    # Separator form: /client/path=C:\host\path (comma or semicolon separated)
     for item in re.split(r"[,;]", raw):
         item = item.strip()
         if "=" in item:
@@ -117,116 +85,108 @@ def get_path_mappings() -> list[tuple[str, Path]]:
     return mappings
 
 
+def resolve_client_path(target_path: Path | str) -> Path:
+    """Resolve a client path against the host filesystem (container mounts)."""
+    path_str = str(target_path).replace("\\", "/")
+    mappings = get_path_mappings()
+
+    for remote_prefix, local_root in mappings:
+        if path_str == remote_prefix:
+            return local_root
+        if path_str.startswith(remote_prefix + "/"):
+            rel_sub = path_str[len(remote_prefix) + 1 :]
+            candidate = local_root / Path(rel_sub)
+            if candidate.exists():
+                return candidate.resolve()
+
+    path_obj = Path(target_path).expanduser()
+    try:
+        # resolve() resolves symlink/junction ancestors even when the final
+        # component does not exist yet, so a link escape is still detected for
+        # new output paths.  strict=False keeps non-existent saves/renders valid.
+        return path_obj.resolve()
+    except Exception:
+        return Path(os.path.abspath(str(path_obj)))
+
+
+def _check_denied(resolved: Path, allowed_extensions: set[str] | None) -> None:
+    if is_system_path(resolved):
+        raise SecuritySandboxError(
+            f"Path '{resolved}' denied: Windows system / program folders are never accessible"
+        )
+    if is_credentials_path(resolved):
+        raise SecuritySandboxError(
+            f"Path '{resolved}' denied: credential and private-key locations are never accessible"
+        )
+    extension = resolved.suffix.lower()
+    if extension in EXECUTABLE_EXTENSIONS and not (
+        allowed_extensions and extension in {e.lower() for e in allowed_extensions}
+    ):
+        raise SecuritySandboxError(
+            f"File extension '{extension}' is an executable/script and cannot be imported"
+        )
+
+
 def validate_path(
     target_path: Path | str,
     allowed_roots: list[Path] | None = None,
     allowed_extensions: set[str] | None = None,
     must_exist: bool = False,
-    for_write: bool = False,
+    user_intent: bool = False,
 ) -> Path:
+    """Validate a file path under the project-aware access policy.
+
+    ``user_intent=True`` marks a path the user explicitly supplied (an
+    attachment or a direct tool argument).  Such files are authorised without
+    copying them anywhere, unless a link redirect or a denied location is
+    involved.  ``allowed_roots``, when given explicitly, remains a hard
+    constraint for callers that need one.
     """
-    Ensure target_path resolves inside a granted root, has an allowed extension,
-    and resolves symlinks / parent traversal ('..') safely.
-
-    ``for_write=True`` additionally requires the containing grant to be writable;
-    use it for every path the server will create or overwrite.
-
-    Raises:
-        SecuritySandboxError: If the path escapes every granted root or has a
-            forbidden extension, or a write is attempted in a read-only grant.
-        FileNotFoundError: If must_exist is True and the path does not exist.
-    """
-    path_obj = Path(target_path)
-    # Canonicalize and resolve all symlinks and '..' components
-    resolved_target = path_obj.resolve()
-
-    roots = [r.resolve() for r in (allowed_roots or get_default_allowed_roots())]
-
-    # Verify target or its parent is contained within at least one allowed root
-    in_sandbox = False
-    for root in roots:
-        try:
-            # If resolved_target is root or a descendant of root
-            if resolved_target == root or root in resolved_target.parents:
-                in_sandbox = True
-                break
-        except Exception:
-            continue
-
-    if not in_sandbox:
+    path_text = str(target_path).replace("\\", "/")
+    if any(part == ".." for part in path_text.split("/")):
         raise SecuritySandboxError(
-            f"Access to path '{target_path}' is denied by the workspace permission model. "
-            f"Path must reside within a granted root: {[str(r) for r in roots]}. "
-            f"Grant access with permission_grant(path=...)."
+            f"Path '{target_path}' denied: directory traversal is not permitted"
         )
 
-    # When the caller only supplied explicit roots, treat them as writable.
-    if for_write and allowed_roots is None:
-        _require_writable(resolved_target, target_path)
+    resolved_target = resolve_client_path(target_path)
 
-    # Restrict file extensions if provided
     if allowed_extensions is not None:
-        ext = resolved_target.suffix.lower()
-        valid_exts = {e.lower() for e in allowed_extensions}
-        if ext not in valid_exts:
+        extension = resolved_target.suffix.lower()
+        if extension not in {ext.lower() for ext in allowed_extensions}:
+            allowed = ", ".join(sorted(allowed_extensions))
             raise SecuritySandboxError(
-                f"File extension '{ext}' is not permitted for '{target_path}'. "
-                f"Allowed extensions: {sorted(valid_exts)}"
+                f"File extension '{extension or '<none>'}' is not permitted; allowed: {allowed}"
+            )
+
+    _check_denied(resolved_target, allowed_extensions)
+
+    if allowed_roots is not None:
+        roots = [Path(root).expanduser().resolve() for root in allowed_roots]
+        if not any(resolved_target == root or root in resolved_target.parents for root in roots):
+            raise SecuritySandboxError(
+                f"Path '{target_path}' denied: outside the explicitly requested roots"
+            )
+    else:
+        controller = get_access_controller()
+        allowed, _reason = controller.is_allowed(resolved_target)
+        if not allowed and user_intent and not has_link_redirect(Path(os.path.abspath(path_text))):
+            controller.register_attachment(resolved_target)
+            allowed = True
+        if not allowed:
+            temp_root = get_temp_root()
+            allowed = resolved_target == temp_root or temp_root in resolved_target.parents
+        if not allowed:
+            folder = resolved_target.parent
+            raise SecuritySandboxError(
+                f"Path '{target_path}' is not yet authorised for Synfig MCP. "
+                f"It is outside the active Synfig project and no approval covers '{folder}'. "
+                f"Approve the folder once with access_approve(folder=\"{folder}\"), "
+                "or open/import the file in Synfig Studio. No manual copying is required."
             )
 
     if must_exist and not resolved_target.exists():
-        raise FileNotFoundError(f"File not found: {resolved_target}")
+        raise FileNotFoundError(
+            f"File not found on host: '{target_path}'. Host resolved path: '{resolved_target}'."
+        )
 
     return resolved_target
-
-
-def _require_writable(resolved_target: Path, original: Path | str) -> None:
-    """Raise unless the grant covering ``resolved_target`` is writable."""
-    from synfig_mcp.security.permissions import permissions
-
-    for grant in permissions.grants():
-        if resolved_target == grant.path or grant.path in resolved_target.parents:
-            if not grant.write:
-                raise SecuritySandboxError(
-                    f"Write to '{original}' is denied: the grant for '{grant.path}' is read-only."
-                )
-            return
-    # Not covered by a user grant (e.g. the implicit temp dir) - allowed.
-
-
-def safe_write_bytes(target: Path | str, data: bytes, *, backup: bool = True) -> Path:
-    """Atomically write ``data`` to ``target``, optionally keeping a ``.bak`` copy.
-
-    The write goes to a sibling temp file that is flushed and ``fsync``-ed, then
-    ``os.replace``-d over the destination, so a crash mid-write can never leave a
-    truncated document behind.  When ``backup`` is set and the file already
-    exists, the previous contents are preserved as ``<name>.bak``.
-
-    Permission errors (read-only file/directory) surface as a typed
-    :class:`SecuritySandboxError` rather than a bare ``OSError``.
-    """
-    target_path = Path(target)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if backup and target_path.exists():
-        with contextlib.suppress(OSError):
-            shutil.copy2(target_path, target_path.with_name(target_path.name + ".bak"))
-
-    fd, tmp_name = tempfile.mkstemp(
-        dir=str(target_path.parent), prefix=f".{target_path.name}.", suffix=".tmp"
-    )
-    tmp_path = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(tmp_path, target_path)
-    except PermissionError as err:
-        raise SecuritySandboxError(
-            f"Cannot write '{target_path}': the file or directory is not writable ({err})."
-        ) from err
-    finally:
-        with contextlib.suppress(OSError):
-            tmp_path.unlink()
-    return target_path

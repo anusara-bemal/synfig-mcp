@@ -4,8 +4,8 @@
       "command": "uvx",
       "args": ["synfig-mcp"],
       "env": {
-        "SYNFIG_MCP_PROFILE": "all",
-        "SYNFIG_MCP_BACKEND": "auto"
+        "BACKEND_MODE": "auto",
+        "BRIDGE_PORT": "19998"
       }
     }
   }
