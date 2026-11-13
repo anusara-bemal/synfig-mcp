@@ -6,13 +6,13 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 111 tools, 107,784 bytes, **29,495 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 111 tools, 107,916 bytes, **29,533 tokens** (`cl100k_base`).
 - **Minimal Profile (`core`)**: 20 tools, 17,294 bytes, **4,603 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **29,495 tokens** to **4,603 tokens**.
+> from **29,533 tokens** to **4,603 tokens**.
 
 ### Profile Allocations & Measured Counts
 
@@ -24,7 +24,7 @@
 | `rig` | 35 | **9,839** | 9,872 | ❌ Exceeds (3000) |
 | `assets` | 24 | **6,466** | 6,485 | ❌ Exceeds (2000) |
 | `review` | 25 | **6,497** | 6,525 | ❌ Exceeds (4000) |
-| `all` | 111 | **29,495** | 29,565 | ❌ Exceeds (28000) |
+| `all` | 111 | **29,533** | 29,603 | ❌ Exceeds (28000) |
 
 ---
 
@@ -34,21 +34,21 @@ Measured against real server output in headless mode:
 
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
-| `health_check()` | 256 | **77** | 78 | < 200 |
-| `doc_new(160x120)` | 193 | **85** | 85 | < 200 |
-| `doc_list()` | 389 | **123** | 123 | < 246 |
-| `layer_add(circle)` | 251 | **86** | 86 | < 200 |
-| `scene_tree()` | 1228 | **364** | 364 | < 728 |
-| `doc_info()` | 389 | **123** | 123 | < 246 |
-| `param_set(radius=2.5)` | 325 | **119** | 119 | < 238 |
+| `health_check()` | 430 | **122** | 123 | < 244 |
+| `doc_new(160x120)` | 193 | **82** | 82 | < 200 |
+| `doc_list()` | 389 | **120** | 120 | < 240 |
+| `layer_add(circle)` | 251 | **83** | 83 | < 200 |
+| `scene_tree()` | 1228 | **361** | 361 | < 722 |
+| `doc_info()` | 389 | **120** | 120 | < 240 |
+| `param_set(radius=2.5)` | 325 | **116** | 116 | < 232 |
 | `param_get(radius)` | 232 | **56** | 56 | < 200 |
 | `anim_time_set(1.5s)` | 17 | **11** | 11 | < 200 |
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 103 | **43** | 43 | < 200 |
+| `render_frame(160x120)` | 103 | **40** | 39 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
-| `schema_get_layer(circle)` | 2662 | **720** | 719 | < 1440 |
+| `schema_get_layer(circle)` | 2709 | **720** | 720 | < 1440 |
 
 ---
 
@@ -81,9 +81,9 @@ Vision model consumption per single preview or contact-sheet image:
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
 | `rig_sheet_from_image` | 2,661 | **731** | 732 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `produce_anime_project` | 1,882 | **493** | 493 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `scene_auto_build` | 1,695 | **483** | 483 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `rig_sheet_slice` | 1,638 | **464** | 466 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `produce_anime_project` | 1,750 | **455** | 455 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_sequence` | 1,520 | **442** | 442 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `character_motion_apply` | 1,525 | **436** | 436 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `sprite_slice` | 1,461 | **416** | 417 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
