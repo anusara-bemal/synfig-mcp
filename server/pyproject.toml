@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "synfig-mcp"
-version = "0.8.0rc2"
+version = "1.0.3"
 description = "Live MCP control of Synfig Studio (native bridge + headless fallback)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -133,6 +133,3 @@ live = "pytest -m real_studio -v -s"
 check = ["format-check", "lint", "typecheck", "test"]
 security = "bandit -r src/"
 verify-validity = "pytest tests/contract/test_sif_synfig_validity.py -v"
-docs-tools = "python ../scripts/generate_tool_docs.py"
-docs-website = "python ../scripts/generate_website_catalog.py"
-docs = ["docs-tools", "docs-website"]

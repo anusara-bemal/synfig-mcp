@@ -17,7 +17,7 @@ Add `synfig-mcp` to your Claude Desktop configuration file:
     "synfig": {
       "command": "python",
       "args": ["-m", "synfig_mcp.server"],
-      "cwd": "D:\\Projects\\Github\\synfig mcp\\server",
+      "cwd": "D:\\Projects\\Github\\synfig-mcp\\server",
       "env": {
         "BACKEND_MODE": "auto",
         "BRIDGE_HOST": "127.0.0.1",

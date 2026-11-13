@@ -1,208 +1,270 @@
 """
-Data models for the anime production pipeline (Step 0).
+Typed models of the production system.
 
-``ProductionBrief`` is the single input a caller gives; ``ProductionReport`` is
-the structured, per-stage result returned.  Both are plain Pydantic models so
-they can be embedded directly in an MCP tool schema.
+A *production* is a tree: a project holds episodes, an episode holds
+sequences and a sequence holds shots.  Everything else - the asset
+registries, the render profiles, the version history - hangs off the project.
+
+The models are strict on purpose: a brief that does not describe a coherent
+production is rejected before a single layer is created, so a production run
+never leaves half-built shots behind because of a typo in the brief.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal
+import re
+from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
-from synfig_mcp.characters.models import StoryboardShot
-
-
-class RenderOptions(BaseModel):
-    """What to render once the scene is built."""
-
-    video: bool = Field(default=True, description="Encode a video file.")
-    video_format: Literal["mp4", "gif"] = Field(
-        default="mp4", description="'mp4' needs ffmpeg; 'gif' only needs Pillow."
-    )
-    contact_sheet: bool = Field(default=True, description="Render a tiled contact sheet.")
-    review: bool = Field(default=True, description="Run the objective review metrics.")
-    preview_frames: int = Field(default=6, ge=2, le=9, description="Frames in the review loop.")
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
-class AudioCue(BaseModel):
-    """One sound file placed on the production timeline."""
-
-    file: str = Field(description="Path to a sound file (wav, ogg, mp3, flac, ...).")
-    time: float = Field(default=0.0, ge=0.0, description="Start offset in seconds.")
-    volume: float = Field(default=1.0, ge=0.0, le=4.0)
+def slugify(value: str) -> str:
+    """Turn a title into a filesystem-safe slug."""
+    slug = _SLUG_RE.sub("-", value.lower()).strip("-")
+    return slug or "production"
 
 
-class CharacterDescriptor(BaseModel):
-    """A high-level character brief that expands into rig-ready parts.
+class TaskStatus(str, Enum):
+    """Lifecycle of a single production task."""
 
-    No franchise names: a descriptor is anatomy, proportions and a palette, so
-    the generated character is always original geometry.
-    """
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    AWAITING_APPROVAL = "awaiting_approval"
 
-    id: str = Field(description="Character id (letters, digits, underscore).")
-    archetype: Literal["humanoid", "chibi"] = Field(
-        default="humanoid",
-        description="Proportion preset: 'humanoid' (7 heads) or 'chibi' (3 heads, big head).",
-    )
-    height: float = Field(
-        default=0.62,
-        gt=0.0,
-        le=1.0,
-        description="Height as a fraction of the canvas height.",
-    )
-    palette: list[str] = Field(
-        default_factory=list,
-        description="Optional hex colours (#rrggbb): [skin, hair, primary, secondary]. "
-        "Falls back to the active style preset.",
-    )
-    facing: Literal["right", "left"] = Field(default="right")
-    position: dict[str, float] | None = Field(
-        default=None,
-        description="Where the character stands, in canvas pixels {x, y}. "
-        "Omitted characters are spread across the floor.",
-    )
-    z: float = Field(default=0.0, description="Scene stacking; higher is in front.")
-    actions: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Motion list, e.g. [{'motion': 'walk', 'start': 0, 'end': 3, "
-        "'move_to': {'x': 900, 'y': 640}}].",
-    )
 
-    @field_validator("palette")
+class RenderProfile(BaseModel):
+    """A named output configuration."""
+
+    name: str
+    width: int = 1920
+    height: int = 1080
+    fps: float = 24.0
+    target: str = "png"
+    description: str = ""
+
+    @field_validator("width", "height")
     @classmethod
-    def _palette_shape(cls, value: list[str]) -> list[str]:
-        for colour in value:
-            raw = colour.strip().lstrip("#")
-            if len(raw) not in (3, 6, 8) or any(c not in "0123456789abcdefABCDEF" for c in raw):
-                raise ValueError(f"palette colour '{colour}' must look like #rrggbb")
+    def _positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("A render profile needs a positive width and height.")
+        return value
+
+    @field_validator("fps")
+    @classmethod
+    def _valid_fps(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("A render profile needs a positive frame rate.")
         return value
 
 
-class AssetRequest(BaseModel):
-    """One asset the scene needs: procedural, or fetched from an open provider."""
+class ShotSpec(BaseModel):
+    """One shot of a sequence."""
 
-    id: str = Field(description="Asset id, used as the layer/group prefix.")
-    kind: Literal["background", "prop", "texture"] = Field(default="prop")
-    procedural: dict[str, Any] | None = Field(
-        default=None,
-        description="Procedural params: {generator, ...}. See AssetGenerator.list_generators().",
-    )
-    search: dict[str, Any] | None = Field(
-        default=None,
-        description="Opt-in network fetch: {query, provider, license, rights, title, creator}.",
-    )
-    position: dict[str, float] | None = Field(
-        default=None, description="Canvas pixels {x, y} for a prop."
-    )
-    height: float | None = Field(default=None, description="Height in canvas pixels for a prop.")
-    z: float = Field(default=0.0)
+    id: str
+    title: str = ""
+    duration: float = 2.0
+    description: str = ""
+    characters: list[str] = Field(default_factory=list)
+    background: str | None = None
+    effects: list[Any] = Field(default_factory=list)
+    camera: list[dict[str, Any]] = Field(default_factory=list)
+    dialogue: list[dict[str, Any]] = Field(default_factory=list)
+    notes: str = ""
 
-    @model_validator(mode="after")
-    def _one_source(self) -> AssetRequest:
-        if self.procedural is None and self.search is None:
-            raise ValueError("an asset needs either 'procedural' or 'search'")
-        return self
+    @field_validator("id")
+    @classmethod
+    def _valid_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A shot needs an id.")
+        return value
+
+    @field_validator("duration")
+    @classmethod
+    def _positive_duration(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("A shot needs a positive duration.")
+        return value
+
+
+class SequenceSpec(BaseModel):
+    """A sequence of shots."""
+
+    id: str
+    title: str = ""
+    shots: list[ShotSpec] = Field(default_factory=list)
+
+
+class EpisodeSpec(BaseModel):
+    """An episode of sequences."""
+
+    id: str
+    title: str = ""
+    sequences: list[SequenceSpec] = Field(default_factory=list)
+
+
+class CharacterSpec(BaseModel):
+    """A character of the production."""
+
+    id: str
+    manifest: str | None = None
+    parts: list[dict[str, Any]] = Field(default_factory=list)
+    position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+    height: float = 200.0
+    flip: bool = False
+    rig: str | None = None
+    actions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ProductionBrief(BaseModel):
-    """The single input to :meth:`AnimeProductionPipeline.run`."""
+    """The structured request an agent hands to the orchestrator."""
 
-    title: str = Field(default="Untitled Production", description="Project title.")
-    style: str = Field(
-        default="shonen_action",
-        description="Style preset name (see style_list). Drives palette and effect stack.",
-    )
-    width: int = Field(default=1280, ge=16, le=8192)
-    height: int = Field(default=720, ge=16, le=8192)
-    fps: float = Field(default=24.0, gt=0.0, le=240.0)
-    duration: float = Field(
-        default=6.0,
-        gt=0.0,
-        le=3600.0,
-        description="Total duration in seconds. When shots are given, their durations win.",
-    )
-    seed: int = Field(
-        default=0,
-        ge=0,
-        description="Seed for all procedural randomness; the same brief reproduces byte-identical layers.",
-    )
-    shots: list[StoryboardShot] = Field(
-        default_factory=list,
-        description="Optional shot list; when empty a single shot spanning 'duration' is used.",
-    )
-    characters: list[CharacterDescriptor] = Field(default_factory=list)
-    assets: list[AssetRequest] = Field(
-        default_factory=list,
-        description="Extra assets beyond each character's generated rig.",
-    )
-    background: dict[str, Any] | None = Field(
-        default=None,
-        description="Convenience background: a procedural spec {generator, ...} or "
-        "{file: 'bg.png', fit: 'cover'}.",
-    )
-    camera: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Camera keys [{time, zoom, center: {x, y}}]; a gentle default is used when empty.",
-    )
-    transitions: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Shot-boundary transitions [{type: 'fade'|'dissolve', duration, time?}]. When "
-        "empty, a fade-in at 0s and a fade-out at the end are used so the edit reads cleanly.",
-    )
-    audio: list[AudioCue] = Field(
-        default_factory=list,
-        description="Sound cues placed on the timeline, e.g. a music bed or a hit at a beat.",
-    )
-    render: RenderOptions = Field(default_factory=RenderOptions)
-    story: Any | None = Field(
-        default=None,
-        description="Optional authored StoryBible (see the story_bible tool). When set, the "
-        "pipeline validates and consumes it instead of deriving one from the brief.",
-    )
-    save_path: str | None = Field(
-        default=None, description="Where to write the .sif/.sifz. Defaults under the workspace."
-    )
-    output_dir: str | None = Field(
-        default=None, description="Directory for the video, contact sheet and rig sheets."
-    )
-
-
-class StageReport(BaseModel):
-    """The outcome of one pipeline stage."""
-
-    name: str
-    status: Literal["ok", "skipped", "failed"] = "ok"
-    detail: str = ""
-    artifacts: list[str] = Field(default_factory=list)
-    metrics: dict[str, Any] = Field(default_factory=dict)
-    warnings: list[str] = Field(default_factory=list)
-
-
-class ProductionReport(BaseModel):
-    """The structured result of a production run."""
-
-    success: bool = Field(description="True when every attempted stage succeeded.")
     title: str
-    style: str
-    doc_id: str | None = None
-    total_shots: int = 0
-    duration_seconds: float = 0.0
-    stages: list[StageReport] = Field(default_factory=list)
-    artifacts: dict[str, str] = Field(
-        default_factory=dict,
-        description="Named output paths: document, video, contact_sheet, rig_sheets, manifest.",
-    )
-    review: dict[str, Any] = Field(default_factory=dict)
-    warnings: list[str] = Field(default_factory=list)
-    verification: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Final read-back checks: document loads, animated waypoints present, "
-        "and every requested artifact exists on disk.",
-    )
-    dry_run: bool = False
+    slug: str | None = None
+    logline: str = ""
+    width: int = 1920
+    height: int = 1080
+    fps: float = 24.0
+    style: str = "shonen_action"
+    episodes: list[EpisodeSpec] = Field(default_factory=list)
+    characters: list[CharacterSpec] = Field(default_factory=list)
+    backgrounds: list[dict[str, Any]] = Field(default_factory=list)
+    props: list[dict[str, Any]] = Field(default_factory=list)
+    rigs: list[dict[str, Any]] = Field(default_factory=list)
+    render_profiles: list[RenderProfile] = Field(default_factory=list)
+    checkpoints: list[str] = Field(default_factory=list)
+    root: str | None = None
+    render_final: bool = False
 
-    def stage(self, name: str) -> StageReport | None:
-        return next((s for s in self.stages if s.name == name), None)
+    @field_validator("slug")
+    @classmethod
+    def _valid_slug(cls, value: str | None) -> str | None:
+        if value is not None and not slugify(value):
+            raise ValueError("A project slug must contain at least one letter or digit.")
+        return value
+
+    @field_validator("width", "height")
+    @classmethod
+    def _positive_size(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("A production needs a positive width and height.")
+        return value
+
+    @field_validator("fps")
+    @classmethod
+    def _valid_fps(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("A production needs a positive frame rate.")
+        return value
+
+    @property
+    def project_slug(self) -> str:
+        """The slug of the project directory."""
+        return self.slug or slugify(self.title)
+
+    @property
+    def shots(self) -> list[ShotSpec]:
+        """Return every shot with the episode and sequence it belongs to."""
+        return [
+            shot
+            for episode in self.episodes
+            for sequence in episode.sequences
+            for shot in sequence.shots
+        ]
+
+    @property
+    def total_duration(self) -> float:
+        """Total duration of the production in seconds."""
+        return sum(shot.duration for shot in self.shots)
+
+
+class AssetRecord(BaseModel):
+    """One entry of the asset registry."""
+
+    id: str
+    kind: str = "asset"
+    path: str | None = None
+    title: str = ""
+    creator: str = ""
+    license_code: str = "own"
+    rights: str = ""
+    source_url: str = ""
+    sha256: str = ""
+    width: int | None = None
+    height: int | None = None
+    created_at: str = ""
+
+
+class VersionRecord(BaseModel):
+    """One entry of the version history."""
+
+    label: str
+    path: str | None = None
+    sha256: str = ""
+    recorded_at: str = ""
+
+
+class ProductionTask(BaseModel):
+    """One step of the production plan."""
+
+    id: str
+    kind: str
+    title: str = ""
+    depends_on: list[str] = Field(default_factory=list)
+    params: dict[str, Any] = Field(default_factory=dict)
+    status: TaskStatus = TaskStatus.PENDING
+    attempts: int = 0
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    checkpoint: str | None = None
+    critical: bool = False
+
+
+class ProductionPlan(BaseModel):
+    """The ordered list of tasks of a production."""
+
+    project: str
+    tasks: list[ProductionTask] = Field(default_factory=list)
+    approved_checkpoints: list[str] = Field(default_factory=list)
+
+    def task(self, task_id: str) -> ProductionTask | None:
+        return next((t for t in self.tasks if t.id == task_id), None)
+
+    def pending(self) -> list[ProductionTask]:
+        return [t for t in self.tasks if t.status == TaskStatus.PENDING]
+
+    def is_approved(self, checkpoint: str) -> bool:
+        return checkpoint in self.approved_checkpoints
+
+
+class ProductionManifest(BaseModel):
+    """The on-disk manifest of a production project."""
+
+    schema_version: str = "1.0"
+    title: str
+    slug: str
+    logline: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    width: int = 1920
+    height: int = 1080
+    fps: float = 24.0
+    style: str = "shonen_action"
+    brief: dict[str, Any] = Field(default_factory=dict)
+    render_profiles: list[RenderProfile] = Field(default_factory=list)
+    assets: list[AssetRecord] = Field(default_factory=list)
+    characters: list[dict[str, Any]] = Field(default_factory=list)
+    backgrounds: list[dict[str, Any]] = Field(default_factory=list)
+    props: list[dict[str, Any]] = Field(default_factory=list)
+    rigs: list[dict[str, Any]] = Field(default_factory=list)
+    episodes: list[dict[str, Any]] = Field(default_factory=list)
+    shots: list[dict[str, Any]] = Field(default_factory=list)
+    versions: list[VersionRecord] = Field(default_factory=list)
+    doc_id: str | None = None
+    project_file: str | None = None
+    status: str = "created"

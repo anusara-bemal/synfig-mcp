@@ -39,9 +39,6 @@ class LiveBackend(BackendBase):
         self._client = client
         self.studio_detected = studio_detected
         self._pipeline: Any = None
-        self._event_log: list[dict[str, Any]] = []
-        self._state_version = 0
-        self._event_task: Any = None
 
     @property
     def name(self) -> str:
@@ -78,39 +75,59 @@ class LiveBackend(BackendBase):
                 await self._client.connect(timeout=settings.bridge_connect_timeout_seconds)
             except Exception as exc:
                 raise BridgeConnectionError(self.bridge_unavailable_message()) from exc
-        self._ensure_event_pump()
+            await self._sync_project_access(self._client)
         return self._client
 
-    def _ensure_event_pump(self) -> None:
-        """Start consuming bridge notifications into the bounded event log.
+    async def _sync_project_access(self, client: BridgeClient, doc_id: str | None = None) -> dict[str, Any]:
+        """Let the open Synfig project authorise its directory and assets.
 
-        Notifications are how a manual artist edit becomes visible to the model:
-        the bridge broadcasts ``event.document_changed`` and friends, and each one
-        bumps the state version so a caller can detect that the document moved
-        under it without polling the whole scene.
+        Best-effort: an unreachable or older bridge must not break document
+        operations; access then falls back to user intent and approvals.
         """
-        import asyncio
+        from synfig_mcp.security.access import get_access_controller
 
-        if self._client is None:
-            return
-        if self._event_task is not None and not self._event_task.done():
-            return
-        self._event_task = asyncio.create_task(self._pump_events(self._client))
-
-    async def _pump_events(self, client: BridgeClient) -> None:
+        report: dict[str, Any] = {"backend": "live", "registered": False}
         try:
-            async for notification in client.events():
-                self._state_version += 1
-                entry = {
-                    "method": notification.method,
-                    "params": notification.params,
-                    "state_version": self._state_version,
-                }
-                self._event_log.append(entry)
-                if len(self._event_log) > 200:
-                    del self._event_log[:-200]
-        except Exception:  # noqa: BLE001 - the pump must never crash a caller
-            return
+            params: dict[str, Any] = {}
+            if doc_id:
+                params["doc_id"] = doc_id
+            res = await client.call("project.assets", params, timeout=5.0)
+            controller = get_access_controller()
+            project_dir = res.get("project_dir")
+            file_path = res.get("file_path")
+            if file_path:
+                controller.register_project(file_path)
+            elif project_dir:
+                controller.register_project(project_dir)
+            assets = res.get("assets") or []
+            paths = [a.get("absolute_path") or a.get("filename") for a in assets]
+            added = controller.register_project_assets([p for p in paths if p])
+            report.update(
+                registered=True,
+                project_dir=project_dir,
+                file_path=file_path,
+                asset_count=len(assets),
+                new_assets=added,
+            )
+        except Exception:
+            return report
+        return report
+
+    async def studio_info(self) -> dict[str, Any]:
+        client = await self._ensure_client()
+        try:
+            res = await client.call("studio.info")
+            res["backend"] = "live"
+            return res
+        except Exception:
+            return {
+                "backend": "live",
+                "docs": [d.model_dump() for d in await self.doc_list()],
+            }
+
+    async def refresh_project_access(self) -> dict[str, Any]:
+        client = await self._ensure_client()
+        return await self._sync_project_access(client)
 
     async def health_check(self) -> HealthStatus:
         """Probe the live bridge socket and report capabilities."""
@@ -122,7 +139,7 @@ class LiveBackend(BackendBase):
             "host_os": platform.system(),
             "workspace_roots": [str(r) for r in get_default_allowed_roots()],
             "path_mappings": [f"{s} -> {d}" for s, d in get_path_mappings()],
-            "sandbox_enabled": True,
+            "sandbox_enabled": False,
         }
         try:
             client = await self._ensure_client()
@@ -184,17 +201,22 @@ class LiveBackend(BackendBase):
 
     async def doc_open(self, file_path: str) -> DocumentInfo:
         safe_path = validate_path(
-            file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, must_exist=True
+            file_path,
+            allowed_extensions={".sif", ".sifz", ".sfg"},
+            must_exist=True,
+            user_intent=True,
         )
         client = await self._ensure_client()
         res = await client.call("doc.open", {"file_path": str(safe_path)})
-        return DocumentInfo.model_validate(res)
+        info = DocumentInfo.model_validate(res)
+        await self._sync_project_access(client, info.id)
+        return info
 
     async def doc_save(self, doc_id: str, file_path: str | None = None) -> str:
         safe_path_str: str | None = None
         if file_path:
             safe_path = validate_path(
-                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, for_write=True
+                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, user_intent=True
             )
             safe_path_str = str(safe_path)
         client = await self._ensure_client()
@@ -202,6 +224,7 @@ class LiveBackend(BackendBase):
         if safe_path_str:
             params["file_path"] = safe_path_str
         res = await client.call("doc.save", params)
+        await self._sync_project_access(client, doc_id)
         return str(res.get("file_path", safe_path_str or ""))
 
     async def doc_close(self, doc_id: str, force: bool = False) -> bool:
@@ -407,15 +430,19 @@ class LiveBackend(BackendBase):
                 ".au",
             },
             must_exist=True,
+            user_intent=True,
         )
         audio_extensions = {".wav", ".ogg", ".mp3", ".flac", ".au"}
         layer_type = "sound" if safe_path.suffix.lower() in audio_extensions else "import"
-        return await self.layer_add(
+        result = await self.layer_add(
             doc_id=doc_id,
             layer_type=layer_type,
             canvas_path=canvas_path,
             params={"filename": {"type": "string", "value": str(safe_path)}},
         )
+        client = await self._ensure_client()
+        await self._sync_project_access(client, doc_id)
+        return result
 
     async def param_get(
         self, doc_id: str, layer_id: str, param_name: str, canvas_path: str = ""
@@ -794,111 +821,6 @@ class LiveBackend(BackendBase):
                 return [str(layer_id) for layer_id in selected]
         return list(layer_ids)
 
-    # -----------------------------------------------------------------------
-    # GUI View & Layer Appearance (Phase 6)
-    # -----------------------------------------------------------------------
-
-    async def view_get(self, doc_id: str) -> dict[str, Any]:
-        client = await self._ensure_client()
-        res = await client.call("view.get", {"doc_id": doc_id})
-        if isinstance(res, dict):
-            focus = res.get("focus") or {}
-            return {
-                "zoom": float(res.get("zoom", 1.0)),
-                "focus": {"x": float(focus.get("x", 0.0)), "y": float(focus.get("y", 0.0))},
-                "gui": True,
-            }
-        return {"zoom": 1.0, "focus": {"x": 0.0, "y": 0.0}, "gui": True}
-
-    async def view_set(
-        self,
-        doc_id: str,
-        mode: str | None = None,
-        zoom: float | None = None,
-        x: float | None = None,
-        y: float | None = None,
-    ) -> dict[str, Any]:
-        client = await self._ensure_client()
-        params: dict[str, Any] = {"doc_id": doc_id}
-        if mode is not None:
-            params["mode"] = mode
-        if zoom is not None:
-            params["zoom"] = zoom
-        if x is not None:
-            params["x"] = x
-        if y is not None:
-            params["y"] = y
-        # ``view.pan`` is a distinct method so panning never accidentally re-zooms.
-        method = "view.pan" if (mode is None and (x is not None or y is not None)) else "view.zoom"
-        if method == "view.zoom" and mode is None and zoom is None:
-            method = "view.fit"
-        res = await client.call(method, params)
-        if isinstance(res, dict):
-            focus = res.get("focus") or {}
-            return {
-                "zoom": float(res.get("zoom", 1.0)),
-                "focus": {"x": float(focus.get("x", 0.0)), "y": float(focus.get("y", 0.0))},
-                "gui": True,
-            }
-        return {"zoom": 1.0, "focus": {"x": 0.0, "y": 0.0}, "gui": True}
-
-    async def layer_set_visibility(
-        self,
-        doc_id: str,
-        layer_id: str,
-        visible: bool,
-        canvas_path: str = "",  # noqa: ARG002
-    ) -> dict[str, Any]:
-        client = await self._ensure_client()
-        res = await client.call(
-            "layer.set_visibility",
-            {"doc_id": doc_id, "layer_id": layer_id, "visible": visible},
-        )
-        return res if isinstance(res, dict) else {"doc_id": doc_id, "layer_id": layer_id}
-
-    async def layer_set_blend(
-        self,
-        doc_id: str,
-        layer_id: str,
-        amount: float | None = None,
-        blend_method: int | None = None,
-        canvas_path: str = "",  # noqa: ARG002
-    ) -> dict[str, Any]:
-        client = await self._ensure_client()
-        params: dict[str, Any] = {"doc_id": doc_id, "layer_id": layer_id}
-        if amount is not None:
-            params["amount"] = amount
-        if blend_method is not None:
-            params["blend_method"] = blend_method
-        res = await client.call("layer.set_blend", params)
-        return res if isinstance(res, dict) else {"doc_id": doc_id, "layer_id": layer_id}
-
-    async def layer_align(
-        self,
-        doc_id: str,
-        layer_ids: list[str],
-        edge: str = "center",
-        canvas_path: str = "",  # noqa: ARG002
-    ) -> dict[str, Any]:
-        client = await self._ensure_client()
-        res = await client.call(
-            "layer.align", {"doc_id": doc_id, "layer_ids": list(layer_ids), "edge": edge}
-        )
-        return res if isinstance(res, dict) else {"doc_id": doc_id, "edge": edge, "moved": []}
-
-    async def recent_events(self, doc_id: str | None = None, limit: int = 20) -> dict[str, Any]:
-        """Return the recent bridge notifications and the current state version."""
-        await self._ensure_client()
-        events = self._event_log
-        if doc_id is not None:
-            events = [e for e in events if str(e.get("params", {}).get("doc_id", doc_id)) == doc_id]
-        return {
-            "events": events[-limit:],
-            "state_version": self._state_version,
-            "doc_id": doc_id,
-            "limit": limit,
-        }
-
     async def render_frame(
         self,
         doc_id: str,
@@ -910,7 +832,7 @@ class LiveBackend(BackendBase):
     ) -> bool:
         normalized_target = require_frame_target(target)
         safe_output = validate_path(
-            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, for_write=True
+            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, user_intent=True
         )
         client = await self._ensure_client()
         p: dict[str, Any] = {
@@ -947,7 +869,7 @@ class LiveBackend(BackendBase):
         progress_cb: Any = None,
         cancel_token: Any = None,
     ) -> list[str]:
-        safe_dir = validate_path(output_dir, for_write=True)
+        safe_dir = validate_path(output_dir, user_intent=True)
         res = await self.pipeline.render_sequence(
             doc_id=doc_id,
             output_dir=str(safe_dir),
@@ -977,7 +899,7 @@ class LiveBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
-            for_write=True,
+            user_intent=True,
         )
         ok = await self.pipeline.render_video(
             doc_id=doc_id,
@@ -1004,7 +926,7 @@ class LiveBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".png", ".jpg", ".jpeg"},
-            for_write=True,
+            user_intent=True,
         )
         ok = await self.pipeline.render_contact_sheet(
             doc_id=doc_id,
@@ -1075,7 +997,7 @@ class LiveBackend(BackendBase):
                 fn_val = fn_p.get("value") if isinstance(fn_p, dict) else fn_p
                 if fn_val:
                     try:
-                        resolved_fn = validate_path(fn_val, must_exist=True)
+                        resolved_fn = validate_path(fn_val, must_exist=True, user_intent=True)
                         resolved_str = str(resolved_fn)
                         if isinstance(norm_params["filename"], dict):
                             norm_params["filename"]["value"] = resolved_str

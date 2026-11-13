@@ -105,6 +105,9 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | Protocol Method | Parameters | Backing Synfig / Studio C++ API | Status |
 |---|---|---|---|
 | `doc.list` | `none` | `studio::App::instance_list` | Verified |
+| `studio.info` | `none` | `studio::App::instance_list`, `PROTOCOL_VERSION`, `STUDIO_VERSION` | Verified |
+| `doc.active` | `none` | `resolve_instance("")`, `canvas->rend_desc()`, `canvas->get_time()` | Verified |
+| `project.assets` | `doc_id?` | `instance->get_file_name()`, recursive import-layer `filename` walk | Verified |
 | `doc.new` | `width`, `height`, `fps`, `duration` | `studio::App::new_instance()`, `RendDesc` setup | Verified |
 | `doc.open` | `file_path` | `studio::App::open(file_path)` | Verified |
 | `doc.save` | `doc_id`, `file_path?` | `instance->save()`, `instance->save_as(path)` | Verified |
@@ -131,6 +134,7 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `param.list` | `doc_id`, `layer_id`, `canvas_path?` | `layer->get_param_list()` | Verified |
 | `param.set` | `doc_id`, `layer_id`, `param_name`, `value` | `Action::LayerParamSet::create()` or `canvas_interface->change_value()` | Verified |
 | `param.link` | `doc_id`, `layer_id`, `param_name`, `link_id`| `Action::LayerParamConnect::create()` | Verified |
+| `rig.bone_add` | `doc_id`, `layer_id`, `time?`, `origin_x?`, `origin_y?`, `angle?`, `width?`, `tipwidth?`, `parent_index?` | `Action::ValueNodeStaticListInsert` (root bone) / `Action::ValueDescCreateChildBone` (child bone) | Verified |
 | `param.convert` | `doc_id`, `layer_id`, `param_name`, `type` | `synfigapp::Action::ValueDescConvert::create()` | Verified |
 | `param.export` | `doc_id`, `layer_id`, `param_name`, `name` | `synfigapp::Action::ValueDescExport::create()` | Verified |
 | `param.unexport` | `doc_id`, `name` | `synfigapp::Action::ValueNodeRemove::create()` | Verified |
@@ -150,25 +154,14 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | `history.list` | `doc_id` | `instance->undo_action_stack()`, `redo_action_stack()` | Verified |
 | `selection.get` | `doc_id` | `canvas_view->get_selection_manager()->get_selected_layers()` | Verified |
 | `selection.set` | `doc_id`, `layer_ids[]` | `canvas_view->get_selection_manager()->set_selected_layers()` | Verified |
-| `view.get` | `doc_id` | `WorkArea::get_zoom()`, `WorkArea::get_focus_point()` | Verified |
-| `view.zoom` | `doc_id`, `mode?` (`in`/`out`/`fit`/`normal`), `zoom?` | `WorkArea::zoom_in/out/fit/norm()`, `WorkArea::set_zoom()` (clamped 1/128–128) | Verified |
-| `view.pan` | `doc_id`, `x`, `y` | `WorkArea::set_focus_point()` | Verified |
-| `view.fit` | `doc_id` | `WorkArea::zoom_fit()` | Verified |
-| `layer.set_visibility` | `doc_id`, `layer_id`, `visible` | `Action::LayerActivate::create()` (`active` flag) | Verified |
-| `layer.set_blend` | `doc_id`, `layer_id`, `amount?`, `blend_method?` | `canvas_interface->change_value()` on the composite `amount`/`blend_method` params | Verified |
-| `layer.align` | `doc_id`, `layer_ids[]`, `edge` | `Layer::get_bounding_rect()` + `change_value()` on each layer's `origin` | Verified |
 | `rig.skeleton_create`| `doc_id`, `name` | `Action::LayerAdd::create("skeleton")` | **Not implemented** (planned) |
-| `rig.bone_add` | `doc_id`, `layer_id` (`skeleton_layer?`), `time?`, `origin_x?`, `origin_y?`, `angle?`, `width?`, `tipwidth?`, `parent_index?` | root: `Action::ValueNodeStaticListInsert::create()`; child: `Action::ValueDescCreateChildBone::create()` | Verified |
+| `rig.bone_add` | `doc_id`, `skeleton_layer`, `parent_bone?` | `Action::ValueDescCreateChildBone::create()` | **Not implemented** (planned) |
 | `rig.bone_bind` | `doc_id`, `layer_id`, `bone_id` | `Action::ValueDescBoneLink::create()` | **Not implemented** (planned) |
 | `render.frame` | `doc_id`, `time`, `width?`, `height?` | Off-thread render via CLI temp save or async renderer | Verified |
 
 > [!WARNING]
 > **Identified P3/P4 Risks**:
-> `rig.bone_bind`: While `ValueDescBoneLink` exists in `synfigapp/actions`, its parameter
-> dictionary requires an exact internal GUID/ValueNode structure. It is therefore listed as
-> *not implemented* until it is probed with golden project files. (`rig.bone_add` is
-> implemented — root bones go in through `ValueNodeStaticListInsert`, child bones through
-> `ValueDescCreateChildBone` with `parent_index`.)
+> `rig.bone_add` and `rig.bone_bind`: While `ValueDescCreateChildBone` and `ValueDescBoneLink` exist in `synfigapp/actions`, their parameter dictionaries require exact internal GUID/ValueNode structure. They are therefore listed as *not implemented* until they are probed with golden project files.
 
 > The table is checked against the C++ dispatcher by `server/tests/unit/test_protocol_docs.py`: a method that is documented but missing from the bridge (or the other way round) fails the build.
 
@@ -197,6 +190,6 @@ Notifications emit when the active document state changes (e.g., manual artist e
 | `1102` | `LayerNotFound` | Layer not found in canvas hierarchy. |
 | `1103` | `ParamNotFound` | Parameter does not exist on layer. |
 | `1201` | `ValidationError` | Parameters failed JSON Schema validation. |
-| `1202` | `SecuritySandboxError` | File path outside allowed workspace roots. |
+| `1202` | `SecuritySandboxError` | Path denied by the project-aware access policy: traversal, system/credential location, disallowed extension, or no project/approval coverage. |
 | `1301` | `ActionExecutionError` | `synfigapp::Action::System` returned false. |
 | `1302` | `RenderError` | Frame or sequence rendering failed. |

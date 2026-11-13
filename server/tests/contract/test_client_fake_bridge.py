@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 
 from synfig_mcp.protocol.client import BridgeClient
-from synfig_mcp.protocol.fake_bridge import FakeBridgeServer
+from tests.support.fake_bridge import FakeBridgeServer
 
 TEST_TOKEN = "valid_token_0123456789abcdef"
 

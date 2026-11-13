@@ -10,6 +10,8 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <functional>
+#include <cctype>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -23,7 +25,6 @@
 #include <gui/app.h>
 #include <gui/instance.h>
 #include <gui/canvasview.h>
-#include <gui/workarea.h>
 #include <synfigapp/action.h>
 #include <synfigapp/action_system.h>
 #include <synfigapp/canvasinterface.h>
@@ -272,8 +273,6 @@ const char* get_build_commit_sha() {
 }
 #endif
 
-static std::vector<std::string> s_workspace_roots;
-
 static std::string normalize_path_str(const std::string& p) {
     if (p.empty()) return "";
 #ifdef _WIN32
@@ -335,215 +334,105 @@ static std::string normalize_path_str(const std::string& p) {
 #endif
 }
 
-static bool is_within_root(const std::string& target_canon, const std::string& root_canon) {
-    std::string s_target = normalize_path_str(target_canon);
-    std::string s_root = normalize_path_str(root_canon);
-    if (s_target == s_root) return true;
-#ifdef _WIN32
-    if (s_target.rfind(s_root + "\\", 0) == 0) return true;
-#else
-    if (s_target.rfind(s_root + "/", 0) == 0) return true;
-#endif
-    return false;
-}
-
-static bool is_overly_broad_root(const std::string& path_str, std::string& reason) {
-    std::string p = normalize_path_str(path_str);
-    if (p.empty()) {
-        reason = "path is empty";
-        return true;
-    }
-
-#ifdef _WIN32
-    // 1. Drive roots (e.g. "c:", "c:\", "d:")
-    if (p.length() <= 3 && p.length() >= 2 && p[1] == ':') {
-        reason = "drive root is overly broad; specify a project-specific directory";
-        return true;
-    }
-
-    // 2. Windows / System directory
-    char win_dir[MAX_PATH];
-    if (GetWindowsDirectoryA(win_dir, MAX_PATH)) {
-        std::string s_win = normalize_path_str(win_dir);
-        if (p == s_win || is_within_root(p, s_win)) {
-            reason = "Windows system directory is not allowed as a workspace root";
-            return true;
-        }
-    }
-
-    // 3. Program Files
-    const char* pf = std::getenv("ProgramFiles");
-    if (pf && *pf) {
-        std::string s_pf = normalize_path_str(pf);
-        if (p == s_pf || is_within_root(p, s_pf)) {
-            reason = "Program Files directory is not allowed as a workspace root";
-            return true;
-        }
-    }
-    const char* pf86 = std::getenv("ProgramFiles(x86)");
-    if (pf86 && *pf86) {
-        std::string s_pf86 = normalize_path_str(pf86);
-        if (p == s_pf86 || is_within_root(p, s_pf86)) {
-            reason = "Program Files (x86) directory is not allowed as a workspace root";
-            return true;
-        }
-    }
-
-    // 4. User home directory directly (e.g. C:\Users\username or C:\Users)
-    const char* up = std::getenv("USERPROFILE");
-    if (up && *up) {
-        std::string s_up = normalize_path_str(up);
-        if (p == s_up) {
-            reason = "User home directory directly is overly broad; specify a dedicated project subfolder";
-            return true;
-        }
-        size_t last_slash = s_up.find_last_of("\\/");
-        if (last_slash != std::string::npos) {
-            std::string s_users = s_up.substr(0, last_slash);
-            if (p == s_users) {
-                reason = "Users directory is overly broad";
-                return true;
-            }
-        }
-    }
-#else
-    if (p == "/" || p == "/root" || p == "/home" || p == "/Users" ||
-        p == "/etc" || p == "/usr" || p == "/bin" || p == "/sbin" || p == "/var") {
-        reason = "system directory is overly broad";
-        return true;
-    }
-    const char* home = std::getenv("HOME");
-    if (home && *home && p == normalize_path_str(home)) {
-        reason = "User home directory directly is overly broad; specify a dedicated project subfolder";
-        return true;
-    }
-#endif
-
-    return false;
-}
-
-static void ensure_default_workspace_roots() {
-    if (!s_workspace_roots.empty()) return;
-
-    const char* env_roots = std::getenv("SYNFIG_MCP_WORKSPACE_ROOTS");
-    if (env_roots && *env_roots) {
-        std::string s(env_roots);
-        std::stringstream ss(s);
-        std::string item;
-#ifdef _WIN32
-        char delim = ';';
-#else
-        char delim = ':';
-#endif
-        while (std::getline(ss, item, delim)) {
-            if (!item.empty()) {
-                std::string reason;
-                if (!is_overly_broad_root(item, reason)) {
-                    s_workspace_roots.push_back(normalize_path_str(item));
-                }
-            }
-        }
-    }
-
-#ifdef _WIN32
-    const char* home = std::getenv("USERPROFILE");
-    if (home && *home) {
-        std::string def_dir = std::string(home) + "\\Documents\\SynfigMCP";
-        s_workspace_roots.push_back(normalize_path_str(def_dir));
-    }
-    char tmp[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tmp)) {
-        s_workspace_roots.push_back(normalize_path_str(tmp));
-    }
-#else
-    const char* home = std::getenv("HOME");
-    if (home && *home) {
-        std::string def_dir = std::string(home) + "/Documents/SynfigMCP";
-        s_workspace_roots.push_back(normalize_path_str(def_dir));
-    }
-    const char* tmp = std::getenv("TMPDIR");
-    s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
-#endif
-}
-
-bool set_workspace_roots(const std::vector<std::string>& roots, std::string& error_msg) {
-    std::vector<std::string> valid_roots;
-    for (const auto& r : roots) {
-        if (!r.empty()) {
-            std::string reason;
-            if (is_overly_broad_root(r, reason)) {
-                error_msg = "Overly broad workspace root rejected: '" + r + "' (" + reason + ")";
-                return false;
-            }
-            valid_roots.push_back(normalize_path_str(r));
-        }
-    }
-    s_workspace_roots = valid_roots;
-#ifdef _WIN32
-    char tmp[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tmp)) {
-        s_workspace_roots.push_back(normalize_path_str(tmp));
-    }
-#else
-    const char* tmp = std::getenv("TMPDIR");
-    s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
-#endif
-    return true;
-}
-
-void set_workspace_roots(const std::vector<std::string>& roots) {
-    std::string err;
-    set_workspace_roots(roots, err);
-}
-
 static bool is_safe_bridge_path(const std::string& path, const std::vector<std::string>& allowed_exts, std::string& out_err) {
+    // Project-aware access policy: the MCP server (Python) authorises paths
+    // against the active Synfig project, user attachments and explicit folder
+    // approvals before they reach the bridge.  The bridge keeps only minimal
+    // safety checks: no traversal, no system/credential locations, and the
+    // per-operation extension allow-list.  There is no workspace-root jail:
+    // assets in Downloads or any user-approved folder work directly.
     if (path.empty()) {
-        out_err = "Security Sandbox Error: path cannot be empty";
+        out_err = "Security Error: path cannot be empty";
         return false;
     }
-    if (path.find('\0') != std::string::npos) {
-        out_err = "Security Sandbox Error: null byte in path";
-        return false;
-    }
-    if (path.find("..") != std::string::npos) {
-        out_err = "Security Sandbox Error: directory traversal ('..') is rejected: " + path;
-        return false;
-    }
-    if (!allowed_exts.empty()) {
-        size_t dot_pos = path.rfind('.');
-        std::string ext = (dot_pos == std::string::npos) ? "" : path.substr(dot_pos);
-        std::string ext_lower = ext;
-        std::transform(ext_lower.begin(), ext_lower.end(), ext_lower.begin(), ::tolower);
-        bool found = false;
-        for (const auto& a : allowed_exts) {
-            std::string a_lower = a;
-            std::transform(a_lower.begin(), a_lower.end(), a_lower.begin(), ::tolower);
-            if (ext_lower == a_lower || ext_lower == ("." + a_lower)) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            out_err = "Security Sandbox Error: file extension '" + ext + "' is not permitted for: " + path;
+
+    std::string path_for_checks = path;
+    std::replace(path_for_checks.begin(), path_for_checks.end(), '\\', '/');
+    std::stringstream parts(path_for_checks);
+    std::string part;
+    while (std::getline(parts, part, '/')) {
+        if (part == "..") {
+            out_err = "Security Error: directory traversal is not permitted";
             return false;
         }
     }
 
-    ensure_default_workspace_roots();
-    std::string canon_target = normalize_path_str(path);
-
-    bool inside = false;
-    for (const auto& root : s_workspace_roots) {
-        if (is_within_root(canon_target, root)) {
-            inside = true;
-            break;
+    std::string lower_path = path_for_checks;
+    std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    const auto dot = lower_path.find_last_of('.');
+    const auto slash = lower_path.find_last_of('/');
+    const std::string extension =
+        dot != std::string::npos && (slash == std::string::npos || dot > slash)
+            ? lower_path.substr(dot)
+            : "";
+    if (!allowed_exts.empty()) {
+        bool allowed = false;
+        for (const auto& candidate : allowed_exts) {
+            if (extension == candidate) {
+                allowed = true;
+                break;
+            }
+        }
+        if (!allowed) {
+            out_err = "Security Error: file extension is not permitted for this operation";
+            return false;
         }
     }
 
-    if (!inside) {
-        out_err = "Security Sandbox Error: Access to path '" + path + "' is denied by bridge workspace sandbox. Path resolves to '" + canon_target + "' which is outside configured workspace roots.";
-        return false;
+    const std::string canonical = normalize_path_str(path);
+    std::string canon_lower = canonical;
+    std::transform(canon_lower.begin(), canon_lower.end(), canon_lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    std::replace(canon_lower.begin(), canon_lower.end(), '\\', '/');
+
+    // Credential / private-key locations are never accessible.
+    static const std::vector<std::string> denied_dirs = {
+        "/.ssh/", "/.aws/", "/.gnupg/", "/.azure/", "/.kube/", "/credentials/",
+        "/private_keys/", "/privatekeys/", "/secrets/"
+    };
+    for (const auto& denied : denied_dirs) {
+        if (canon_lower.find(denied) != std::string::npos) {
+            out_err = "Security Error: credential and private-key locations are never accessible";
+            return false;
+        }
     }
+
+#ifdef _WIN32
+    // Windows system / program installation folders are never accessible.
+    std::vector<std::string> denied_prefixes;
+    const char* env_names[] = {"SYSTEMROOT", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"};
+    for (const char* env_name : env_names) {
+        const char* value = std::getenv(env_name);
+        if (value && *value) {
+            std::string prefix(value);
+            std::replace(prefix.begin(), prefix.end(), '\\', '/');
+            std::transform(prefix.begin(), prefix.end(), prefix.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            while (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
+            denied_prefixes.push_back(prefix + "/");
+        }
+    }
+    for (const auto& prefix : denied_prefixes) {
+        if (canon_lower.rfind(prefix, 0) == 0) {
+            out_err = "Security Error: Windows system / program folders are never accessible";
+            return false;
+        }
+    }
+#else
+    static const std::vector<std::string> denied_prefixes = {
+        "/etc/", "/usr/", "/bin/", "/sbin/", "/boot/", "/proc/", "/sys/", "/dev/"
+    };
+    for (const auto& prefix : denied_prefixes) {
+        if (canon_lower.rfind(prefix, 0) == 0) {
+            out_err = "Security Error: system folders are never accessible";
+            return false;
+        }
+    }
+#endif
 
     return true;
 }
@@ -594,24 +483,9 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
 
         inout_authenticated = true;
 
-        if (params.contains("workspace_roots") && params["workspace_roots"].is_array()) {
-            std::vector<std::string> roots;
-            for (const auto& r : params["workspace_roots"]) {
-                if (r.is_string()) {
-                    roots.push_back(r.get<std::string>());
-                }
-            }
-            if (!roots.empty()) {
-                std::string err_reason;
-                if (!set_workspace_roots(roots, err_reason)) {
-                    res["error"] = {
-                        {"code", 1203},
-                        {"message", err_reason}
-                    };
-                    return res;
-                }
-            }
-        }
+        // workspace_roots from older clients is accepted but no longer
+        // enforced: access authority is the active project plus the MCP
+        // server's project-aware approval policy.
 
         res["result"] = {
             {"protocol_version", PROTOCOL_VERSION},
@@ -630,7 +504,9 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 "anim.read",
                 "anim.write",
                 "history",
-                "events"
+                "events",
+                "studio.info",
+                "project.read"
             }},
             {"session_id", "synfig_mcp_session"}
         };
@@ -681,6 +557,144 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             }
 
             r["result"] = doc_list;
+            return r;
+        });
+    }
+
+    if (method == "studio.info") {
+        return run_on_main_thread([&]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            nlohmann::json docs = nlohmann::json::array();
+            int idx = 0;
+            for (auto it = studio::App::instance_list.begin(); it != studio::App::instance_list.end(); ++it, ++idx) {
+                etl::handle<studio::Instance> inst = *it;
+                if (!inst || !inst->get_canvas()) continue;
+                nlohmann::json item;
+                item["doc_id"] = "doc_" + std::to_string(idx);
+                item["name"] = inst->get_canvas()->get_name();
+                item["file_path"] = inst->get_file_name().empty() ? nullptr : nlohmann::json(inst->get_file_name());
+                docs.push_back(item);
+            }
+
+            nlohmann::json result;
+            result["protocol_version"] = PROTOCOL_VERSION;
+            result["studio_version"] = STUDIO_VERSION;
+            result["docs"] = docs;
+            r["result"] = result;
+            return r;
+        });
+    }
+
+    if (method == "doc.active") {
+        return run_on_main_thread([&]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance("");
+            if (!inst || !inst->get_canvas()) {
+                return make_input_error(req, 2001, "No document is open in Synfig Studio.");
+            }
+
+            std::string doc_id = "doc_0";
+            int idx = 0;
+            for (auto it = studio::App::instance_list.begin(); it != studio::App::instance_list.end(); ++it, ++idx) {
+                if (*it == inst) {
+                    doc_id = "doc_" + std::to_string(idx);
+                    break;
+                }
+            }
+
+            synfig::Canvas::Handle canvas = inst->get_canvas();
+            synfig::RendDesc desc = canvas->rend_desc();
+            nlohmann::json result;
+            result["doc_id"] = doc_id;
+            result["name"] = canvas->get_name();
+            result["file_path"] = inst->get_file_name().empty() ? nullptr : nlohmann::json(inst->get_file_name());
+            result["width"] = desc.get_w();
+            result["height"] = desc.get_h();
+            result["fps"] = static_cast<double>(desc.get_frame_rate());
+            result["start_time"] = static_cast<double>(desc.get_time_start());
+            result["end_time"] = static_cast<double>(desc.get_time_end());
+            result["current_time"] = static_cast<double>(canvas->get_time());
+            r["result"] = result;
+            return r;
+        });
+    }
+
+    if (method == "project.assets") {
+        std::string wanted_doc;
+        if (params.contains("doc_id") && params["doc_id"].is_string()) {
+            wanted_doc = params["doc_id"].get<std::string>();
+        }
+        return run_on_main_thread([&, wanted_doc]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(wanted_doc);
+            if (!inst || !inst->get_canvas()) {
+                return make_input_error(req, 2001, "No matching document is open in Synfig Studio.");
+            }
+
+            std::string file_path = inst->get_file_name();
+            std::string project_dir;
+            if (!file_path.empty()) {
+                std::string canonical = normalize_path_str(file_path);
+                size_t last_sep = canonical.find_last_of("\\/");
+                if (last_sep != std::string::npos) {
+                    project_dir = canonical.substr(0, last_sep);
+                }
+            }
+
+            nlohmann::json assets = nlohmann::json::array();
+            std::vector<std::string> visited;
+            std::function<void(synfig::Canvas::Handle)> walk = [&](synfig::Canvas::Handle canvas) {
+                if (!canvas) return;
+                std::string canvas_id = canvas->get_id();
+                if (std::find(visited.begin(), visited.end(), canvas_id) != visited.end()) return;
+                visited.push_back(canvas_id);
+                for (auto it = canvas->begin(); it != canvas->end(); ++it) {
+                    synfig::Layer::Handle layer = *it;
+                    if (!layer) continue;
+                    if (layer->get_name() == "import") {
+                        synfig::Layer::ParamList param_list = layer->get_param_list();
+                        auto found = param_list.find("filename");
+                        if (found != param_list.end() && found->second.get_type() == synfig::type_string) {
+                            std::string filename = found->second.get(synfig::String());
+                            if (!filename.empty()) {
+                                nlohmann::json asset;
+                                asset["layer_description"] = layer->get_description();
+                                asset["canvas_id"] = canvas_id;
+                                asset["filename"] = filename;
+                                asset["absolute_path"] = project_dir.empty()
+                                    ? synfig::filesystem::Path::absolute_path(filename)
+                                    : synfig::filesystem::Path::absolute_path(project_dir, filename);
+                                assets.push_back(asset);
+                            }
+                        }
+                    }
+                    etl::handle<synfig::Layer_PasteCanvas> paste =
+                        etl::handle<synfig::Layer_PasteCanvas>::cast_dynamic(layer);
+                    if (paste && paste->get_sub_canvas()) {
+                        walk(paste->get_sub_canvas());
+                    }
+                }
+                for (auto& child : canvas->children()) {
+                    walk(child);
+                }
+            };
+            walk(inst->get_canvas());
+
+            nlohmann::json result;
+            result["doc_id"] = wanted_doc.empty() ? "active" : wanted_doc;
+            result["file_path"] = file_path.empty() ? nullptr : nlohmann::json(file_path);
+            result["project_dir"] = project_dir.empty() ? nullptr : nlohmann::json(project_dir);
+            result["assets"] = assets;
+            r["result"] = result;
             return r;
         });
     }
@@ -3068,263 +3082,6 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
         });
     }
 
-    // --- 7b. GUI VIEW METHODS (zoom / pan / fit) ---
-    // These drive the running Studio's WorkArea through its own stable methods
-    // (``WorkArea::set_zoom``, ``set_focus_point``) so the canvas the artist sees
-    // matches the tool's view.  They are cosmetic only and never touch the
-    // document, so they are not undoable.
-    if (method == "view.zoom" || method == "view.pan" || method == "view.fit" || method == "view.get") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string mode = (method == "view.zoom") ? params.value("mode", "set") : "";
-        double zoom = params.value("zoom", 0.0);
-        double x = params.value("x", 0.0);
-        double y = params.value("y", 0.0);
-
-        return run_on_main_thread([&, doc_id, method, mode, zoom, x, y]() -> nlohmann::json {
-            nlohmann::json r;
-            r["jsonrpc"] = "2.0";
-            r["id"] = req["id"];
-
-            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
-            if (!inst || !inst->get_canvas()) {
-                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
-                return r;
-            }
-
-            etl::handle<studio::CanvasView> cv = inst->find_canvas_view(inst->get_canvas());
-            if (!cv) {
-                cv = studio::App::get_selected_canvas_view();
-            }
-            if (!cv || !cv->get_work_area()) {
-                r["error"] = {{"code", -32000}, {"message", "No canvas view is open for " + doc_id}};
-                return r;
-            }
-
-            studio::WorkArea* wa = cv->get_work_area();
-
-            if (method == "view.zoom") {
-                if (mode == "in") {
-                    wa->zoom_in();
-                } else if (mode == "out") {
-                    wa->zoom_out();
-                } else if (mode == "fit") {
-                    wa->zoom_fit();
-                } else if (mode == "normal") {
-                    wa->zoom_norm();
-                } else {
-                    if (zoom <= 0.0) {
-                        r["error"] = {{"code", -32602}, {"message", "view.zoom requires zoom > 0"}};
-                        return r;
-                    }
-                    wa->set_zoom(static_cast<float>(zoom));
-                }
-            } else if (method == "view.pan") {
-                wa->set_focus_point(synfig::Point(x, y));
-            } else if (method == "view.fit") {
-                wa->zoom_fit();
-            }
-
-            synfig::Point focus = wa->get_focus_point();
-            r["result"] = {
-                {"doc_id", doc_id},
-                {"zoom", wa->get_zoom()},
-                {"focus", {{"x", focus[0]}, {"y", focus[1]}}}
-            };
-            return r;
-        });
-    }
-
-    // --- 7c. LAYER VISIBILITY / BLEND (GUI-visible state) ---
-    // ``layer.set_visibility`` toggles the ``active`` flag through the undoable
-    // ``LayerActivate`` action.  ``layer.set_blend`` writes the standard composite
-    // ``amount`` (opacity 0..1) and ``blend_method`` parameters, which exist on
-    // every composite layer (layer_composite.cpp); a non-composite layer rejects
-    // them, and that rejection is reported rather than hidden.
-    if (method == "layer.set_visibility" || method == "layer.set_blend") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string layer_id = params.value("layer_id", "");
-        bool visible = params.value("visible", true);
-        double amount = params.value("amount", 1.0);
-        int blend_method = params.value("blend_method", 0);
-        bool has_amount = params.contains("amount");
-        bool has_blend = params.contains("blend_method");
-
-        nlohmann::json early;
-        if (reject_empty_identifiers(req, layer_id, std::string("layer"), early)) {
-            return early;
-        }
-
-        return run_on_main_thread([&, doc_id, layer_id, visible, amount, blend_method, has_amount, has_blend, method]() -> nlohmann::json {
-            nlohmann::json r;
-            r["jsonrpc"] = "2.0";
-            r["id"] = req["id"];
-
-            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
-            if (!inst || !inst->get_canvas()) {
-                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
-                return r;
-            }
-
-            synfig::Layer::Handle layer = find_layer_in_canvas(inst->get_canvas(), layer_id);
-            if (!layer) {
-                r["error"] = {{"code", 2002}, {"message", "Layer not found: " + layer_id}};
-                return r;
-            }
-
-            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
-
-            if (method == "layer.set_visibility") {
-                synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: layer.set_visibility");
-                synfigapp::Action::Handle action = synfigapp::Action::create("LayerActivate");
-                if (!action) {
-                    grouper.cancel();
-                    r["error"] = {{"code", 1301}, {"message", "LayerActivate action unavailable"}};
-                    return r;
-                }
-                action->set_param("canvas", layer->get_canvas());
-                action->set_param("canvas_interface", ci);
-                action->set_param("layer", layer);
-                action->set_param("new_status", visible);
-                if (!inst->perform_action(action)) {
-                    grouper.cancel();
-                    r["error"] = {{"code", 1301}, {"message", "LayerActivate failed for " + layer_id}};
-                    return r;
-                }
-                grouper.finish();
-                r["result"] = {
-                    {"doc_id", doc_id},
-                    {"layer_id", layer_id},
-                    {"visible", layer->active()},
-                    {"diff", make_diff("layer.set_visibility", {}, {layer_id}, {})}
-                };
-                return r;
-            }
-
-            // layer.set_blend: only composite layers carry amount/blend_method.
-            bool ok = true;
-            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: layer.set_blend");
-            if (has_amount) {
-                ok = ci->change_value(synfigapp::ValueDesc(layer, "amount"), synfig::ValueBase(static_cast<synfig::Real>(amount))) && ok;
-            }
-            if (has_blend) {
-                ok = ci->change_value(synfigapp::ValueDesc(layer, "blend_method"), synfig::ValueBase(static_cast<int>(blend_method))) && ok;
-            }
-            if (!ok) {
-                grouper.cancel();
-                r["error"] = {{"code", 1301},
-                              {"message", "Layer '" + layer_id + "' has no amount/blend_method (not a composite layer)"}};
-                return r;
-            }
-            grouper.finish();
-
-            nlohmann::json after_amount = nullptr;
-            nlohmann::json after_blend = nullptr;
-            synfig::ValueBase va = layer->get_param("amount");
-            if (va.is_valid()) after_amount = valuebase_to_json(va);
-            synfig::ValueBase vb = layer->get_param("blend_method");
-            if (vb.is_valid()) after_blend = valuebase_to_json(vb);
-            r["result"] = {
-                {"doc_id", doc_id},
-                {"layer_id", layer_id},
-                {"amount", after_amount},
-                {"blend_method", after_blend},
-                {"diff", make_diff("layer.set_blend", {}, {layer_id}, {})}
-            };
-            return r;
-        });
-    }
-
-    // --- 7d. ALIGN LAYERS (translate each selected layer to a shared edge) ---
-    // Synfig has no single Align action; alignment is a translate per layer.  This
-    // reads each layer's rendered bounding box (``Layer::get_bounding_rect``) at the
-    // current time and emits one ``translate`` ``origin`` change per layer, grouped
-    // into a single undo step.  Only the ``origin`` parameter is touched, so the
-    // transform is additive and reversible.
-    if (method == "layer.align") {
-        std::string doc_id = params.value("doc_id", "doc_0");
-        std::string edge = params.value("edge", "center");
-        std::vector<std::string> layer_ids = params.value("layer_ids", std::vector<std::string>());
-
-        return run_on_main_thread([&, doc_id, edge, layer_ids]() -> nlohmann::json {
-            nlohmann::json r;
-            r["jsonrpc"] = "2.0";
-            r["id"] = req["id"];
-
-            etl::handle<studio::Instance> inst = resolve_instance(doc_id);
-            if (!inst || !inst->get_canvas()) {
-                r["error"] = {{"code", 2001}, {"message", "Document not found: " + doc_id}};
-                return r;
-            }
-            if (layer_ids.empty()) {
-                r["error"] = {{"code", -32602}, {"message", "layer.align requires layer_ids"}};
-                return r;
-            }
-
-            etl::handle<synfigapp::CanvasInterface> ci = inst->find_canvas_interface(inst->get_canvas());
-            synfig::RendDesc rd = inst->get_canvas()->rend_desc();
-            double left = rd.get_tl()[0], top = rd.get_tl()[1], right = rd.get_br()[0], bottom = rd.get_br()[1];
-
-            std::vector<synfig::Layer::Handle> layers;
-            std::vector<synfig::Rect> boxes;
-            double ref_left = 1e30, ref_right = -1e30, ref_top = 1e30, ref_bottom = -1e30;
-            for (const auto& lid : layer_ids) {
-                synfig::Layer::Handle l = find_layer_in_canvas(inst->get_canvas(), lid);
-                if (!l) continue;
-                synfig::Rect box = l->get_bounding_rect();
-                layers.push_back(l);
-                boxes.push_back(box);
-                if (box.minx < ref_left) ref_left = box.minx;
-                if (box.maxx > ref_right) ref_right = box.maxx;
-                if (box.miny < ref_top) ref_top = box.miny;
-                if (box.maxy > ref_bottom) ref_bottom = box.maxy;
-            }
-            if (layers.empty()) {
-                r["error"] = {{"code", 2002}, {"message", "None of the given layer_ids exist"}};
-                return r;
-            }
-
-            double target_x = (edge == "left") ? left : (edge == "right") ? right : (left + right) / 2.0;
-            double target_y = (edge == "top") ? top : (edge == "bottom") ? bottom : (top + bottom) / 2.0;
-            double ref_cx = (ref_left + ref_right) / 2.0;
-            double ref_cy = (ref_top + ref_bottom) / 2.0;
-
-            synfigapp::Action::PassiveGrouper grouper(inst.get(), "mcp: layer.align");
-            nlohmann::json moved = nlohmann::json::array();
-            for (size_t i = 0; i < layers.size(); ++i) {
-                double cx = (boxes[i].minx + boxes[i].maxx) / 2.0;
-                double cy = (boxes[i].miny + boxes[i].maxy) / 2.0;
-                double dx = 0.0, dy = 0.0;
-                if (edge == "left") dx = ref_left - boxes[i].minx;
-                else if (edge == "right") dx = ref_right - boxes[i].maxx;
-                else if (edge == "top") dy = ref_top - boxes[i].miny;
-                else if (edge == "bottom") dy = ref_bottom - boxes[i].maxy;
-                else if (edge == "horizontal") { dx = ref_cx - cx; }
-                else if (edge == "vertical") { dy = ref_cy - cy; }
-                else { dx = target_x - cx; dy = target_y - cy; }
-                if (dx == 0.0 && dy == 0.0) continue;
-
-                synfig::ValueBase origin = layers[i]->get_param("origin");
-                synfig::Point p(0, 0);
-                if (origin.is_valid()) p = origin.get(synfig::Point());
-                synfig::Point np(p[0] + dx, p[1] + dy);
-                ci->change_value(synfigapp::ValueDesc(layers[i], "origin"), synfig::ValueBase(np));
-                moved.push_back({
-                    {"layer_id", layers[i]->get_description().empty() ? layers[i]->get_name() : layers[i]->get_description()},
-                    {"dx", dx}, {"dy", dy}
-                });
-            }
-            grouper.finish();
-
-            r["result"] = {
-                {"doc_id", doc_id},
-                {"edge", edge},
-                {"moved", moved},
-                {"diff", make_diff("layer.align", {}, {}, {})}
-            };
-            return r;
-        });
-    }
-
     // --- 8. HISTORY METHODS ---
     if (method == "history.undo" || method == "history.redo") {
         std::string doc_id = params.value("doc_id", "doc_0");
@@ -3517,42 +3274,6 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             {"success", true},
             {"closed", true},
             {"diff", make_diff(method, {"mock_id"}, {}, {})}
-        };
-        return res;
-    }
-    if (method == "view.zoom" || method == "view.pan" || method == "view.fit" || method == "view.get") {
-        res["result"] = {
-            {"doc_id", params.value("doc_id", "doc_0")},
-            {"zoom", params.value("zoom", 1.0)},
-            {"focus", {{"x", params.value("x", 0.0)}, {"y", params.value("y", 0.0)}}}
-        };
-        return res;
-    }
-    if (method == "layer.set_visibility") {
-        res["result"] = {
-            {"doc_id", params.value("doc_id", "doc_0")},
-            {"layer_id", params.value("layer_id", "")},
-            {"visible", params.value("visible", true)},
-            {"diff", make_diff("layer.set_visibility", {}, {params.value("layer_id", "")}, {})}
-        };
-        return res;
-    }
-    if (method == "layer.set_blend") {
-        res["result"] = {
-            {"doc_id", params.value("doc_id", "doc_0")},
-            {"layer_id", params.value("layer_id", "")},
-            {"amount", params.value("amount", 1.0)},
-            {"blend_method", params.value("blend_method", 0)},
-            {"diff", make_diff("layer.set_blend", {}, {params.value("layer_id", "")}, {})}
-        };
-        return res;
-    }
-    if (method == "layer.align") {
-        res["result"] = {
-            {"doc_id", params.value("doc_id", "doc_0")},
-            {"edge", params.value("edge", "center")},
-            {"moved", nlohmann::json::array()},
-            {"diff", make_diff("layer.align", {}, {}, {})}
         };
         return res;
     }
