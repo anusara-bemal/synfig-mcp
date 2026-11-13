@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 83 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 93 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,8 +16,9 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (2 tools)
+- [Other](#other) (8 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
+- [Production Orchestration](#production-orchestration) (4 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
 - [Selection](#selection) (2 tools)
@@ -25,7 +26,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 83 tools.**
+**Total: 93 tools.**
 
 ## Animation & Keyframes
 
@@ -258,13 +259,7 @@ Gotcha: Assuming only the root canvas exists when layers are inside nested group
 
 *Profiles: all, core*
 
-Apply a declarative scene build spec (layers, params, waypoints, groups) atomically as one undo step.
-
-Note: Every layer in `spec.layers` requires a non-empty `id` string (e.g. `{"id": "bg_layer", "type": "import"}`). Image and sound file paths are verified on the host and automatically mapped if `SYNFIG_MCP_PATH_MAPPING` is configured.
-
-Returns: Compact diff {action: 'scene.build', created: [...], modified: [...]}.
-
-Gotcha: spec.doc_id defaults to the currently selected document; never call doc_new/doc_open first - implement in the open document.
+Apply a declarative scene spec {doc_id, layers:[{id,type,params}], groups}. Layer id required. Returns created/modified diff. Defaults to active document; don't call doc_new/doc_open first.
 
 #### Parameters
 
@@ -279,11 +274,7 @@ Gotcha: spec.doc_id defaults to the currently selected document; never call doc_
 
 *Profiles: all, core*
 
-Export current scene state into a declarative SceneBuildSpec JSON.
-
-Returns: Structured SceneBuildSpec dictionary compatible with scene_build.
-
-Gotcha: Filter fields=['params', 'waypoints'] to reduce returned payload tokens.
+Export scene state as a SceneBuildSpec JSON for scene_build. Use fields=['params','waypoints'] to trim payload.
 
 #### Parameters
 
@@ -299,11 +290,7 @@ Gotcha: Filter fields=['params', 'waypoints'] to reduce returned payload tokens.
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Get a token-bounded structural summary of canvas size, framerate, duration, and layer hierarchy.
-
-Returns: Compact document metadata summary strictly bounded under budget_tokens.
-
-Gotcha: Defaults to the currently selected document; call this first to confirm the target before building.
+Token-bounded summary of canvas size, fps, duration, and layer hierarchy. Call first to confirm the target document before building.
 
 #### Parameters
 
@@ -376,11 +363,7 @@ Gotcha: The root canvas cannot be deleted.
 
 *Profiles: all, rig*
 
-Change the resolution, frame rate, time range or background colour of a canvas.
-
-Returns: Object with the updated canvas properties and a diff summary.
-
-Gotcha: Setting end_time before start_time.
+Change canvas resolution, fps, time range or background colour. Returns updated properties and diff. end_time must be after start_time.
 
 #### Parameters
 
@@ -420,27 +403,17 @@ Gotcha: Looking for a layer ID without checking nested 'children' inside group l
 
 *Profiles: all, rig*
 
-Build a whole animated shot in one call: background, rigged cut-out characters, props,
+Build a whole animated shot in one call: background, rigged characters, props, camera, audio.
 
-camera moves and audio. One undo step; everything is validated before the document changes.
+One undo step; validated before the document changes. spec: {width, height, fps, duration,
 
-spec: {width, height, fps, duration, background: {file|color, fit},
+background, characters, props, camera, audio, save_path, preview}. Positions are canvas pixels
 
-characters: [{id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
+from top-left; a character's feet sit on position. Full spec: synfig_help('declarative_build').
 
-position: {x, y}, height, flip, z, actions: [{motion, start, end, move_to: {x, y}, speed}]}],
+Returns doc_id, characters, props, warnings, saved_to, preview. Parts named by body role get
 
-props: [{id, file, position, height, rotation, z, actions}],
-
-camera: [{time, zoom, center: {x, y}}], audio: {file, delay}, save_path, preview}.
-
-Positions are canvas pixels from the top-left (coords: "units" for Synfig units); a character
-
-stands with its feet on 'position'. Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
-
-Returns: {doc_id, characters, props, warnings, saved_to, preview: {contact_sheet_base64, ...}}.
-
-Gotcha: Parts named by body role get default joints; other parts need parent + attach.
+default joints; others need parent + attach.
 
 #### Parameters
 
@@ -457,17 +430,13 @@ Gotcha: Parts named by body role get default joints; other parts need parent + a
 
 *Profiles: all, rig*
 
-Assemble a jointed cut-out character from part images (or primitives) in an open document.
+Assemble a jointed cut-out character from part images in an open document. spec: {doc_id, id,
 
-spec: {doc_id, id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
+manifest | parts, position, height, flip, layout, actions}. Each part gets a joint layer
 
-position: {x, y}, height, flip, layout: "assemble" | "in_place", actions?}.
+<id>_<part>_rot; turning a part carries its children. Returns root group, parts, roles, joint ids.
 
-Every part gets a joint layer <id>_<part>_rot; turning a part carries its children.
-
-Returns: Rig summary with root group, parts, roles and joint layer ids.
-
-Gotcha: Use dry_run=true to preview the hierarchy; pivot/attach are fractions of the image.
+dry_run=true previews; pivot/attach are image fractions. See synfig_help('characters').
 
 #### Parameters
 
@@ -482,13 +451,11 @@ Gotcha: Use dry_run=true to preview the hierarchy; pivot/attach are fractions of
 
 *Profiles: all, rig*
 
-Key a pose on a rigged character: a preset (idle, punch, jump, walk_contact, walk_passing)
+Key a pose on a rigged character: preset (idle, punch, jump, walk_contact, walk_passing) or
 
-or explicit joint angles, e.g. angles={"upper_arm_r": 120, "head": -10} (degrees from rest).
+angles={"upper_arm_r":120,...} (degrees from rest). Returns keyed joints and missing joints.
 
-Returns: The joint layers that were keyed and the joints the character does not have.
-
-Gotcha: Fails when the character has none of the addressed joints - nothing is keyed silently.
+Fails if none of the addressed joints exist; nothing is keyed silently.
 
 #### Parameters
 
@@ -506,13 +473,11 @@ Gotcha: Fails when the character has none of the addressed joints - nothing is k
 
 *Profiles: all, rig*
 
-Animate a rigged character: walk, run, idle, talk (loop until end_time), wave, jump, nod,
+Animate a rigged character: walk, run, idle, talk (loop), wave, jump, nod, punch (once), rest,
 
-punch (play once), rest, move. move_to={x, y} (canvas pixels) travels there by end_time.
+move. move_to={x,y} (canvas pixels) travels there by end_time. Returns keyframe times, waypoint
 
-Returns: Keyframe times, waypoint count, animated layers and skipped joints.
-
-Gotcha: The character must have been built by character_rig_from_parts or scene_auto_build.
+count, animated layers, skipped joints. Character must come from character_rig_from_parts/scene_auto_build.
 
 #### Parameters
 
@@ -534,11 +499,7 @@ Gotcha: The character must have been built by character_rig_from_parts or scene_
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, characters, review).
-
-Returns: Markdown guide text and list of available guide topics.
-
-Gotcha: Querying help avoids loading large documentation into the active context.
+Get Synfig MCP guidance by topic (overview, scene, profiles, declarative_build, animation, characters, production, review). Returns Markdown guide text.
 
 #### Parameters
 
@@ -552,11 +513,7 @@ Gotcha: Querying help avoids loading large documentation into the active context
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Check server readiness, active backend ('live' Synfig Studio vs 'headless' pure-Python SIF engine), and connection status.
-
-Returns: JSON object with 'backend' ('live' or 'headless'), 'connected' (bool), 'studio_running' (bool), and 'details'.
-
-Gotcha: In 'auto' mode a blank canvas usually means Studio is open without its MCP bridge. Check 'details.warning' and use the patched Studio build.
+Check readiness and active backend ('live' Studio vs 'headless' SIF engine). Returns backend, connected, studio_running, details. In auto mode a blank canvas usually means Studio is open without its MCP bridge; check details.warning.
 
 #### Parameters
 
@@ -570,11 +527,7 @@ Gotcha: In 'auto' mode a blank canvas usually means Studio is open without its M
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-List all currently open or loaded animation documents.
-
-Returns: Array of document objects, each containing 'id', 'name', 'width', 'height', 'fps', and 'duration_frames'.
-
-Gotcha: Passing a file path instead of obtaining a valid 'doc_id' from this list.
+List open documents. Returns array with id, name, width, height, fps, duration_frames. Use these doc_id values, not file paths.
 
 #### Parameters
 
@@ -586,11 +539,7 @@ Gotcha: Passing a file path instead of obtaining a valid 'doc_id' from this list
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Get metadata, resolution, framerate, and time bounds for a specific document.
-
-Returns: Document details including 'width', 'height', 'fps', 'start_time', 'end_time', and 'duration_frames'.
-
-Gotcha: Invoking without a valid doc_id from doc_list().
+Get document metadata: width, height, fps, start_time, end_time, duration_frames. Requires a valid doc_id.
 
 #### Parameters
 
@@ -604,11 +553,7 @@ Gotcha: Invoking without a valid doc_id from doc_list().
 
 *Profiles: all, core*
 
-Create a new blank Synfig animation document with specified resolution and framerate.
-
-Returns: The created DocumentInfo object with generated 'id', 'name', dimensions, and fps.
-
-Gotcha: ONLY call when the user explicitly asked for a new document. Otherwise reuse the currently open document (doc_list) and pass its doc_id.
+Create a new blank document. Returns id, name, dimensions, fps. ONLY call when the user explicitly asked for a new document; otherwise reuse the open document from doc_list.
 
 #### Parameters
 
@@ -624,11 +569,7 @@ Gotcha: ONLY call when the user explicitly asked for a new document. Otherwise r
 
 *Profiles: all, core*
 
-Open an existing Synfig animation project (.sif, .sifz, or .sfg container).
-
-Returns: DocumentInfo representing the loaded project.
-
-Gotcha: ONLY call when the user explicitly asked to open this file. Never use it to 'start fresh'; implement in the currently open document instead.
+Open an existing project (.sif, .sifz, .sfg). ONLY call when the user explicitly asked to open this file; otherwise build in the currently open document.
 
 #### Parameters
 
@@ -642,11 +583,7 @@ Gotcha: ONLY call when the user explicitly asked to open this file. Never use it
 
 *Profiles: all, core*
 
-Save the document to disk in .sif (XML), .sifz (gzip), or .sfg (ZIP container) format.
-
-Returns: Object containing 'file_path' of the saved file.
-
-Gotcha: Omitting file_path when the document was newly created with doc_new() and has no default path.
+Save document to .sif/.sifz/.sfg. Returns file_path. Pass file_path for a new doc_new document that has no default path.
 
 #### Parameters
 
@@ -680,11 +617,7 @@ Gotcha: Closing without saving changes first with doc_save, unless force=True is
 
 *Profiles: all*
 
-Update canvas resolution, frame rate, time bounds, or name.
-
-Returns: Updated DocumentInfo object.
-
-Gotcha: Setting end_time less than or equal to start_time.
+Update document resolution, fps, time bounds, or name. Returns updated DocumentInfo. end_time must be after start_time.
 
 #### Parameters
 
@@ -786,11 +719,7 @@ Gotcha: Use dry_run=true to preview generated layer tree before mutating documen
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Undo the previous action in Studio or Headless mode. Exactly 1 MCP mutating tool call = 1 undo step.
-
-Returns: Object with 'success': bool.
-
-Gotcha: Calling undo when undo stack is empty (returns success: false).
+Undo the previous action. One mutating MCP call = one undo step. Returns success (false when the stack is empty).
 
 #### Parameters
 
@@ -804,11 +733,7 @@ Gotcha: Calling undo when undo stack is empty (returns success: false).
 
 *Profiles: all, anim, assets, core, fx, review, rig*
 
-Redo the previously undone action.
-
-Returns: Object with 'success': bool.
-
-Gotcha: Calling redo after a new mutating action was performed (new actions clear redo stack).
+Redo the previously undone action. Returns success. A new mutating action clears the redo stack.
 
 #### Parameters
 
@@ -842,11 +767,7 @@ Gotcha: Assuming infinite redo after performing a new mutation.
 
 *Profiles: all, fx*
 
-Add a new visual layer (e.g. 'circle', 'rectangle', 'star', 'solid_color', 'text', 'PasteCanvas') to the canvas.
-
-Returns: Object with 'layer_id', 'layer_type', 'depth', and structured 'diff' summary.
-
-Gotcha: Using invalid layer type names. Query schema_list_layers() first to see all valid types.
+Add a visual layer (circle, rectangle, star, solid_color, text, PasteCanvas, ...). Returns layer_id, layer_type, depth, diff. Query schema_list_layers for valid types.
 
 #### Parameters
 
@@ -1107,15 +1028,100 @@ Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'publ
 
 ## Other
 
+### `studio_launch`
+
+*Profiles: all*
+
+Launch patched Synfig Studio with the MCP bridge enabled; waits until reachable.
+
+Returns: 'launched', 'pid', 'bridge_ready', or 'already_running'.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `wait_seconds` | `number` | No | - |
+
+---
+
+### `studio_info`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Inspect connected Studio: versions and open documents with file paths.
+
+Returns: 'backend', 'studio_version', 'docs' [{doc_id, name, file_path}].
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `access_approve`
+
+*Profiles: all, assets, core*
+
+Approve a folder (e.g. Downloads) for file access; remembered across sessions. System/credential/drive roots rejected.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `folder` | `string` | Yes | - |
+| `reason` | `string` | No | - |
+
+---
+
+### `access_revoke`
+
+*Profiles: all, assets*
+
+Remove a previously approved folder from file access.
+
+Returns: 'revoked' (bool), 'folder'.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `folder` | `string` | Yes | - |
+
+---
+
+### `access_status`
+
+*Profiles: all, assets*
+
+Show file access policy: approved folders, project dirs, asset/attachment counts.
+
+Returns: JSON describing every source of file authority this session.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `project_refresh`
+
+*Profiles: all, assets*
+
+Re-read the open project via the native bridge; authorise its dir and imported assets.
+
+Returns: 'registered', 'project_dir', 'file_path', asset counts.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
 ### `rig_bone_add`
 
 *Profiles: all, rig*
 
-Add a bone to a skeleton layer (Synfig's cut-out rigging primitive).
-
-Returns: Object describing the created bone and a diff summary.
-
-Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it cannot create bones.
+Add a bone to a skeleton layer (cut-out rigging). Returns the created bone and diff. Needs Synfig Studio; headless cannot create bones.
 
 #### Parameters
 
@@ -1137,17 +1143,13 @@ Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it
 
 *Profiles: all, assets, rig*
 
-Cut a character rig sheet (one image, many body parts) into one transparent PNG per part.
+Cut a rig sheet (one image, many parts) into one transparent PNG per part. Call once without
 
-Call once without names and look at preview_base64 (numbered boxes), then call again with
+names to see preview_base64 (numbered boxes), then again with names={"1":"head",...} to export.
 
-names={"1": "head", "2": "torso", "3": "upper_arm_l", ...} to export only the real parts.
+Returns parts, manifest, output_dir, preview_base64. Needs transparent/uniform background; name
 
-Returns: {parts: [{index, name, file, bbox}], manifest, output_dir, preview_base64}.
-
-Gotcha: Needs a transparent or uniform background. Name parts by body role (head, torso,
-
-upper_arm_l, forearm_l, hand_l, upper_leg_r, lower_leg_r, foot_r) so rigs assemble themselves.
+parts by body role (head, torso, upper_arm_l, ...) so rigs auto-assemble. See synfig_help('characters').
 
 #### Parameters
 
@@ -1310,17 +1312,97 @@ Gotcha: Attempting to unexport a node that is still referenced by multiple activ
 
 ---
 
+## Production Orchestration
+
+### `production_run`
+
+*Profiles: all, rig*
+
+Run a whole production from a structured brief as a dependency-ordered, resumable task
+
+graph: documents, characters, backgrounds, layout, animation, effects, QC, previews,
+
+manifest and report. brief: {title, episodes[].sequences[].shots[], characters[],
+
+backgrounds[], props[], rigs[], style, checkpoints[], root, render_final}. Stages named in
+
+checkpoints pause until production_approve; state is saved after every task so
+
+production_resume can continue. dry_run=true returns the plan without touching anything.
+
+Full brief schema: synfig_help('production'). Returns status, task_states, awaiting_approval.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+| `dry_run` | `boolean` | No | - |
+
+---
+
+### `production_resume`
+
+*Profiles: all, rig*
+
+Continue an interrupted production from its last checkpoint. Completed tasks are not
+
+repeated; shot files on disk are re-opened and verified. root defaults to the configured
+
+workspace. Returns the same status/task_states structure as production_run.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `slug` | `string` | Yes | - |
+| `root` | `any` | No | - |
+| `max_attempts` | `integer` | No | - |
+
+---
+
+### `production_approve`
+
+*Profiles: all, rig*
+
+Approve a human-approval checkpoint (e.g. 'layout', 'animation') so the paused
+
+production can continue. Call production_resume afterwards to run the next stages.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `slug` | `string` | Yes | - |
+| `checkpoint` | `string` | Yes | - |
+| `root` | `any` | No | - |
+
+---
+
+### `production_status`
+
+*Profiles: all, rig*
+
+Inspect a production: manifest status, per-task states, pending approvals, versions,
+
+registered assets and the latest log events. Read-only.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `slug` | `string` | Yes | - |
+| `root` | `any` | No | - |
+
+---
+
 ## Render & Preview
 
 ### `render_frame`
 
 *Profiles: all, core, review*
 
-Render a single frame of the animation to an image file (PNG, JPEG, BMP, GIF, PPM).
-
-Returns: Object with 'success': bool, 'output_path', 'time', and image dimensions.
-
-Gotcha: Sequence encoders such as 'ffmpeg' need render_sequence, not render_frame.
+Render one frame to an image (PNG, JPEG, BMP, GIF, PPM). Returns success, output_path, time. Sequence encoders like ffmpeg need render_sequence instead.
 
 #### Parameters
 
@@ -1339,11 +1421,7 @@ Gotcha: Sequence encoders such as 'ffmpeg' need render_sequence, not render_fram
 
 *Profiles: all, review*
 
-Render an image sequence across an animation time range using the rendering pipeline.
-
-Returns: List of generated output frame file paths.
-
-Gotcha: Passing a file path instead of an output directory.
+Render an image sequence across a time range. Returns list of output frame paths. Pass an output directory, not a file path.
 
 #### Parameters
 
@@ -1365,11 +1443,7 @@ Gotcha: Passing a file path instead of an output directory.
 
 *Profiles: all, review*
 
-Start an asynchronous animation render job and immediately return a job_id.
-
-Returns: Dictionary with 'job_id', 'status': 'running', and 'output_dir'.
-
-Gotcha: Verify document ID before invoking.
+Start an async render job; returns job_id immediately with status='running' and output_dir.
 
 #### Parameters
 
@@ -1390,11 +1464,7 @@ Gotcha: Verify document ID before invoking.
 
 *Profiles: all, review*
 
-Query the execution status and progress of an asynchronous render job.
-
-Returns: Dictionary with 'job_id', 'status' ('running', 'completed', 'cancelled', 'failed'),
-
-Gotcha: Verify document ID before invoking.
+Query an async render job's status/progress. Returns job_id and status (running/completed/cancelled/failed).
 
 #### Parameters
 
@@ -1408,11 +1478,7 @@ Gotcha: Verify document ID before invoking.
 
 *Profiles: all, review*
 
-Retrieve final output frames for a completed render job.
-
-Returns: Dictionary with 'job_id', 'status': 'completed', and 'frames': list of file paths.
-
-Gotcha: Verify document ID before invoking.
+Get final frames of a completed render job. Returns job_id, status, frames (file paths).
 
 #### Parameters
 
@@ -1426,11 +1492,7 @@ Gotcha: Verify document ID before invoking.
 
 *Profiles: all, review*
 
-Cancel an active in-flight render job by its job_id.
-
-Returns: Dictionary with 'cancelled': True, 'job_id': str, and status message.
-
-Gotcha: Verify document ID before invoking.
+Cancel an in-flight render job by job_id. Returns cancelled, job_id, message.
 
 #### Parameters
 
@@ -1444,11 +1506,7 @@ Gotcha: Verify document ID before invoking.
 
 *Profiles: all, review*
 
-Render an animation time range and compile directly to a video file (.mp4 or .gif).
-
-Returns: Object containing 'success': bool and 'output_path'.
-
-Gotcha: Targeting an invalid extension (use .mp4 or .gif).
+Render a time range straight to video (.mp4 or .gif). Returns success, output_path.
 
 #### Parameters
 
@@ -1468,11 +1526,7 @@ Gotcha: Targeting an invalid extension (use .mp4 or .gif).
 
 *Profiles: all, review*
 
-Render selected keyframe timestamps into a visual contact sheet / storyboard grid image.
-
-Returns: Object containing 'success': bool and 'output_path'.
-
-Gotcha: Setting cols or rows to 0.
+Render keyframe timestamps into a contact-sheet grid image. Returns success, output_path. cols/rows must be > 0.
 
 #### Parameters
 

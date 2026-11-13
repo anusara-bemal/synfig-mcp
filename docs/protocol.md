@@ -105,6 +105,9 @@ Every method is verified against the real `synfig-studio` and `synfigapp` header
 | Protocol Method | Parameters | Backing Synfig / Studio C++ API | Status |
 |---|---|---|---|
 | `doc.list` | `none` | `studio::App::instance_list` | Verified |
+| `studio.info` | `none` | `studio::App::instance_list`, `PROTOCOL_VERSION`, `STUDIO_VERSION` | Verified |
+| `doc.active` | `none` | `resolve_instance("")`, `canvas->rend_desc()`, `canvas->get_time()` | Verified |
+| `project.assets` | `doc_id?` | `instance->get_file_name()`, recursive import-layer `filename` walk | Verified |
 | `doc.new` | `width`, `height`, `fps`, `duration` | `studio::App::new_instance()`, `RendDesc` setup | Verified |
 | `doc.open` | `file_path` | `studio::App::open(file_path)` | Verified |
 | `doc.save` | `doc_id`, `file_path?` | `instance->save()`, `instance->save_as(path)` | Verified |
@@ -187,6 +190,6 @@ Notifications emit when the active document state changes (e.g., manual artist e
 | `1102` | `LayerNotFound` | Layer not found in canvas hierarchy. |
 | `1103` | `ParamNotFound` | Parameter does not exist on layer. |
 | `1201` | `ValidationError` | Parameters failed JSON Schema validation. |
-| `1202` | `SecuritySandboxError` | File path outside allowed workspace roots. |
+| `1202` | `SecuritySandboxError` | Path denied by the project-aware access policy: traversal, system/credential location, disallowed extension, or no project/approval coverage. |
 | `1301` | `ActionExecutionError` | `synfigapp::Action::System` returned false. |
 | `1302` | `RenderError` | Frame or sequence rendering failed. |

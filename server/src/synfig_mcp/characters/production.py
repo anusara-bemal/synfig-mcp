@@ -135,7 +135,9 @@ class SceneAutoBuilder:
                 }
             )
         if bg.file:
-            path = validate_path(bg.file, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True)
+            path = validate_path(
+                bg.file, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True, user_intent=True
+            )
             try:
                 with Image.open(path) as img:
                     img_w, img_h = img.width, img.height
@@ -308,7 +310,10 @@ class SceneAutoBuilder:
 
         if spec.audio is not None:
             audio = validate_path(
-                spec.audio.file, allowed_extensions=AUDIO_EXTENSIONS, must_exist=True
+                spec.audio.file,
+                allowed_extensions=AUDIO_EXTENSIONS,
+                must_exist=True,
+                user_intent=True,
             )
             layers.append(
                 {
@@ -360,7 +365,9 @@ class SceneAutoBuilder:
 
         save_path = None
         if spec.save_path:
-            save_path = validate_path(spec.save_path, allowed_extensions=DOCUMENT_EXTENSIONS)
+            save_path = validate_path(
+                spec.save_path, allowed_extensions=DOCUMENT_EXTENSIONS, user_intent=True
+            )
 
         created_doc = False
         if spec.doc_id is not None:

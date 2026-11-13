@@ -72,6 +72,21 @@ class BackendBase(ABC):
         """Return a string or hash representing the current document revision/state."""
         return doc_id
 
+    async def studio_info(self) -> dict[str, Any]:
+        """Identity of the connected application and the documents it has open."""
+        return {
+            "backend": self.name,
+            "docs": [d.model_dump() for d in await self.doc_list()],
+        }
+
+    async def refresh_project_access(self) -> dict[str, Any]:
+        """Re-register the open project's directory and assets for file access.
+
+        The live backend reads this from the native bridge; the headless
+        backend re-registers its loaded documents.  Returns a small report.
+        """
+        return {"backend": self.name, "registered": False}
+
     @abstractmethod
     async def doc_new(
         self, width: int = 1920, height: int = 1080, fps: float = 24.0

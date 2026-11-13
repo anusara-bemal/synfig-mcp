@@ -339,7 +339,9 @@ def _point_in_image(
 
 def load_manifest_parts(manifest_path: str) -> list[CutoutPart]:
     """Read the parts written by ``rig_sheet_slice``."""
-    path = validate_path(manifest_path, allowed_extensions={".json"}, must_exist=True)
+    path = validate_path(
+        manifest_path, allowed_extensions={".json"}, must_exist=True, user_intent=True
+    )
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return [
@@ -351,7 +353,9 @@ def load_manifest_parts(manifest_path: str) -> list[CutoutPart]:
 
 
 def _image_size(file_path: str) -> tuple[Path, tuple[int, int]]:
-    path = validate_path(file_path, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True)
+    path = validate_path(
+        file_path, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True, user_intent=True
+    )
     try:
         with Image.open(path) as img:
             return path, (img.width, img.height)

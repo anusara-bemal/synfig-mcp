@@ -10,7 +10,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
-#include <filesystem>
+#include <functional>
 #include <cctype>
 
 #ifdef _WIN32
@@ -273,8 +273,6 @@ const char* get_build_commit_sha() {
 }
 #endif
 
-static std::vector<std::string> s_workspace_roots;
-
 static std::string normalize_path_str(const std::string& p) {
     if (p.empty()) return "";
 #ifdef _WIN32
@@ -336,136 +334,15 @@ static std::string normalize_path_str(const std::string& p) {
 #endif
 }
 
-static bool is_within_root(const std::string& target_canon, const std::string& root_canon) {
-    std::string s_target = normalize_path_str(target_canon);
-    std::string s_root = normalize_path_str(root_canon);
-    if (s_target == s_root) return true;
-#ifdef _WIN32
-    if (s_target.rfind(s_root + "\\", 0) == 0) return true;
-#else
-    if (s_target.rfind(s_root + "/", 0) == 0) return true;
-#endif
-    return false;
-}
-
-static bool is_overly_broad_root(const std::string& path_str, std::string& reason) {
-    std::string normalized = path_str;
-    std::replace(normalized.begin(), normalized.end(), '\\', '/');
-    while (normalized.size() > 1 && normalized.back() == '/') normalized.pop_back();
-
-#ifdef _WIN32
-    std::string lower = normalized;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    const char* home = std::getenv("USERPROFILE");
-    const char* system_root = std::getenv("SYSTEMROOT");
-    const char* program_files = std::getenv("ProgramFiles");
-    const char* program_files_x86 = std::getenv("ProgramFiles(x86)");
-    auto same_path = [&lower](const char* value) {
-        if (!value || !*value) return false;
-        std::string candidate(value);
-        std::replace(candidate.begin(), candidate.end(), '\\', '/');
-        while (candidate.size() > 1 && candidate.back() == '/') candidate.pop_back();
-        std::transform(candidate.begin(), candidate.end(), candidate.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
-        return lower == candidate;
-    };
-    if ((lower.size() == 2 && lower[1] == ':') || same_path(home) ||
-        same_path(system_root) || same_path(program_files) || same_path(program_files_x86)) {
-        reason = "filesystem, user, system, or program root";
-        return true;
-    }
-#else
-    const char* home = std::getenv("HOME");
-    std::string home_path = home ? home : "";
-    while (home_path.size() > 1 && home_path.back() == '/') home_path.pop_back();
-    if (normalized == "/" || (!home_path.empty() && normalized == home_path)) {
-        reason = "filesystem root or user home";
-        return true;
-    }
-#endif
-    return false;
-}
-
-static void ensure_default_workspace_roots() {
-    if (!s_workspace_roots.empty()) return;
-
-    const char* env_roots = std::getenv("SYNFIG_MCP_WORKSPACE_ROOTS");
-    if (env_roots && *env_roots) {
-        std::string s(env_roots);
-        std::stringstream ss(s);
-        std::string item;
-#ifdef _WIN32
-        char delim = ';';
-#else
-        char delim = ':';
-#endif
-        while (std::getline(ss, item, delim)) {
-            if (!item.empty()) {
-                std::string reason;
-                if (!is_overly_broad_root(item, reason)) {
-                    s_workspace_roots.push_back(normalize_path_str(item));
-                }
-            }
-        }
-    }
-
-#ifdef _WIN32
-    const char* home = std::getenv("USERPROFILE");
-    if (home && *home) {
-        std::string def_dir = std::string(home) + "\\Documents\\SynfigMCP";
-        s_workspace_roots.push_back(normalize_path_str(def_dir));
-    }
-    char tmp[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tmp)) {
-        s_workspace_roots.push_back(normalize_path_str(tmp));
-    }
-#else
-    const char* home = std::getenv("HOME");
-    if (home && *home) {
-        std::string def_dir = std::string(home) + "/Documents/SynfigMCP";
-        s_workspace_roots.push_back(normalize_path_str(def_dir));
-    }
-    const char* tmp = std::getenv("TMPDIR");
-    s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
-#endif
-}
-
-bool set_workspace_roots(const std::vector<std::string>& roots, std::string& error_msg) {
-    std::vector<std::string> valid_roots;
-    for (const auto& r : roots) {
-        if (!r.empty()) {
-            std::string reason;
-            if (is_overly_broad_root(r, reason)) {
-                error_msg = "Overly broad workspace root rejected: '" + r + "' (" + reason + ")";
-                return false;
-            }
-            valid_roots.push_back(normalize_path_str(r));
-        }
-    }
-    s_workspace_roots = valid_roots;
-#ifdef _WIN32
-    char tmp[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tmp)) {
-        s_workspace_roots.push_back(normalize_path_str(tmp));
-    }
-#else
-    const char* tmp = std::getenv("TMPDIR");
-    s_workspace_roots.push_back(normalize_path_str(tmp ? tmp : "/tmp"));
-#endif
-    return true;
-}
-
-void set_workspace_roots(const std::vector<std::string>& roots) {
-    std::string err;
-    set_workspace_roots(roots, err);
-}
-
 static bool is_safe_bridge_path(const std::string& path, const std::vector<std::string>& allowed_exts, std::string& out_err) {
+    // Project-aware access policy: the MCP server (Python) authorises paths
+    // against the active Synfig project, user attachments and explicit folder
+    // approvals before they reach the bridge.  The bridge keeps only minimal
+    // safety checks: no traversal, no system/credential locations, and the
+    // per-operation extension allow-list.  There is no workspace-root jail:
+    // assets in Downloads or any user-approved folder work directly.
     if (path.empty()) {
-        out_err = "Security Sandbox Error: path cannot be empty";
+        out_err = "Security Error: path cannot be empty";
         return false;
     }
 
@@ -475,7 +352,7 @@ static bool is_safe_bridge_path(const std::string& path, const std::vector<std::
     std::string part;
     while (std::getline(parts, part, '/')) {
         if (part == "..") {
-            out_err = "Security Sandbox Error: directory traversal is not permitted";
+            out_err = "Security Error: directory traversal is not permitted";
             return false;
         }
     }
@@ -499,19 +376,65 @@ static bool is_safe_bridge_path(const std::string& path, const std::vector<std::
             }
         }
         if (!allowed) {
-            out_err = "Security Sandbox Error: file extension is not permitted";
+            out_err = "Security Error: file extension is not permitted for this operation";
             return false;
         }
     }
 
-    ensure_default_workspace_roots();
     const std::string canonical = normalize_path_str(path);
-    for (const auto& root : s_workspace_roots) {
-        if (is_within_root(canonical, root)) return true;
+    std::string canon_lower = canonical;
+    std::transform(canon_lower.begin(), canon_lower.end(), canon_lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    std::replace(canon_lower.begin(), canon_lower.end(), '\\', '/');
+
+    // Credential / private-key locations are never accessible.
+    static const std::vector<std::string> denied_dirs = {
+        "/.ssh/", "/.aws/", "/.gnupg/", "/.azure/", "/.kube/", "/credentials/",
+        "/private_keys/", "/privatekeys/", "/secrets/"
+    };
+    for (const auto& denied : denied_dirs) {
+        if (canon_lower.find(denied) != std::string::npos) {
+            out_err = "Security Error: credential and private-key locations are never accessible";
+            return false;
+        }
     }
 
-    out_err = "Security Sandbox Error: path is outside configured workspace roots";
-    return false;
+#ifdef _WIN32
+    // Windows system / program installation folders are never accessible.
+    std::vector<std::string> denied_prefixes;
+    const char* env_names[] = {"SYSTEMROOT", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"};
+    for (const char* env_name : env_names) {
+        const char* value = std::getenv(env_name);
+        if (value && *value) {
+            std::string prefix(value);
+            std::replace(prefix.begin(), prefix.end(), '\\', '/');
+            std::transform(prefix.begin(), prefix.end(), prefix.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            while (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
+            denied_prefixes.push_back(prefix + "/");
+        }
+    }
+    for (const auto& prefix : denied_prefixes) {
+        if (canon_lower.rfind(prefix, 0) == 0) {
+            out_err = "Security Error: Windows system / program folders are never accessible";
+            return false;
+        }
+    }
+#else
+    static const std::vector<std::string> denied_prefixes = {
+        "/etc/", "/usr/", "/bin/", "/sbin/", "/boot/", "/proc/", "/sys/", "/dev/"
+    };
+    for (const auto& prefix : denied_prefixes) {
+        if (canon_lower.rfind(prefix, 0) == 0) {
+            out_err = "Security Error: system folders are never accessible";
+            return false;
+        }
+    }
+#endif
+
+    return true;
 }
 
 nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authenticated) {
@@ -560,24 +483,9 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
 
         inout_authenticated = true;
 
-        if (params.contains("workspace_roots") && params["workspace_roots"].is_array()) {
-            std::vector<std::string> roots;
-            for (const auto& r : params["workspace_roots"]) {
-                if (r.is_string()) {
-                    roots.push_back(r.get<std::string>());
-                }
-            }
-            if (!roots.empty()) {
-                std::string err_reason;
-                if (!set_workspace_roots(roots, err_reason)) {
-                    res["error"] = {
-                        {"code", 1203},
-                        {"message", err_reason}
-                    };
-                    return res;
-                }
-            }
-        }
+        // workspace_roots from older clients is accepted but no longer
+        // enforced: access authority is the active project plus the MCP
+        // server's project-aware approval policy.
 
         res["result"] = {
             {"protocol_version", PROTOCOL_VERSION},
@@ -596,7 +504,9 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
                 "anim.read",
                 "anim.write",
                 "history",
-                "events"
+                "events",
+                "studio.info",
+                "project.read"
             }},
             {"session_id", "synfig_mcp_session"}
         };
@@ -647,6 +557,144 @@ nlohmann::json dispatch_request(const nlohmann::json& req, bool& inout_authentic
             }
 
             r["result"] = doc_list;
+            return r;
+        });
+    }
+
+    if (method == "studio.info") {
+        return run_on_main_thread([&]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            nlohmann::json docs = nlohmann::json::array();
+            int idx = 0;
+            for (auto it = studio::App::instance_list.begin(); it != studio::App::instance_list.end(); ++it, ++idx) {
+                etl::handle<studio::Instance> inst = *it;
+                if (!inst || !inst->get_canvas()) continue;
+                nlohmann::json item;
+                item["doc_id"] = "doc_" + std::to_string(idx);
+                item["name"] = inst->get_canvas()->get_name();
+                item["file_path"] = inst->get_file_name().empty() ? nullptr : nlohmann::json(inst->get_file_name());
+                docs.push_back(item);
+            }
+
+            nlohmann::json result;
+            result["protocol_version"] = PROTOCOL_VERSION;
+            result["studio_version"] = STUDIO_VERSION;
+            result["docs"] = docs;
+            r["result"] = result;
+            return r;
+        });
+    }
+
+    if (method == "doc.active") {
+        return run_on_main_thread([&]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance("");
+            if (!inst || !inst->get_canvas()) {
+                return make_input_error(req, 2001, "No document is open in Synfig Studio.");
+            }
+
+            std::string doc_id = "doc_0";
+            int idx = 0;
+            for (auto it = studio::App::instance_list.begin(); it != studio::App::instance_list.end(); ++it, ++idx) {
+                if (*it == inst) {
+                    doc_id = "doc_" + std::to_string(idx);
+                    break;
+                }
+            }
+
+            synfig::Canvas::Handle canvas = inst->get_canvas();
+            synfig::RendDesc desc = canvas->rend_desc();
+            nlohmann::json result;
+            result["doc_id"] = doc_id;
+            result["name"] = canvas->get_name();
+            result["file_path"] = inst->get_file_name().empty() ? nullptr : nlohmann::json(inst->get_file_name());
+            result["width"] = desc.get_w();
+            result["height"] = desc.get_h();
+            result["fps"] = static_cast<double>(desc.get_frame_rate());
+            result["start_time"] = static_cast<double>(desc.get_time_start());
+            result["end_time"] = static_cast<double>(desc.get_time_end());
+            result["current_time"] = static_cast<double>(canvas->get_time());
+            r["result"] = result;
+            return r;
+        });
+    }
+
+    if (method == "project.assets") {
+        std::string wanted_doc;
+        if (params.contains("doc_id") && params["doc_id"].is_string()) {
+            wanted_doc = params["doc_id"].get<std::string>();
+        }
+        return run_on_main_thread([&, wanted_doc]() -> nlohmann::json {
+            nlohmann::json r;
+            r["jsonrpc"] = "2.0";
+            r["id"] = req["id"];
+
+            etl::handle<studio::Instance> inst = resolve_instance(wanted_doc);
+            if (!inst || !inst->get_canvas()) {
+                return make_input_error(req, 2001, "No matching document is open in Synfig Studio.");
+            }
+
+            std::string file_path = inst->get_file_name();
+            std::string project_dir;
+            if (!file_path.empty()) {
+                std::string canonical = normalize_path_str(file_path);
+                size_t last_sep = canonical.find_last_of("\\/");
+                if (last_sep != std::string::npos) {
+                    project_dir = canonical.substr(0, last_sep);
+                }
+            }
+
+            nlohmann::json assets = nlohmann::json::array();
+            std::vector<std::string> visited;
+            std::function<void(synfig::Canvas::Handle)> walk = [&](synfig::Canvas::Handle canvas) {
+                if (!canvas) return;
+                std::string canvas_id = canvas->get_id();
+                if (std::find(visited.begin(), visited.end(), canvas_id) != visited.end()) return;
+                visited.push_back(canvas_id);
+                for (auto it = canvas->begin(); it != canvas->end(); ++it) {
+                    synfig::Layer::Handle layer = *it;
+                    if (!layer) continue;
+                    if (layer->get_name() == "import") {
+                        synfig::Layer::ParamList param_list = layer->get_param_list();
+                        auto found = param_list.find("filename");
+                        if (found != param_list.end() && found->second.get_type() == synfig::type_string) {
+                            std::string filename = found->second.get(synfig::String());
+                            if (!filename.empty()) {
+                                nlohmann::json asset;
+                                asset["layer_description"] = layer->get_description();
+                                asset["canvas_id"] = canvas_id;
+                                asset["filename"] = filename;
+                                asset["absolute_path"] = project_dir.empty()
+                                    ? synfig::filesystem::Path::absolute_path(filename)
+                                    : synfig::filesystem::Path::absolute_path(project_dir, filename);
+                                assets.push_back(asset);
+                            }
+                        }
+                    }
+                    etl::handle<synfig::Layer_PasteCanvas> paste =
+                        etl::handle<synfig::Layer_PasteCanvas>::cast_dynamic(layer);
+                    if (paste && paste->get_sub_canvas()) {
+                        walk(paste->get_sub_canvas());
+                    }
+                }
+                for (auto& child : canvas->children()) {
+                    walk(child);
+                }
+            };
+            walk(inst->get_canvas());
+
+            nlohmann::json result;
+            result["doc_id"] = wanted_doc.empty() ? "active" : wanted_doc;
+            result["file_path"] = file_path.empty() ? nullptr : nlohmann::json(file_path);
+            result["project_dir"] = project_dir.empty() ? nullptr : nlohmann::json(project_dir);
+            result["assets"] = assets;
+            r["result"] = result;
             return r;
         });
     }

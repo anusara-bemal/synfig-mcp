@@ -17,8 +17,21 @@ from mcp.types import TextContent
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
 from synfig_mcp.protocol.client import BridgeClient
-from synfig_mcp.protocol.fake_bridge import FakeBridgeServer
 from synfig_mcp.server import create_server
+from tests.support.fake_bridge import FakeBridgeServer
+from tests.support.mock_provider import MockAssetProvider
+
+
+def _inject_mock_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test-only: the production pipeline has no mock fallback."""
+    import synfig_mcp.assets.pipeline as pipeline_mod
+
+    real_pipeline = pipeline_mod.AssetPipeline
+
+    def factory() -> real_pipeline:  # type: ignore[valid-type]
+        return real_pipeline(providers=[MockAssetProvider()])
+
+    monkeypatch.setattr(pipeline_mod, "AssetPipeline", factory)
 
 
 @pytest_asyncio.fixture(params=["headless", "live_fake"])
@@ -50,8 +63,11 @@ async def mcp_server(request: pytest.FixtureRequest) -> AsyncIterator[tuple[str,
 
 
 @pytest.mark.asyncio
-async def test_asset_search_mock(mcp_server: tuple[str, MCPServer]) -> None:
+async def test_asset_search_mock(
+    mcp_server: tuple[str, MCPServer], monkeypatch: pytest.MonkeyPatch
+) -> None:
     _, app = mcp_server
+    _inject_mock_provider(monkeypatch)
     async with Client(app) as client:
         res = await client.call_tool("asset_search", {"query": "cloud", "provider": "mock"})
         assert res.content
@@ -65,8 +81,11 @@ async def test_asset_search_mock(mcp_server: tuple[str, MCPServer]) -> None:
 
 
 @pytest.mark.asyncio
-async def test_asset_preview_mock(mcp_server: tuple[str, MCPServer]) -> None:
+async def test_asset_preview_mock(
+    mcp_server: tuple[str, MCPServer], monkeypatch: pytest.MonkeyPatch
+) -> None:
     _, app = mcp_server
+    _inject_mock_provider(monkeypatch)
     async with Client(app) as client:
         res = await client.call_tool(
             "asset_preview", {"asset_id": "mock_cloud_01", "provider": "mock"}

@@ -10,7 +10,7 @@ from typing import Any
 
 from synfig_mcp.logging import get_logger
 
-logger = get_logger("synfig_mcp.protocol.fake_bridge")
+logger = get_logger("tests.support.fake_bridge")
 
 MAX_MESSAGE_SIZE = 10 * 1024 * 1024
 DEFAULT_FAKE_TOKEN = "0123456789abcdef0123456789abcdef"  # nosec B105
@@ -109,6 +109,8 @@ class FakeBridgeServer:
         self._fake_docs: dict[str, dict[str, Any]] = {}
         self._fake_time: float = 0.0
         self._fake_keyframes: list[dict[str, Any]] = []
+        #: Injected per-document imported assets for project.assets responses.
+        self.fake_project_assets: dict[str, list[dict[str, Any]]] = {}
 
     async def start(self) -> None:
         """Start the fake bridge TCP server."""
@@ -327,10 +329,73 @@ class FakeBridgeServer:
                     "end_time": 5.0,
                     "duration_frames": 120,
                 }
+            if method == "doc.open":
+                if params.get("file_path"):
+                    cached_doc["file_path"] = params["file_path"]
+                self._fake_docs[doc_id] = cached_doc
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": cached_doc,
+            }
+
+        if method == "studio.info":
+            docs = [
+                {
+                    "doc_id": d["doc_id"],
+                    "name": d.get("name", ""),
+                    "file_path": d.get("file_path"),
+                }
+                for d in self._fake_docs.values()
+            ]
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "protocol_version": self.protocol_version,
+                    "studio_version": self.studio_version,
+                    "docs": docs,
+                },
+            }
+
+        if method == "doc.active":
+            if not self._fake_docs:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": 2001, "message": "No document is open in Synfig Studio."},
+                }
+            doc = next(iter(self._fake_docs.values()))
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": doc["doc_id"],
+                    "name": doc.get("name", ""),
+                    "file_path": doc.get("file_path"),
+                    "width": doc.get("width", 1920),
+                    "height": doc.get("height", 1080),
+                    "fps": doc.get("fps", 24.0),
+                    "start_time": doc.get("start_time", 0.0),
+                    "end_time": doc.get("end_time", 5.0),
+                    "current_time": self._fake_time,
+                },
+            }
+
+        if method == "project.assets":
+            doc_id = params.get("doc_id") or next(iter(self._fake_docs), "doc_0")
+            doc = self._fake_docs.get(doc_id)
+            file_path = doc.get("file_path") if doc else None
+            project_dir = str(Path(file_path).parent) if file_path else None
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "doc_id": doc_id,
+                    "file_path": file_path,
+                    "project_dir": project_dir,
+                    "assets": self.fake_project_assets.get(doc_id, []),
+                },
             }
 
         if method == "doc.set_properties":

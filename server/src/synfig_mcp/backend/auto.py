@@ -97,6 +97,14 @@ class AutoBackend(BackendBase):
         """Delegate to the active backend."""
         return await self._current().health_check()
 
+    async def studio_info(self) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().studio_info()
+
+    async def refresh_project_access(self) -> dict[str, Any]:
+        """Delegate to the active backend."""
+        return await self._current().refresh_project_access()
+
     async def doc_list(
         self,
     ) -> list[DocumentInfo]:

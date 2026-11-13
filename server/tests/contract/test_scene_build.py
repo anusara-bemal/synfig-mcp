@@ -21,7 +21,7 @@ from mcp.types import TextContent, TextResourceContents
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
 from synfig_mcp.protocol.client import BridgeClient
-from synfig_mcp.protocol.fake_bridge import FakeBridgeServer
+from tests.support.fake_bridge import FakeBridgeServer
 from synfig_mcp.server import create_server
 
 

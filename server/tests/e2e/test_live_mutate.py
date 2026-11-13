@@ -1116,7 +1116,7 @@ async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_
     sandbox_root.mkdir()
 
     # 1. doc_open: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied"):
         await backend.doc_open("C:/Windows/System32/drivers/etc/hosts.sif")
 
     # 2. doc_open: forbidden extension
@@ -1126,7 +1126,7 @@ async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_
         await backend.doc_open(str(dummy_file))
 
     # 3. doc_save: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied"):
         await backend.doc_save("doc_0", "C:/Windows/System32/hacked.sif")
 
     # 4. doc_save: forbidden extension
@@ -1138,11 +1138,11 @@ async def test_live_tools_path_sandbox_rejection(live_studio: BridgeClient, tmp_
         await backend.render_frame("doc_0", output_path=str(sandbox_root / "evil.ps1"))
 
     # 6. render_frame: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied"):
         await backend.render_frame("doc_0", output_path="C:/Windows/System32/evil.png")
 
     # 7. render_sequence: outside sandbox rejection
-    with pytest.raises(SecuritySandboxError, match="denied by workspace sandbox"):
+    with pytest.raises(SecuritySandboxError, match="denied"):
         await backend.render_sequence("doc_0", output_dir="C:/Windows/System32/evil_seq")
 
     # 8. render_video: forbidden extension
@@ -1160,17 +1160,18 @@ async def test_bridge_direct_path_safety_rejection(
     live_studio: BridgeClient, tmp_path: Path
 ) -> None:
     """
-    Security requirement 1: C++ bridge defense-in-depth rejects all 5 unsafe path categories:
-    1. Absolute path outside root
+    Security requirement 1: C++ bridge defense-in-depth rejects unsafe path categories:
+    1. System / program folder path (e.g. C:/Windows/System32)
     2. '..' directory traversal escape
-    3. Symlink / junction escape
+    3. Symlink / junction escape into a system folder
     4. Disallowed file extension
-    5. Path inside root (must succeed)
+    5. Ordinary user path (must succeed - there is no workspace-root jail)
     """
     inside_dir = tmp_path / "inside_workspace"
     inside_dir.mkdir(parents=True, exist_ok=True)
 
-    # Configure bridge workspace roots to include repo root and tmp_path
+    # workspace_roots is accepted for backwards compatibility but no longer
+    # enforced: access authority is the project-aware policy, not a root jail.
     await live_studio.call(
         "hello",
         {
@@ -1186,21 +1187,21 @@ async def test_bridge_direct_path_safety_rejection(
     with pytest.raises(SecurityError) as exc_abs_open:
         await live_studio.call("doc.open", {"file_path": "C:/Windows/System32/secret.sif"})
     assert exc_abs_open.value.code == 1203
-    assert "outside configured workspace roots" in str(exc_abs_open.value).lower()
+    assert "system" in str(exc_abs_open.value).lower()
 
     with pytest.raises(SecurityError) as exc_abs_save:
         await live_studio.call(
             "doc.save", {"doc_id": "doc_0", "file_path": "C:/Windows/System32/hacked.sif"}
         )
     assert exc_abs_save.value.code == 1203
-    assert "outside configured workspace roots" in str(exc_abs_save.value).lower()
+    assert "system" in str(exc_abs_save.value).lower()
 
     with pytest.raises(SecurityError) as exc_abs_render:
         await live_studio.call(
             "render.frame", {"doc_id": "doc_0", "output_path": "C:/Windows/System32/frame.png"}
         )
     assert exc_abs_render.value.code == 1203
-    assert "outside configured workspace roots" in str(exc_abs_render.value).lower()
+    assert "system" in str(exc_abs_render.value).lower()
 
     # -------------------------------------------------------------
     # Case 2: '..' directory traversal escape -> rejected (code 1203)
@@ -1244,14 +1245,14 @@ async def test_bridge_direct_path_safety_rejection(
         with pytest.raises(SecurityError) as exc_junc_open:
             await live_studio.call("doc.open", {"file_path": str(escaped_open_path)})
         assert exc_junc_open.value.code == 1203
-        assert "outside configured workspace roots" in str(exc_junc_open.value).lower()
+        assert "system" in str(exc_junc_open.value).lower()
 
         with pytest.raises(SecurityError) as exc_junc_save:
             await live_studio.call(
                 "doc.save", {"doc_id": "doc_0", "file_path": str(junction_dir / "escaped.sif")}
             )
         assert exc_junc_save.value.code == 1203
-        assert "outside configured workspace roots" in str(exc_junc_save.value).lower()
+        assert "system" in str(exc_junc_save.value).lower()
 
         with pytest.raises(SecurityError) as exc_junc_render:
             await live_studio.call(
@@ -1259,7 +1260,7 @@ async def test_bridge_direct_path_safety_rejection(
                 {"doc_id": "doc_0", "output_path": str(junction_dir / "escaped.png")},
             )
         assert exc_junc_render.value.code == 1203
-        assert "outside configured workspace roots" in str(exc_junc_render.value).lower()
+        assert "system" in str(exc_junc_render.value).lower()
 
     # -------------------------------------------------------------
     # Case 4: Disallowed file extension -> rejected (code 1203)
@@ -1297,60 +1298,41 @@ async def test_bridge_direct_path_safety_rejection(
 
 @pytest.mark.real_studio
 @pytest.mark.asyncio
-async def test_bridge_broad_workspace_roots_rejection(live_studio: BridgeClient) -> None:
-    """Requirement 1: Bridge rejects or warns on overly broad workspace roots (drive root, user home, Windows/Program Files)."""
-    # 1. Drive root rejection
-    drive_root = "C:/" if os.name == "nt" else "/"
-    with pytest.raises(SecurityError) as exc_drive:
-        await live_studio.call(
-            "hello",
-            {
-                "token": live_studio.token or "",
-                "protocol_version": "1.0",
-                "workspace_roots": [drive_root],
-            },
-        )
-    assert exc_drive.value.code == 1203
-    assert "overly broad" in str(exc_drive.value).lower()
+async def test_bridge_workspace_roots_not_a_jail(live_studio: BridgeClient) -> None:
+    """Project-aware access: workspace_roots is accepted but no longer enforced.
 
-    # 2. Windows / System directory rejection
+    The old workspace-root jail is gone, so broad roots (drive root, user home)
+    no longer raise. The minimal safety checks still deny system and credential
+    locations regardless of any workspace_roots the client sends.
+    """
+    # 1. Broad roots are accepted, not rejected (no jail any more).
+    broad_roots = ["C:/" if os.name == "nt" else "/", str(Path.home())]
     if os.name == "nt":
-        with pytest.raises(SecurityError) as exc_win:
-            await live_studio.call(
-                "hello",
-                {
-                    "token": live_studio.token or "",
-                    "protocol_version": "1.0",
-                    "workspace_roots": ["C:/Windows"],
-                },
-            )
-        assert exc_win.value.code == 1203
-
-        # 3. Program Files rejection
-        with pytest.raises(SecurityError) as exc_pf:
-            await live_studio.call(
-                "hello",
-                {
-                    "token": live_studio.token or "",
-                    "protocol_version": "1.0",
-                    "workspace_roots": ["C:/Program Files"],
-                },
-            )
-        assert exc_pf.value.code == 1203
-
-    # 4. User home directory directly
-    user_home = str(Path.home())
-    with pytest.raises(SecurityError) as exc_home:
-        await live_studio.call(
+        broad_roots += ["C:/Windows", "C:/Program Files"]
+    for root in broad_roots:
+        res = await live_studio.call(
             "hello",
             {
                 "token": live_studio.token or "",
                 "protocol_version": "1.0",
-                "workspace_roots": [user_home],
+                "workspace_roots": [root],
             },
         )
-    assert exc_home.value.code == 1203
-    assert "overly broad" in str(exc_home.value).lower()
+        assert res.get("protocol_version"), f"hello rejected broad root {root}"
+
+    # 2. System folders are still denied regardless of workspace_roots.
+    if os.name == "nt":
+        with pytest.raises(SecurityError) as exc_sys:
+            await live_studio.call("doc.open", {"file_path": "C:/Windows/System32/secret.sif"})
+        assert exc_sys.value.code == 1203
+        assert "system" in str(exc_sys.value).lower()
+
+    # 3. Credential locations are still denied.
+    cred_path = str(Path.home() / ".ssh" / "id_rsa.sif")
+    with pytest.raises(SecurityError) as exc_cred:
+        await live_studio.call("doc.open", {"file_path": cred_path})
+    assert exc_cred.value.code == 1203
+    assert "credential" in str(exc_cred.value).lower()
 
 
 @pytest.mark.real_studio
@@ -1736,6 +1718,13 @@ async def test_bridge_opt_in_default_and_stale_token_cleanup() -> None:
             proc_default.wait(timeout=3)
         except subprocess.TimeoutExpired:
             proc_default.kill()
+            proc_default.wait(timeout=3)
+
+    # Gtk::Application ("org.synfig.SynfigStudio") releases its single-instance
+    # lock asynchronously after the process dies. Relaunching immediately can
+    # make the next instance forward to the dying primary and exit without
+    # writing a token, so let the lock settle before starting the ON instance.
+    await asyncio.sleep(1.0)
 
     # 3. Test ON with SYNFIG_MCP_ENABLE=1: Stale token cleaned, active token created and removed on stop
     env_on = studio_env(

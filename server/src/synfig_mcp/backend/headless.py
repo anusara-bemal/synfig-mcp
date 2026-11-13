@@ -132,7 +132,10 @@ class HeadlessBackend(BackendBase):
     async def doc_open(self, file_path: str) -> DocumentInfo:
         """Open a .sif/.sifz/.sfg document from disk."""
         path = validate_path(
-            file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, must_exist=True
+            file_path,
+            allowed_extensions={".sif", ".sifz", ".sfg"},
+            must_exist=True,
+            user_intent=True,
         )
 
         doc_id = f"doc_{uuid.uuid4().hex[:8]}"
@@ -145,7 +148,38 @@ class HeadlessBackend(BackendBase):
         self._current_time[doc_id] = 0.0
         self._dirty[doc_id] = False
 
+        self._register_project_access(doc_id)
         return self._sync_doc_info(doc_id)
+
+    def _register_project_access(self, doc_id: str) -> None:
+        """Let the open project authorise its directory and imported assets."""
+        from synfig_mcp.security.access import collect_asset_paths, get_access_controller
+
+        controller = get_access_controller()
+        path = self._doc_paths.get(doc_id)
+        if path is not None:
+            controller.register_project(path)
+        doc = self._documents.get(doc_id)
+        if doc is not None:
+            try:
+                tree = doc.get_scene_tree("")
+                controller.register_project_assets(collect_asset_paths(tree))
+            except Exception:
+                pass
+
+    async def refresh_project_access(self) -> dict[str, Any]:
+        """Re-register every loaded document's directory and imported assets."""
+        from synfig_mcp.security.access import get_access_controller
+
+        for doc_id in list(self._documents):
+            self._register_project_access(doc_id)
+        controller = get_access_controller()
+        return {
+            "backend": "headless",
+            "registered": True,
+            "documents": len(self._documents),
+            "project_asset_count": controller.status()["project_asset_count"],
+        }
 
     async def doc_save(self, doc_id: str, file_path: str | None = None) -> str:
         """Save document to disk (.sif, .sifz, or .sfg)."""
@@ -154,16 +188,21 @@ class HeadlessBackend(BackendBase):
 
         target: Path
         if file_path:
-            target = validate_path(file_path, allowed_extensions={".sif", ".sifz", ".sfg"})
+            target = validate_path(
+                file_path, allowed_extensions={".sif", ".sifz", ".sfg"}, user_intent=True
+            )
         elif doc_id in self._doc_paths:
             target = self._doc_paths[doc_id]
         else:
-            target = validate_path(Path.cwd() / f"{doc_id}.sifz")
+            from synfig_mcp.security.access import get_staging_root
+
+            target = validate_path(get_staging_root() / f"{doc_id}.sifz")
 
         save_sif(self._documents[doc_id], target)
         self._doc_paths[doc_id] = target.resolve()
         self._dirty[doc_id] = False
         self._sync_doc_info(doc_id)
+        self._register_project_access(doc_id)
         return str(target.resolve())
 
     async def doc_close(self, doc_id: str, force: bool = False) -> bool:
@@ -458,6 +497,7 @@ class HeadlessBackend(BackendBase):
                 ".au",
             },
             must_exist=True,
+            user_intent=True,
         )
         audio_extensions = {".wav", ".ogg", ".mp3", ".flac", ".au"}
         if safe_path.suffix.lower() in audio_extensions:
@@ -1055,7 +1095,9 @@ class HeadlessBackend(BackendBase):
             raise DocumentNotFoundError(f"Document '{doc_id}' not found.")
 
         normalized_target = require_frame_target(target)
-        safe_output = validate_path(output_path, allowed_extensions={".png", ".jpg", ".jpeg"})
+        safe_output = validate_path(
+            output_path, allowed_extensions={".png", ".jpg", ".jpeg"}, user_intent=True
+        )
 
         doc = self._documents[doc_id]
         # Write to temporary .sif file for CLI render
@@ -1098,7 +1140,7 @@ class HeadlessBackend(BackendBase):
         progress_cb: Any = None,
         cancel_token: Any = None,
     ) -> list[str]:
-        safe_dir = validate_path(output_dir)
+        safe_dir = validate_path(output_dir, user_intent=True)
         res = await self.pipeline.render_sequence(
             doc_id=doc_id,
             output_dir=str(safe_dir),
@@ -1128,6 +1170,7 @@ class HeadlessBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".mp4", ".gif", ".avi", ".mkv", ".webm"},
+            user_intent=True,
         )
         ok = await self.pipeline.render_video(
             doc_id=doc_id,
@@ -1154,6 +1197,7 @@ class HeadlessBackend(BackendBase):
         safe_output = validate_path(
             output_path,
             allowed_extensions={".png", ".jpg", ".jpeg"},
+            user_intent=True,
         )
         ok = await self.pipeline.render_contact_sheet(
             doc_id=doc_id,
@@ -1215,7 +1259,7 @@ class HeadlessBackend(BackendBase):
                     fn_val = p.get("value") if isinstance(p, dict) else p
                 if fn_val:
                     try:
-                        resolved_fn = validate_path(fn_val, must_exist=True)
+                        resolved_fn = validate_path(fn_val, must_exist=True, user_intent=True)
                         resolved_str = str(resolved_fn)
                         if isinstance(lyr.params["filename"], dict):
                             lyr.params["filename"]["value"] = resolved_str

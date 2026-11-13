@@ -21,11 +21,11 @@ GUIDE_TOPICS: dict[str, str] = {
     "profiles": """# Synfig MCP Tool Profiles
 
 Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
-- `all` (default): The complete suite - all 83 tools: documents, canvases, scene
+- `all` (default): The complete suite - all 93 tools: documents, canvases, scene
   building, layers, parameters and value nodes, animation, selection, history,
-  effect recipes, style presets, character rigging, storyboards, licensed assets,
-  rendering (frame, sequence, video, contact sheet, async jobs), visual review
-  and schema introspection.
+  effect recipes, style presets, character rigging, storyboards, production
+  orchestration, licensed assets, rendering (frame, sequence, video, contact
+  sheet, async jobs), visual review and schema introspection.
 - `core`: Minimal set for document lifecycle, declarative build, inspection, undo
   (< 3,000 tokens).
 - `anim`: Waypoint and keyframe animation tools, time controls, interpolation modes.
@@ -75,6 +75,31 @@ Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
 Call `schema_list_layers()` for the exact list of the installed Synfig build and
 `schema_get_layer("<type>")` for the parameters, their value types and whether
 they are writable.
+""",
+    "scene": """# End-to-End Scene Workflow (connect -> build -> animate -> render -> save)
+
+Execute, do not just describe. Ordered tool sequence for a request like
+"blue sky, green ground, red sun moving left->right, a walking character, easing,
+render a preview, save":
+
+1. `studio_info()` — check `bridge.reachable`. If false, `studio_launch()` and
+   re-check. Never claim success while the bridge is unreachable.
+2. `doc_new(width, height, fps, duration)` — create the project.
+3. `doc_set_time_range(doc_id, start_time, end_time, fps)` — set the timeline
+   (e.g. 0..5s for a 5-second move).
+4. Build geometry in ONE undo step with `scene_build` (see
+   `synfig_help('declarative_build')`): a `solid_color` sky, a `rectangle`/
+   `solid_color` ground, a `circle` sun, and basic-shape character parts.
+   Use `layer_add` only for single incremental layers.
+5. Animate with `anim_animate_param` (batch waypoints, one undo step): sun
+   `origin` from left to right across the time range; character `origin` for the
+   walk. Set `interpolation` (e.g. "clamped"/"ease") for easing.
+6. `render_frame(doc_id, time, ...)` — render a preview PNG and inspect it.
+7. `doc_save(doc_id, file_path)` — persist the .sif. Verify the file exists.
+
+Coordinates: origin is canvas centre, +Y up, 60 px per Synfig unit. Colors are
+normalized `[0,1]` tagged unions. Confirm each step's returned state before the
+next; on failure read the error code and correct, do not silently continue.
 """,
     "animation": """# Synfig MCP Animation System
 
@@ -156,6 +181,60 @@ The defaults are estimates. Look at the preview, then override per part:
 ## Limits
 - Joints are rotate layers (forward kinematics); there is no IK, mesh deformation or lip-sync.
 - Without `doc_id` a new document is created; pass `doc_id` to build into the open one.
+""",
+    "production": """# AI Production Orchestration
+
+`production_run` turns a structured brief into a dependency-ordered, resumable task
+graph and executes it against the backend: create document -> build characters,
+backgrounds, props and rigs -> lay out / camera / animate / effects per shot ->
+validate -> render preview (and final when `render_final`) -> write manifest and
+report. Every task is verified before it is reported done, and the run state is
+saved after each task, so an interrupted run resumes exactly where it stopped.
+
+## Brief schema
+```json
+{
+  "title": "My Short", "slug": "my-short", "logline": "...",
+  "width": 1920, "height": 1080, "fps": 24, "style": "shonen_action",
+  "characters": [{
+    "id": "hero", "manifest": "parts/manifest.json",
+    "position": {"x": 300, "y": 950}, "height": 600,
+    "actions": [{"motion": "walk", "start": 0, "end": 4}]
+  }],
+  "backgrounds": [{"id": "sky", "file": "bg.png"}],
+  "props": [], "rigs": [],
+  "episodes": [{"id": "ep1", "sequences": [{"id": "sq1", "shots": [{
+    "id": "sh010", "title": "Hero enters", "duration": 4,
+    "characters": ["hero"], "background": "sky",
+    "effects": [{"name": "vignette", "params": {"opacity": 0.4}}],
+    "camera": [{"time": 0, "zoom": 1}, {"time": 4, "zoom": 1.2}]
+  }]}]}],
+  "render_profiles": [{"name": "hd", "width": 1920, "height": 1080}],
+  "checkpoints": ["layout", "animation"],
+  "root": "C:/Users/me/Documents/SynfigMCP", "render_final": false
+}
+```
+A character uses `manifest` (from `rig_sheet_slice`) or inline `parts` (same shape
+as `scene_auto_build`). Backgrounds use `file` or `color`. Shots reference
+characters/backgrounds by id.
+
+## Human-approval checkpoints
+Stages named in `checkpoints` (e.g. `layout`, `animation`, `render`) pause the run
+with status `awaiting_approval`. Inspect with `production_status`, approve with
+`production_approve(slug, checkpoint)`, then `production_resume(slug)` to continue.
+Resume never bypasses an unapproved gate.
+
+## On-disk layout
+`<root>/projects/<slug>/` holds `project.json` (manifest: assets with sha256 and
+license, versions, shots), `shots/*.sif`, `renders/<shot>/preview.png` and
+`final/`, `checkpoints/state.json` (resumable state), `logs/events.jsonl`, and
+`reports/production-report.{md,json}`.
+
+## Tools
+- `production_run(brief, dry_run)` - start; `dry_run=true` returns the plan only.
+- `production_resume(slug, root, max_attempts)` - continue an interrupted run.
+- `production_approve(slug, checkpoint, root)` - approve a gate.
+- `production_status(slug, root)` - read-only manifest, task states, approvals.
 """,
     "review": """# Visual Review Loop & Token Efficiency
 

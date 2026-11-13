@@ -26,6 +26,18 @@
 | `review` | 18 | **4,904** | 4,915 | ❌ Exceeds (4000) |
 | `all` | 81 | **20,479** | 20,503 | ❌ Exceeds (16000) |
 
+### Baseline update — production orchestrator (v1.0.0)
+
+The `all` profile now exposes **93 tools** at **22,634 tokens** (`cl100k_base`),
+after the production orchestrator added `production_run`, `production_resume`,
+`production_approve` and `production_status` (~967 tokens combined). Their full
+brief schema lives in `synfig_help('production')`, not the tool docstrings.
+
+- The `all` CI ceiling was raised **22,000 → 23,000** to accommodate this
+  deliberate feature addition (`test_tools_list_token_ceiling`).
+- The `core` profile is **unchanged**: 15 tools, **2,880 tokens** (< 3,000), so
+  tight-context clients pay nothing for the orchestrator.
+
 ---
 
 ## 2. Response Size of Top 15 Common Calls

@@ -14,12 +14,16 @@ from typing import Any
 
 from synfig_mcp.assets.models import AssetManifest, AssetMetadata, LicensePolicy
 from synfig_mcp.assets.providers.base import BaseAssetProvider
-from synfig_mcp.assets.providers.mock_provider import MockAssetProvider
 from synfig_mcp.assets.providers.openverse import OpenverseAssetProvider
 from synfig_mcp.assets.security.raster_hardening import harden_raster_image
 from synfig_mcp.assets.security.svg_sanitizer import sanitize_svg
 from synfig_mcp.assets.security.url_validator import validate_asset_url
-from synfig_mcp.security.sandbox import get_default_allowed_roots
+from synfig_mcp.errors import SynfigError
+from synfig_mcp.security.access import get_staging_root
+from synfig_mcp.security.sandbox import validate_path
+
+#: Largest local file that may be registered as an asset (25 MB, same as downloads).
+MAX_LOCAL_ASSET_BYTES = 25 * 1024 * 1024
 
 
 class AssetPipeline:
@@ -33,20 +37,23 @@ class AssetPipeline:
         self.policy = policy or LicensePolicy()
         self.providers: dict[str, BaseAssetProvider] = {
             "openverse": OpenverseAssetProvider(),
-            "mock": MockAssetProvider(),
         }
         if providers:
             for p in providers:
                 self.providers[p.name] = p
 
     def get_provider(self, name: str) -> BaseAssetProvider:
-        """Resolve asset provider, falling back to mock provider for offline resilience."""
-        return self.providers.get(name.lower(), self.providers["mock"])
+        """Resolve an asset provider; unknown providers are an explicit error."""
+        provider = self.providers.get(name.lower())
+        if provider is None:
+            raise SynfigError(
+                f"Unknown asset provider '{name}'. Available: {sorted(self.providers)}"
+            )
+        return provider
 
     def _get_assets_dir(self) -> Path:
-        """Return workspace assets directory."""
-        workspace = get_default_allowed_roots()[0]
-        assets_dir = workspace / "assets"
+        """Return the project-aware assets directory (active project first)."""
+        assets_dir = get_staging_root() / "assets"
         assets_dir.mkdir(parents=True, exist_ok=True)
         return assets_dir
 
@@ -191,11 +198,17 @@ class AssetPipeline:
                 "error": f"Invalid rights declaration '{rights}'. Must be one of: {sorted(valid_rights)}",
             }
 
-        p = Path(file_path)
-        if not p.exists():
-            return {"success": False, "error": f"File '{file_path}' does not exist."}
+        try:
+            p = validate_path(file_path, must_exist=True, user_intent=True)
+        except (SynfigError, FileNotFoundError) as exc:
+            return {"success": False, "error": str(exc)}
 
         raw_bytes = p.read_bytes()
+        if len(raw_bytes) > MAX_LOCAL_ASSET_BYTES:
+            return {
+                "success": False,
+                "error": f"Asset exceeds the {MAX_LOCAL_ASSET_BYTES // (1024 * 1024)} MB size limit.",
+            }
         sha256_hash = hashlib.sha256(raw_bytes).hexdigest()
         asset_id = f"local_{sha256_hash[:10]}"
 

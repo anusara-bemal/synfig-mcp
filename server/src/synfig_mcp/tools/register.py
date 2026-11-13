@@ -63,6 +63,13 @@ TOOL_PROFILES: dict[str, set[str]] = {
     # Core & Diagnostics
     "health_check": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "synfig_help": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "studio_launch": {"all"},
+    "studio_info": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    # Project-aware file access
+    "access_approve": {"core", "assets", "all"},
+    "access_revoke": {"assets", "all"},
+    "access_status": {"assets", "all"},
+    "project_refresh": {"assets", "all"},
     # Document Management
     "doc_list": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "doc_new": {"core", "all"},
@@ -128,6 +135,11 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "character_pose_apply": {"rig", "all"},
     "character_motion_apply": {"rig", "all"},
     "storyboard_from_script": {"rig", "all"},
+    # Production orchestration
+    "production_run": {"rig", "all"},
+    "production_resume": {"rig", "all"},
+    "production_approve": {"rig", "all"},
+    "production_status": {"rig", "all"},
     # History & Undo
     "history_undo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "history_redo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
@@ -175,7 +187,11 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
                 "to create or load one."
             )
         elif isinstance(exc, SecuritySandboxError):
-            hint = " Add the target directory to SYNFIG_MCP_WORKSPACE_ROOTS."
+            hint = (
+                " Approve the folder once with access_approve(folder=...), or open/import "
+                "the file in Synfig Studio. Files you attach or pass directly are authorised "
+                "automatically; no manual copying is needed."
+            )
         elif isinstance(exc, BridgeConnectionError) and "MCP Bridge" not in exc.message:
             hint = (
                 " Start the patched Synfig Studio and enable Tools -> MCP Bridge, "
@@ -219,10 +235,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("synfig_help", annotations=READ_ONLY)
     async def synfig_help(topic: str = "overview") -> dict[str, Any]:
-        """Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, characters, review).
-        Returns: Markdown guide text and list of available guide topics.
-        Gotcha: Querying help avoids loading large documentation into the active context.
-        """
+        """Get Synfig MCP guidance by topic (overview, scene, profiles, declarative_build, animation, characters, production, review). Returns Markdown guide text."""
         from synfig_mcp.resources.guides import get_guide_content
 
         return wrap_untrusted({"topic": topic, "content": get_guide_content(topic)})
@@ -233,12 +246,63 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("health_check", annotations=READ_ONLY)
     async def health_check() -> dict[str, Any]:
-        """Check server readiness, active backend ('live' Synfig Studio vs 'headless' pure-Python SIF engine), and connection status.
-        Returns: JSON object with 'backend' ('live' or 'headless'), 'connected' (bool), 'studio_running' (bool), and 'details'.
-        Gotcha: In 'auto' mode a blank canvas usually means Studio is open without its MCP bridge. Check 'details.warning' and use the patched Studio build.
-        """
+        """Check readiness and active backend ('live' Studio vs 'headless' SIF engine). Returns backend, connected, studio_running, details. In auto mode a blank canvas usually means Studio is open without its MCP bridge; check details.warning."""
         status = await backend.health_check()
         return status.model_dump()
+
+    @tool_for("studio_launch", annotations=MUTATING)
+    async def studio_launch(wait_seconds: float = 45.0) -> dict[str, Any]:
+        """Launch patched Synfig Studio with the MCP bridge enabled; waits until reachable.
+        Returns: 'launched', 'pid', 'bridge_ready', or 'already_running'.
+        """
+        from synfig_mcp.backend.launch import launch_studio
+
+        return await launch_studio(wait_seconds=wait_seconds)
+
+    @tool_for("studio_info", annotations=READ_ONLY)
+    async def studio_info() -> dict[str, Any]:
+        """Inspect connected Studio: versions and open documents with file paths.
+        Returns: 'backend', 'studio_version', 'docs' [{doc_id, name, file_path}].
+        """
+        return wrap_untrusted(await backend.studio_info())
+
+    # -----------------------------------------------------------------------
+    # Project-aware file access
+    # -----------------------------------------------------------------------
+
+    @tool_for("access_approve", annotations=MUTATING)
+    async def access_approve(folder: str, reason: str = "user") -> dict[str, Any]:
+        """Approve a folder (e.g. Downloads) for file access; remembered across sessions. System/credential/drive roots rejected."""
+        from synfig_mcp.security.access import get_access_controller
+
+        resolved = get_access_controller().approve_folder(folder, reason=reason)
+        return {"approved": True, "folder": str(resolved), "reason": reason}
+
+    @tool_for("access_revoke", annotations=MUTATING)
+    async def access_revoke(folder: str) -> dict[str, Any]:
+        """Remove a previously approved folder from file access.
+        Returns: 'revoked' (bool), 'folder'.
+        """
+        from synfig_mcp.security.access import get_access_controller
+
+        revoked = get_access_controller().revoke_folder(folder)
+        return {"revoked": revoked, "folder": folder}
+
+    @tool_for("access_status", annotations=READ_ONLY)
+    async def access_status() -> dict[str, Any]:
+        """Show file access policy: approved folders, project dirs, asset/attachment counts.
+        Returns: JSON describing every source of file authority this session.
+        """
+        from synfig_mcp.security.access import get_access_controller
+
+        return get_access_controller().status()
+
+    @tool_for("project_refresh", annotations=READ_ONLY)
+    async def project_refresh() -> dict[str, Any]:
+        """Re-read the open project via the native bridge; authorise its dir and imported assets.
+        Returns: 'registered', 'project_dir', 'file_path', asset counts.
+        """
+        return await backend.refresh_project_access()
 
     # -----------------------------------------------------------------------
     # Document Management
@@ -246,10 +310,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("doc_list", annotations=READ_ONLY)
     async def doc_list() -> list[dict[str, Any]]:
-        """List all currently open or loaded animation documents.
-        Returns: Array of document objects, each containing 'id', 'name', 'width', 'height', 'fps', and 'duration_frames'.
-        Gotcha: Passing a file path instead of obtaining a valid 'doc_id' from this list.
-        """
+        """List open documents. Returns array with id, name, width, height, fps, duration_frames. Use these doc_id values, not file paths."""
         docs = await backend.doc_list()
         res: list[dict[str, Any]] = []
         for d in docs:
@@ -260,10 +321,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("doc_info", annotations=READ_ONLY)
     async def doc_info(doc_id: str = "doc_0") -> dict[str, Any]:
-        """Get metadata, resolution, framerate, and time bounds for a specific document.
-        Returns: Document details including 'width', 'height', 'fps', 'start_time', 'end_time', and 'duration_frames'.
-        Gotcha: Invoking without a valid doc_id from doc_list().
-        """
+        """Get document metadata: width, height, fps, start_time, end_time, duration_frames. Requires a valid doc_id."""
         info = await backend.doc_info(doc_id)
         if info is not None:
             res = info.model_dump()
@@ -279,28 +337,19 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("doc_new", annotations=MUTATING)
     async def doc_new(width: int = 1920, height: int = 1080, fps: float = 24.0) -> dict[str, Any]:
-        """Create a new blank Synfig animation document with specified resolution and framerate.
-        Returns: The created DocumentInfo object with generated 'id', 'name', dimensions, and fps.
-        Gotcha: ONLY call when the user explicitly asked for a new document. Otherwise reuse the currently open document (doc_list) and pass its doc_id.
-        """
+        """Create a new blank document. Returns id, name, dimensions, fps. ONLY call when the user explicitly asked for a new document; otherwise reuse the open document from doc_list."""
         doc = await backend.doc_new(width=width, height=height, fps=fps)
         return doc.model_dump()
 
     @tool_for("doc_open", annotations=MUTATING)
     async def doc_open(file_path: str) -> dict[str, Any]:
-        """Open an existing Synfig animation project (.sif, .sifz, or .sfg container).
-        Returns: DocumentInfo representing the loaded project.
-        Gotcha: ONLY call when the user explicitly asked to open this file. Never use it to 'start fresh'; implement in the currently open document instead.
-        """
+        """Open an existing project (.sif, .sifz, .sfg). ONLY call when the user explicitly asked to open this file; otherwise build in the currently open document."""
         doc = await backend.doc_open(file_path=file_path)
         return doc.model_dump()
 
     @tool_for("doc_save", annotations=MUTATING)
     async def doc_save(doc_id: str, file_path: str | None = None) -> dict[str, str]:
-        """Save the document to disk in .sif (XML), .sifz (gzip), or .sfg (ZIP container) format.
-        Returns: Object containing 'file_path' of the saved file.
-        Gotcha: Omitting file_path when the document was newly created with doc_new() and has no default path.
-        """
+        """Save document to .sif/.sifz/.sfg. Returns file_path. Pass file_path for a new doc_new document that has no default path."""
         path = await backend.doc_save(doc_id=doc_id, file_path=file_path)
         return {"file_path": path}
 
@@ -324,10 +373,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         start_time: float | None = None,
         end_time: float | None = None,
     ) -> dict[str, Any]:
-        """Update canvas resolution, frame rate, time bounds, or name.
-        Returns: Updated DocumentInfo object.
-        Gotcha: Setting end_time less than or equal to start_time.
-        """
+        """Update document resolution, fps, time bounds, or name. Returns updated DocumentInfo. end_time must be after start_time."""
         res = await backend.doc_set_properties(
             doc_id=doc_id,
             name=name,
@@ -391,11 +437,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         spec: dict[str, Any],
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Apply declarative scene build spec.
-        Spec: {doc_id, layers: [{id, type, params}], groups}. Layer 'id' required. Image paths host-resolved or via SYNFIG_MCP_PATH_MAPPING.
-        Returns: Diff {action: 'scene.build', created: [...], modified: [...]}.
-        Gotcha: Defaults to active document; do not call doc_new/doc_open first.
-        """
+        """Apply a declarative scene spec {doc_id, layers:[{id,type,params}], groups}. Layer id required. Returns created/modified diff. Defaults to active document; don't call doc_new/doc_open first."""
         res = await backend.scene_build(spec=spec, dry_run=dry_run)
         return wrap_untrusted(res)
 
@@ -405,10 +447,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         scope: str = "canvas",
         fields: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Export current scene state into a declarative SceneBuildSpec JSON.
-        Returns: Structured SceneBuildSpec dictionary compatible with scene_build.
-        Gotcha: Filter fields=['params', 'waypoints'] to reduce returned payload tokens.
-        """
+        """Export scene state as a SceneBuildSpec JSON for scene_build. Use fields=['params','waypoints'] to trim payload."""
         res = await backend.scene_export_spec(doc_id=doc_id, scope=scope, fields=fields)
         return wrap_untrusted(res)
 
@@ -417,10 +456,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         doc_id: str = "doc_0",
         budget_tokens: int = 500,
     ) -> dict[str, Any]:
-        """Get a token-bounded structural summary of canvas size, framerate, duration, and layer hierarchy.
-        Returns: Compact document metadata summary strictly bounded under budget_tokens.
-        Gotcha: Defaults to the currently selected document; call this first to confirm the target before building.
-        """
+        """Token-bounded summary of canvas size, fps, duration, and layer hierarchy. Call first to confirm the target document before building."""
         res = await backend.scene_summary(doc_id=doc_id, budget_tokens=budget_tokens)
         return wrap_untrusted(res)
 
@@ -465,10 +501,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         end_time: float | None = None,
         background_color: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Change the resolution, frame rate, time range or background colour of a canvas.
-        Returns: Object with the updated canvas properties and a diff summary.
-        Gotcha: Setting end_time before start_time.
-        """
+        """Change canvas resolution, fps, time range or background colour. Returns updated properties and diff. end_time must be after start_time."""
         return await backend.canvas_set_properties(
             doc_id=doc_id,
             canvas_id=canvas_id,
@@ -498,10 +531,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         description: str | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Add a new visual layer (e.g. 'circle', 'rectangle', 'star', 'solid_color', 'text', 'PasteCanvas') to the canvas.
-        Returns: Object with 'layer_id', 'layer_type', 'depth', and structured 'diff' summary.
-        Gotcha: Using invalid layer type names. Query schema_list_layers() first to see all valid types.
-        """
+        """Add a visual layer (circle, rectangle, star, solid_color, text, PasteCanvas, ...). Returns layer_id, layer_type, depth, diff. Query schema_list_layers for valid types."""
         merged_params = dict(params or {})
         if description and "desc" not in merged_params:
             merged_params["desc"] = description
@@ -1127,10 +1157,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         tip_width: float = 1.0,
         parent_index: int = -1,
     ) -> dict[str, Any]:
-        """Add a bone to a skeleton layer (Synfig's cut-out rigging primitive).
-        Returns: Object describing the created bone and a diff summary.
-        Gotcha: Bone authoring needs Synfig Studio - the headless engine reports that it cannot create bones.
-        """
+        """Add a bone to a skeleton layer (cut-out rigging). Returns the created bone and diff. Needs Synfig Studio; headless cannot create bones."""
         return await backend.bone_add(
             doc_id=doc_id,
             layer_id=layer_id,
@@ -1152,12 +1179,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         bg_tolerance: int = 28,
         preview: bool = True,
     ) -> dict[str, Any]:
-        """Cut a character rig sheet (one image, many body parts) into one transparent PNG per part.
-        Call once without names and look at preview_base64 (numbered boxes), then call again with
-        names={"1": "head", "2": "torso", "3": "upper_arm_l", ...} to export only the real parts.
-        Returns: {parts: [{index, name, file, bbox}], manifest, output_dir, preview_base64}.
-        Gotcha: Needs a transparent or uniform background. Name parts by body role (head, torso,
-        upper_arm_l, forearm_l, hand_l, upper_leg_r, lower_leg_r, foot_r) so rigs assemble themselves.
+        """Cut a rig sheet (one image, many parts) into one transparent PNG per part. Call once without
+        names to see preview_base64 (numbered boxes), then again with names={"1":"head",...} to export.
+        Returns parts, manifest, output_dir, preview_base64. Needs transparent/uniform background; name
+        parts by body role (head, torso, upper_arm_l, ...) so rigs auto-assemble. See synfig_help('characters').
         """
         from pathlib import Path
 
@@ -1165,8 +1190,12 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         from synfig_mcp.characters.sheet import slice_rig_sheet
         from synfig_mcp.security.sandbox import validate_path
 
-        sheet = validate_path(file_path, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True)
-        target = validate_path(output_dir or str(sheet.parent / f"{sheet.stem}_parts"))
+        sheet = validate_path(
+            file_path, allowed_extensions=IMAGE_EXTENSIONS, must_exist=True, user_intent=True
+        )
+        target = validate_path(
+            output_dir or str(sheet.parent / f"{sheet.stem}_parts"), user_intent=True
+        )
         res = slice_rig_sheet(
             Path(sheet),
             Path(target),
@@ -1183,17 +1212,12 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         spec: dict[str, Any],
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Build a whole animated shot in one call: background, rigged cut-out characters, props,
-        camera moves and audio. One undo step; everything is validated before the document changes.
-        spec: {width, height, fps, duration, background: {file|color, fit},
-          characters: [{id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
-            position: {x, y}, height, flip, z, actions: [{motion, start, end, move_to: {x, y}, speed}]}],
-          props: [{id, file, position, height, rotation, z, actions}],
-          camera: [{time, zoom, center: {x, y}}], audio: {file, delay}, save_path, preview}.
-        Positions are canvas pixels from the top-left (coords: "units" for Synfig units); a character
-        stands with its feet on 'position'. Motions: walk, run, idle, wave, jump, nod, talk, rest, pose, move.
-        Returns: {doc_id, characters, props, warnings, saved_to, preview: {contact_sheet_base64, ...}}.
-        Gotcha: Parts named by body role get default joints; other parts need parent + attach.
+        """Build a whole animated shot in one call: background, rigged characters, props, camera, audio.
+        One undo step; validated before the document changes. spec: {width, height, fps, duration,
+        background, characters, props, camera, audio, save_path, preview}. Positions are canvas pixels
+        from top-left; a character's feet sit on position. Full spec: synfig_help('declarative_build').
+        Returns doc_id, characters, props, warnings, saved_to, preview. Parts named by body role get
+        default joints; others need parent + attach.
         """
         from synfig_mcp.characters.production import SceneAutoBuilder
 
@@ -1205,12 +1229,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         spec: dict[str, Any],
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Assemble a jointed cut-out character from part images (or primitives) in an open document.
-        spec: {doc_id, id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}],
-          position: {x, y}, height, flip, layout: "assemble" | "in_place", actions?}.
-        Every part gets a joint layer <id>_<part>_rot; turning a part carries its children.
-        Returns: Rig summary with root group, parts, roles and joint layer ids.
-        Gotcha: Use dry_run=true to preview the hierarchy; pivot/attach are fractions of the image.
+        """Assemble a jointed cut-out character from part images in an open document. spec: {doc_id, id,
+        manifest | parts, position, height, flip, layout, actions}. Each part gets a joint layer
+        <id>_<part>_rot; turning a part carries its children. Returns root group, parts, roles, joint ids.
+        dry_run=true previews; pivot/attach are image fractions. See synfig_help('characters').
         """
         from synfig_mcp.characters.rigging import RiggingEngine
 
@@ -1226,10 +1248,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         time: float = 0.0,
         angles: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Key a pose on a rigged character: a preset (idle, punch, jump, walk_contact, walk_passing)
-        or explicit joint angles, e.g. angles={"upper_arm_r": 120, "head": -10} (degrees from rest).
-        Returns: The joint layers that were keyed and the joints the character does not have.
-        Gotcha: Fails when the character has none of the addressed joints - nothing is keyed silently.
+        """Key a pose on a rigged character: preset (idle, punch, jump, walk_contact, walk_passing) or
+        angles={"upper_arm_r":120,...} (degrees from rest). Returns keyed joints and missing joints.
+        Fails if none of the addressed joints exist; nothing is keyed silently.
         """
         from synfig_mcp.characters.rigging import RiggingEngine
 
@@ -1249,10 +1270,9 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         speed: float = 1.0,
         move_to: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Animate a rigged character: walk, run, idle, talk (loop until end_time), wave, jump, nod,
-        punch (play once), rest, move. move_to={x, y} (canvas pixels) travels there by end_time.
-        Returns: Keyframe times, waypoint count, animated layers and skipped joints.
-        Gotcha: The character must have been built by character_rig_from_parts or scene_auto_build.
+        """Animate a rigged character: walk, run, idle, talk (loop), wave, jump, nod, punch (once), rest,
+        move. move_to={x,y} (canvas pixels) travels there by end_time. Returns keyframe times, waypoint
+        count, animated layers, skipped joints. Character must come from character_rig_from_parts/scene_auto_build.
         """
         from synfig_mcp.characters.rigging import RiggingEngine
 
@@ -1284,24 +1304,151 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
+    # Production orchestration
+    # -----------------------------------------------------------------------
+
+    def _production_workspace(root: str | None, slug: str):
+        from synfig_mcp.config import settings
+        from synfig_mcp.production.workspace import ProductionWorkspace
+        from synfig_mcp.security.sandbox import get_default_allowed_roots, validate_path
+
+        base = validate_path(
+            root or str(settings.workspace_roots[0]),
+            allowed_roots=get_default_allowed_roots(),
+        )
+        return ProductionWorkspace.open(base / "projects", slug)
+
+    @tool_for("production_run", annotations=MUTATING)
+    async def production_run(
+        brief: dict[str, Any],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Run a whole production from a structured brief as a dependency-ordered, resumable task
+        graph: documents, characters, backgrounds, layout, animation, effects, QC, previews,
+        manifest and report. brief: {title, episodes[].sequences[].shots[], characters[],
+        backgrounds[], props[], rigs[], style, checkpoints[], root, render_final}. Stages named in
+        checkpoints pause until production_approve; state is saved after every task so
+        production_resume can continue. dry_run=true returns the plan without touching anything.
+        Full brief schema: synfig_help('production'). Returns status, task_states, awaiting_approval.
+        """
+        from synfig_mcp.config import settings
+        from synfig_mcp.production.models import ProductionBrief
+        from synfig_mcp.production.orchestrator import ProductionOrchestrator
+        from synfig_mcp.production.planner import build_plan
+        from synfig_mcp.production.workspace import ProductionWorkspace
+
+        parsed = ProductionBrief.model_validate(brief)
+        plan = build_plan(parsed)
+        if dry_run:
+            return wrap_untrusted(
+                {
+                    "project": parsed.project_slug,
+                    "dry_run": True,
+                    "tasks": [
+                        {
+                            "id": t.id,
+                            "kind": t.kind,
+                            "depends_on": t.depends_on,
+                            "checkpoint": t.checkpoint,
+                        }
+                        for t in plan.tasks
+                    ],
+                    "checkpoints": parsed.checkpoints,
+                }
+            )
+        workspace = ProductionWorkspace.create(
+            parsed, parsed.root or str(settings.workspace_roots[0])
+        )
+        orchestrator = ProductionOrchestrator(backend=backend, workspace=workspace)
+        res = await orchestrator.run(parsed, plan=plan)
+        res["project_dir"] = str(workspace.project_dir)
+        return wrap_untrusted(res)
+
+    @tool_for("production_resume", annotations=MUTATING)
+    async def production_resume(
+        slug: str,
+        root: str | None = None,
+        max_attempts: int = 2,
+    ) -> dict[str, Any]:
+        """Continue an interrupted production from its last checkpoint. Completed tasks are not
+        repeated; shot files on disk are re-opened and verified. root defaults to the configured
+        workspace. Returns the same status/task_states structure as production_run.
+        """
+        from synfig_mcp.production.orchestrator import ProductionOrchestrator
+
+        workspace = _production_workspace(root, slug)
+        orchestrator = ProductionOrchestrator(backend=backend, workspace=workspace)
+        res = await orchestrator.resume(max_attempts=max_attempts)
+        res["project_dir"] = str(workspace.project_dir)
+        return wrap_untrusted(res)
+
+    @tool_for("production_approve", annotations=MUTATING)
+    async def production_approve(
+        slug: str,
+        checkpoint: str,
+        root: str | None = None,
+    ) -> dict[str, Any]:
+        """Approve a human-approval checkpoint (e.g. 'layout', 'animation') so the paused
+        production can continue. Call production_resume afterwards to run the next stages.
+        """
+        from synfig_mcp.production.orchestrator import ProductionOrchestrator
+
+        workspace = _production_workspace(root, slug)
+        orchestrator = ProductionOrchestrator(backend=backend, workspace=workspace)
+        res = await orchestrator.approve(checkpoint)
+        return wrap_untrusted(res)
+
+    @tool_for("production_status", annotations=READ_ONLY)
+    async def production_status(
+        slug: str,
+        root: str | None = None,
+    ) -> dict[str, Any]:
+        """Inspect a production: manifest status, per-task states, pending approvals, versions,
+        registered assets and the latest log events. Read-only.
+        """
+        workspace = _production_workspace(root, slug)
+        manifest = workspace.read_manifest()
+        orchestrator_state = workspace.read_state("state.json")
+        tasks: list[dict[str, Any]] = []
+        awaiting: list[str] = []
+        if orchestrator_state and "plan" in orchestrator_state:
+            for task in orchestrator_state["plan"].get("tasks", []):
+                tasks.append(
+                    {
+                        "id": task.get("id"),
+                        "kind": task.get("kind"),
+                        "status": task.get("status"),
+                        "error": task.get("error"),
+                    }
+                )
+                if task.get("status") == "awaiting_approval" and task.get("checkpoint"):
+                    awaiting.append(task["checkpoint"])
+        return wrap_untrusted(
+            {
+                "project": manifest.slug,
+                "status": manifest.status,
+                "project_dir": str(workspace.project_dir),
+                "tasks": tasks,
+                "awaiting_approval": sorted(set(awaiting)),
+                "assets": [a.model_dump() for a in manifest.assets],
+                "versions": [v.model_dump() for v in manifest.versions],
+                "recent_events": workspace.read_log(limit=20),
+            }
+        )
+
+    # -----------------------------------------------------------------------
     # History (Undo / Redo)
     # -----------------------------------------------------------------------
 
     @tool_for("history_undo", annotations=MUTATING)
     async def history_undo(doc_id: str = "doc_0") -> dict[str, bool]:
-        """Undo the previous action in Studio or Headless mode. Exactly 1 MCP mutating tool call = 1 undo step.
-        Returns: Object with 'success': bool.
-        Gotcha: Calling undo when undo stack is empty (returns success: false).
-        """
+        """Undo the previous action. One mutating MCP call = one undo step. Returns success (false when the stack is empty)."""
         success = await backend.undo(doc_id=doc_id)
         return {"success": success}
 
     @tool_for("history_redo", annotations=MUTATING)
     async def history_redo(doc_id: str = "doc_0") -> dict[str, bool]:
-        """Redo the previously undone action.
-        Returns: Object with 'success': bool.
-        Gotcha: Calling redo after a new mutating action was performed (new actions clear redo stack).
-        """
+        """Redo the previously undone action. Returns success. A new mutating action clears the redo stack."""
         success = await backend.redo(doc_id=doc_id)
         return {"success": success}
 
@@ -1340,10 +1487,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         height: int | None = None,
         target: str = "png",
     ) -> dict[str, Any]:
-        """Render a single frame of the animation to an image file (PNG, JPEG, BMP, GIF, PPM).
-        Returns: Object with 'success': bool, 'output_path', 'time', and image dimensions.
-        Gotcha: Sequence encoders such as 'ffmpeg' need render_sequence, not render_frame.
-        """
+        """Render one frame to an image (PNG, JPEG, BMP, GIF, PPM). Returns success, output_path, time. Sequence encoders like ffmpeg need render_sequence instead."""
         success = await backend.render_frame(
             doc_id=doc_id,
             output_path=output_path,
@@ -1372,10 +1516,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         job_id: str | None = None,
         ctx: Context | None = None,
     ) -> list[str]:
-        """Render an image sequence across an animation time range using the rendering pipeline.
-        Returns: List of generated output frame file paths.
-        Gotcha: Passing a file path instead of an output directory.
-        """
+        """Render an image sequence across a time range. Returns list of output frame paths. Pass an output directory, not a file path."""
 
         async def on_progress(cur: int, total: int, pct: float) -> None:
             if ctx is not None:
@@ -1415,10 +1556,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         target: str = "png",
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """Start an asynchronous animation render job and immediately return a job_id.
-        Returns: Dictionary with 'job_id', 'status': 'running', and 'output_dir'.
-        Gotcha: Verify document ID before invoking.
-        """
+        """Start an async render job; returns job_id immediately with status='running' and output_dir."""
 
         async def on_progress(cur: int, total: int, pct: float) -> None:
             if ctx is not None:
@@ -1441,26 +1579,17 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
 
     @tool_for("render_status", annotations=READ_ONLY)
     async def render_status(job_id: str) -> dict[str, Any]:
-        """Query the execution status and progress of an asynchronous render job.
-        Returns: Dictionary with 'job_id', 'status' ('running', 'completed', 'cancelled', 'failed'),
-        Gotcha: Verify document ID before invoking.
-        """
+        """Query an async render job's status/progress. Returns job_id and status (running/completed/cancelled/failed)."""
         return job_manager.get_status(job_id)
 
     @tool_for("render_result", annotations=READ_ONLY)
     async def render_result(job_id: str) -> dict[str, Any]:
-        """Retrieve final output frames for a completed render job.
-        Returns: Dictionary with 'job_id', 'status': 'completed', and 'frames': list of file paths.
-        Gotcha: Verify document ID before invoking.
-        """
+        """Get final frames of a completed render job. Returns job_id, status, frames (file paths)."""
         return job_manager.get_result(job_id)
 
     @tool_for("render_cancel", annotations=DESTRUCTIVE)
     async def render_cancel(job_id: str) -> dict[str, Any]:
-        """Cancel an active in-flight render job by its job_id.
-        Returns: Dictionary with 'cancelled': True, 'job_id': str, and status message.
-        Gotcha: Verify document ID before invoking.
-        """
+        """Cancel an in-flight render job by job_id. Returns cancelled, job_id, message."""
         # First check active job_manager job
         with contextlib.suppress(Exception):
             return job_manager.cancel_job(job_id)
@@ -1489,10 +1618,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         width: int | None = None,
         height: int | None = None,
     ) -> dict[str, Any]:
-        """Render an animation time range and compile directly to a video file (.mp4 or .gif).
-        Returns: Object containing 'success': bool and 'output_path'.
-        Gotcha: Targeting an invalid extension (use .mp4 or .gif).
-        """
+        """Render a time range straight to video (.mp4 or .gif). Returns success, output_path."""
         success = await backend.render_video(
             doc_id=doc_id,
             output_path=output_path,
@@ -1515,10 +1641,7 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         start_time: float | None = None,
         end_time: float | None = None,
     ) -> dict[str, Any]:
-        """Render selected keyframe timestamps into a visual contact sheet / storyboard grid image.
-        Returns: Object containing 'success': bool and 'output_path'.
-        Gotcha: Setting cols or rows to 0.
-        """
+        """Render keyframe timestamps into a contact-sheet grid image. Returns success, output_path. cols/rows must be > 0."""
         success = await backend.render_contact_sheet(
             doc_id=doc_id,
             output_path=output_path,
