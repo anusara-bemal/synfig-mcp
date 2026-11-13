@@ -41,7 +41,7 @@ def test_token_budget_artifact_exists() -> None:
 
 @pytest.mark.asyncio
 async def test_tools_list_core_profile_budget() -> None:
-    """Default 'core' profile must stay strictly below 3,000 tokens."""
+    """Default 'core' profile must stay strictly below 4,000 tokens."""
     backend = HeadlessBackend()
     app = create_server(backend=backend, profile="core")
     async with Client(app) as client:
@@ -52,8 +52,8 @@ async def test_tools_list_core_profile_budget() -> None:
     tokens = count_tokens(dumped)
 
     # Core budget ceiling enforced by CI
-    assert tokens <= 3000, f"core profile exceeded 3,000 token budget: {tokens} tokens"
-    assert len(tools_res.tools) <= 15, f"core profile tool count bloated: {len(tools_res.tools)}"
+    assert tokens <= 4000, f"core profile exceeded 4,000 token budget: {tokens} tokens"
+    assert len(tools_res.tools) <= 20, f"core profile tool count bloated: {len(tools_res.tools)}"
 
 
 @pytest.mark.asyncio
@@ -68,9 +68,10 @@ async def test_tools_list_token_ceiling() -> None:
     dumped = json.dumps(tools_raw)
     tokens = count_tokens(dumped)
 
-    # Full studio ceiling.  Raised from 22,000 to 24,000 when the anime
-    # production pipeline (produce_anime_project and friends) was added.
-    assert tokens <= 24000, f"tools/list token bloat detected: {tokens} > 24000"
+    # Full studio ceiling.  Raised to 26,000 when the runtime permission tools
+    # (permission_list/grant/revoke) were added to the default surface.
+
+    assert tokens <= 26000, f"tools/list token bloat detected: {tokens} > 26000"
 
 
 @pytest.mark.asyncio

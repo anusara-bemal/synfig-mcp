@@ -159,7 +159,7 @@ def _data_list(result: Any) -> list[Any]:
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        ({"background": {"file": "missing.png"}}, "denied by workspace sandbox"),
+        ({"background": {"file": "missing.png"}}, "denied by the workspace permission model"),
         ({"duration": -1}, "duration"),
         ({"characters": [{"id": "hero", "parts": []}]}, "no parts"),
         ({"props": [{"id": "hero", "file": "BG"}]}, "must be unique"),

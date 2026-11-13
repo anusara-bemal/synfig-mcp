@@ -6,6 +6,7 @@ Exposes typed, categorized tools over BackendBase with ToolAnnotations and LLM-o
 import contextlib
 from collections.abc import Callable
 from functools import wraps
+from pathlib import Path
 from typing import Any, TypeVar, cast
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -62,6 +63,10 @@ DESTRUCTIVE = ToolAnnotations(read_only_hint=False, destructive_hint=True, idemp
 TOOL_PROFILES: dict[str, set[str]] = {
     # Core & Diagnostics
     "health_check": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    # Filesystem permissions
+    "permission_list": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "permission_grant": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "permission_revoke": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "synfig_help": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     # Document Management
     "doc_list": {"core", "anim", "fx", "rig", "assets", "review", "all"},
@@ -239,6 +244,53 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         """
         status = await backend.health_check()
         return status.model_dump()
+
+    # -----------------------------------------------------------------------
+    # Filesystem Permissions
+    # -----------------------------------------------------------------------
+
+    @tool_for("permission_list", annotations=READ_ONLY)
+    async def permission_list() -> dict[str, Any]:
+        """List the directory roots the user has granted the server read/write access to.
+        Returns: Object with 'roots' (each: path, read, write, source) and 'default' (the fallback project dir).
+        Gotcha: A path must be inside one of these roots for any file tool to accept it; grant more with permission_grant.
+        """
+        from synfig_mcp.security.permissions import permissions
+
+        roots = [g.as_dict() for g in permissions.grants()]
+        return {"roots": roots, "count": len(roots)}
+
+    @tool_for("permission_grant", annotations=MUTATING)
+    async def permission_grant(path: str, read: bool = True, write: bool = True) -> dict[str, Any]:
+        """Grant the server access to a directory root for this session (the user authorizes a folder).
+        Args:
+            path: Absolute or relative path to a directory (or a file inside it) to authorize.
+            read: Allow reading from the root (default True).
+            write: Allow creating/overwriting files under the root (default True).
+        Returns: The resulting grant (path, read, write, source).
+        Gotcha: The path must exist. Granting a drive root, system folder or the user home root directly is rejected as overly broad.
+        """
+        from synfig_mcp.security.permissions import permissions
+        from synfig_mcp.security.sandbox import is_overly_broad_root
+
+        resolved = Path(path).expanduser().resolve()
+        broad, reason = is_overly_broad_root(resolved)
+        if broad:
+            raise SecuritySandboxError(f"Cannot grant '{resolved}': {reason}.")
+        grant = permissions.grant(resolved, read=read, write=write, source="user")
+        return grant.as_dict()
+
+    @tool_for("permission_revoke", annotations=MUTATING)
+    async def permission_revoke(path: str) -> dict[str, Any]:
+        """Revoke a previously granted directory root.
+        Args:
+            path: The directory root to remove from the grant list.
+        Returns: Object with 'revoked' (bool) and the path.
+        """
+        from synfig_mcp.security.permissions import permissions
+
+        resolved = Path(path).expanduser().resolve()
+        return {"revoked": permissions.revoke(resolved), "path": str(resolved)}
 
     # -----------------------------------------------------------------------
     # Document Management

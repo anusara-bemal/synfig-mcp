@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 89 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 92 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -16,7 +16,7 @@
 - [History & Undo](#history-undo) (3 tools)
 - [Layer Manipulation](#layer-manipulation) (9 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (7 tools)
+- [Other](#other) (10 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
@@ -25,7 +25,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 89 tools.**
+**Total: 92 tools.**
 
 ## Animation & Keyframes
 
@@ -1130,6 +1130,70 @@ Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'publ
 ---
 
 ## Other
+
+### `permission_list`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+List the directory roots the user has granted the server read/write access to.
+
+Returns: Object with 'roots' (each: path, read, write, source) and 'default' (the fallback project dir).
+
+Gotcha: A path must be inside one of these roots for any file tool to accept it; grant more with permission_grant.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `permission_grant`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Grant the server access to a directory root for this session (the user authorizes a folder).
+
+Args:
+
+path: Absolute or relative path to a directory (or a file inside it) to authorize.
+
+read: Allow reading from the root (default True).
+
+write: Allow creating/overwriting files under the root (default True).
+
+Returns: The resulting grant (path, read, write, source).
+
+Gotcha: The path must exist. Granting a drive root, system folder or the user home root directly is rejected as overly broad.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `path` | `string` | Yes | - |
+| `read` | `boolean` | No | - |
+| `write` | `boolean` | No | - |
+
+---
+
+### `permission_revoke`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Revoke a previously granted directory root.
+
+Args:
+
+path: The directory root to remove from the grant list.
+
+Returns: Object with 'revoked' (bool) and the path.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `path` | `string` | Yes | - |
+
+---
 
 ### `rig_bone_add`
 

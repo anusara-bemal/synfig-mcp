@@ -267,13 +267,13 @@ async def main() -> None:
     ]
 
     ceilings = {
-        "core": 3000,
+        "core": 4000,
         "anim": 4500,
         "fx": 4500,
         "rig": 3000,
         "assets": 2000,
         "review": 4000,
-        "all": 16000,
+        "all": 26000,
     }
 
     for stat in profile_stats:
