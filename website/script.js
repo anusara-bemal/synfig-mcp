@@ -4,133 +4,111 @@
  */
 
 // ============================================================
-// 81 Synfig MCP Tool Catalog
+// Synfig MCP Tool Catalog (generated — do not edit by hand)
+//   Regenerate: uv run python scripts/generate_website_catalog.py
 // ============================================================
 const TOOLS_CATALOG = [
-  // CORE (13)
-  { name: "health_check",       profile: "core",   desc: "Verifies server connectivity, active backend (live vs headless), and Synfig runtime status.",                                        params: "()" },
-  { name: "synfig_help",        profile: "core",   desc: "Authoritative syntax, documentation, parameter types, and schema guidance for requested topics.",                                     params: "(topic: string)" },
-  { name: "doc_new",            profile: "core",   desc: "Creates a new animation canvas document with width, height, fps, and metadata.",                                                     params: "(width?, height?, fps?, name?)" },
-  { name: "doc_open",           profile: "core",   desc: "Opens an existing .sif, .sifz, or .sfg document within the security sandbox.",                                                       params: "(file_path: string)" },
-  { name: "doc_save",           profile: "core",   desc: "Saves active animation document atomically to disk.",                                                                                params: "(file_path?: string)" },
-  { name: "doc_info",           profile: "core",   desc: "Inspects canvas dimensions, frame rate, timeline boundaries, and layer hierarchy.",                                                  params: "()" },
-  { name: "scene_build",        profile: "core",   desc: "Primary construction tool. Builds layers, hierarchies, parameters, and waypoints in 1 atomic undo step.",                           params: "(spec: object, dry_run?: bool)" },
-  { name: "scene_export_spec",  profile: "core",   desc: "Serializes active canvas layers and keyframes into compact JSON scene spec.",                                                        params: "(scope?, fields?)" },
-  { name: "scene_summary",      profile: "core",   desc: "Hierarchical overview of canvas with token-budget truncation.",                                                                      params: "(budget_tokens?: int)" },
-  { name: "history_undo",       profile: "core",   desc: "Rolls back the last studio action on the GTK main thread.",                                                                         params: "()" },
-  { name: "history_redo",       profile: "core",   desc: "Reapplies the previously undone action on the GTK main thread.",                                                                    params: "()" },
-  { name: "render_frame",       profile: "core",   desc: "Renders single frame to lossless PNG preview with base64 return.",                                                                  params: "(time?, width?, height?, quality?)" },
-  { name: "schema_introspect",  profile: "core",   desc: "Schema reflection for layer types, value nodes, and render targets.",                                                               params: "(entity_type: string)" },
-
-  // ANIM (21)
-  { name: "anim_keyframe_add",       profile: "anim", desc: "Adds a timeline keyframe bookmark at specified time with description.",                                            params: "(time: string, description?: string)" },
-  { name: "anim_keyframe_list",      profile: "anim", desc: "Lists all keyframes in active document with timecodes and descriptions.",                                          params: "()" },
-  { name: "anim_keyframe_remove",    profile: "anim", desc: "Removes a keyframe at specified time position.",                                                                   params: "(time: string)" },
-  { name: "anim_waypoint_set",       profile: "anim", desc: "Creates or updates parameter waypoint with easing (clamped, smooth, linear, constant).",                          params: "(layer, param, time, value, interp?)" },
-  { name: "anim_waypoint_remove",    profile: "anim", desc: "Deletes a parameter waypoint at specified timecode.",                                                              params: "(layer, param, time)" },
-  { name: "anim_animate_param",      profile: "anim", desc: "Batch creates an entire sequence of interpolated waypoints for a parameter.",                                      params: "(layer, param, waypoints: array)" },
-  { name: "anim_time_get",           profile: "anim", desc: "Returns current playhead time position in document.",                                                              params: "()" },
-  { name: "anim_time_set",           profile: "anim", desc: "Scrubs timeline playhead to specific frame or timestamp.",                                                         params: "(time: string)" },
-  { name: "anim_interpolation_set",  profile: "anim", desc: "Sets default interpolation mode (TCB, linear, ease-in, ease-out, constant).",                                     params: "(layer, param, interpolation)" },
-  { name: "doc_set_time_range",      profile: "anim", desc: "Configures start time, end time, and loop boundaries for canvas.",                                                 params: "(start_time, end_time)" },
-  { name: "param_get",               profile: "anim", desc: "Reads current or animated value of a layer parameter at current time.",                                            params: "(layer_name, param_name)" },
-  { name: "param_set",               profile: "anim", desc: "Updates layer parameter value statically or in animation mode.",                                                   params: "(layer_name, param_name, value)" },
-  { name: "param_convert",           profile: "anim", desc: "Converts parameter to procedural valuenode (add, scale, sine, timeloop, etc.).",                                   params: "(layer, param, valuenode_type)" },
-  { name: "anim_loop_set",           profile: "anim", desc: "Configures looping behaviour on a parameter valuenode.",                                                           params: "(layer, param, loop_mode)" },
-  { name: "anim_loop_get",           profile: "anim", desc: "Returns looping configuration for a parameter's valuenode.",                                                       params: "(layer, param)" },
-  { name: "anim_speed_set",          profile: "anim", desc: "Scales all waypoint timings on a layer parameter by a speed factor.",                                              params: "(layer, param, factor: float)" },
-  { name: "anim_curve_bake",         profile: "anim", desc: "Bakes a live animation curve into discrete per-frame waypoints for portability.",                                  params: "(layer, param, start_time, end_time, fps?)" },
-  { name: "anim_retarget",           profile: "anim", desc: "Re-maps animation curves from one layer onto another target layer.",                                               params: "(source_layer, target_layer, params?)" },
-  { name: "anim_timing_offset",      profile: "anim", desc: "Shifts all waypoints on a layer parameter by a time delta.",                                                       params: "(layer, param, delta: string)" },
-  { name: "anim_ease_global",        profile: "anim", desc: "Applies a global ease-in/ease-out curve adjustment to all waypoints within a time range.",                         params: "(start_time, end_time, ease_in, ease_out)" },
-  { name: "anim_snapshot",           profile: "anim", desc: "Captures current parameter state as a named snapshot for later restoration.",                                      params: "(name: string, layers?)" },
-
-  // FX (25)
-  { name: "layer_add",          profile: "fx", desc: "Instantiates a new primitive, shape, gradient, or filter layer into the document.",                   params: "(type: string, name?: string)" },
-  { name: "layer_remove",       profile: "fx", desc: "Deletes specified layer from canvas hierarchy.",                                                      params: "(name: string)" },
-  { name: "layer_duplicate",    profile: "fx", desc: "Duplicates a layer or group with linked or independent parameters.",                                  params: "(name: string)" },
-  { name: "layer_group",        profile: "fx", desc: "Encapsulates collection of layers into hierarchically grouped switch/canvas layer.",                   params: "(layer_names, group_name)" },
-  { name: "layer_ungroup",      profile: "fx", desc: "Flattens a group layer back into parent canvas.",                                                     params: "(group_name: string)" },
-  { name: "layer_reorder",      profile: "fx", desc: "Reorders layer position in rendering Z-stack.",                                                       params: "(name: string, index: int)" },
-  { name: "layer_rename",       profile: "fx", desc: "Renames a layer within the canvas.",                                                                  params: "(name: string, new_name: string)" },
-  { name: "layer_visibility",   profile: "fx", desc: "Toggles layer visibility on the canvas.",                                                             params: "(name: string, visible: bool)" },
-  { name: "layer_link_param",   profile: "fx", desc: "Dynamically links a parameter of one layer to another layer's parameter via shared valuenode.",        params: "(layer_a, param_a, layer_b, param_b)" },
-  { name: "recipe_list",        profile: "fx", desc: "Lists all 14 built-in anime, cinematic, and motion graphics effect recipes.",                          params: "()" },
-  { name: "recipe_info",        profile: "fx", desc: "Returns JSON schema and parameter requirements for a specific effect recipe.",                         params: "(name: string)" },
-  { name: "recipe_apply",       profile: "fx", desc: "Applies an effect recipe (anime speedlines, halftone, glow) in 1 atomic undo step.",                  params: "(name, params?, target?)" },
-  { name: "style_list",         profile: "fx", desc: "Lists available aesthetic color presets and palettes.",                                                params: "()" },
-  { name: "style_apply",        profile: "fx", desc: "Applies full color grading and styling preset to canvas layers.",                                      params: "(name: string, time?: string)" },
-  { name: "blend_mode_set",     profile: "fx", desc: "Sets layer compositing blend mode (Normal, Multiply, Screen, Overlay, etc.).",                        params: "(layer: string, mode: string)" },
-  { name: "gradient_create",    profile: "fx", desc: "Creates a linear or radial gradient layer with specified color stops.",                               params: "(type, stops: array, name?)" },
-  { name: "noise_layer_add",    profile: "fx", desc: "Adds procedural noise layer (perlin, simplex, worley) with configurable frequency.",                   params: "(type, frequency, amplitude)" },
-  { name: "distort_warp",       profile: "fx", desc: "Applies a warp distortion effect layer to specified target layers.",                                   params: "(target, warp_type, amount)" },
-  { name: "blur_add",           profile: "fx", desc: "Adds a blur layer (box, gaussian, motion, radial) with specified parameters.",                         params: "(type, size, target?)" },
-  { name: "mask_layer_add",     profile: "fx", desc: "Creates a bitmap or vector mask layer linked to a target.",                                            params: "(target_layer, mask_type)" },
-  { name: "outline_add",        profile: "fx", desc: "Adds a stroked outline layer to any spline or region layer.",                                          params: "(target_layer, width, color?)" },
-  { name: "shadow_add",         profile: "fx", desc: "Adds a drop shadow composite effect to a layer group.",                                               params: "(target_layer, offset, blur, color?)" },
-  { name: "particle_system_add",profile: "fx", desc: "Creates a particle emitter layer with configurable spawn rate, lifetime, and physics.",               params: "(name, emitter_spec: object)" },
-  { name: "fx_chain_apply",     profile: "fx", desc: "Applies a named sequence of effects as a single undo-able operation.",                                 params: "(chain_name: string, target?)" },
-  { name: "canvas_resize",      profile: "fx", desc: "Resizes or crops the canvas with optional anchor alignment and layer scaling.",                        params: "(width, height, anchor?, scale_layers?)" },
-
-  // RIG (23)
-  { name: "bone_create",              profile: "rig", desc: "Creates an individual bone in the skeleton layer with length, tip, and angle.",                                      params: "(skeleton_layer, name, origin, length)" },
-  { name: "bone_link_parent",         profile: "rig", desc: "Establishes hierarchical parent-child relationship between two bones.",                                              params: "(child_bone, parent_bone)" },
-  { name: "bone_transform_set",       profile: "rig", desc: "Rotates, translates, or scales a bone at a specific timeline position.",                                            params: "(bone_name, origin, angle, length)" },
-  { name: "bone_delete",              profile: "rig", desc: "Removes a bone and optionally re-parents its children.",                                                            params: "(bone_name, reparent?: bool)" },
-  { name: "bone_rename",              profile: "rig", desc: "Renames an existing bone within a skeleton layer.",                                                                  params: "(skeleton_layer, old_name, new_name)" },
-  { name: "bone_weight_set",          profile: "rig", desc: "Sets influence weight of a bone on a linked deformable layer.",                                                     params: "(bone_name, target_layer, weight)" },
-  { name: "skeleton_create",          profile: "rig", desc: "Creates a new skeleton layer in the canvas.",                                                                       params: "(name: string, position?)" },
-  { name: "skeleton_distortion_add",  profile: "rig", desc: "Applies a Skeleton Distortion deformer layer to smoothly bend bitmap graphics.",                                    params: "(target_layer, skeleton_name)" },
-  { name: "character_rig_from_parts", profile: "rig", desc: "Constructs complete bone skeleton and binds anatomical SVG/PNG parts automatically.",                               params: "(spec: object)" },
-  { name: "character_pose_apply",     profile: "rig", desc: "Applies a predefined character keyframe pose (idle, walk, run, jump, punch).",                                      params: "(character_name, pose_name, time?)" },
-  { name: "character_pose_save",      profile: "rig", desc: "Saves current bone transforms as a named reusable pose.",                                                           params: "(character_name, pose_name)" },
-  { name: "ik_solve",                 profile: "rig", desc: "Runs inverse kinematics solver to position a bone chain's end effector.",                                          params: "(end_bone, target_position, iterations?)" },
-  { name: "ik_constraint_add",        profile: "rig", desc: "Adds a constraint (look-at, limit angle, two-bone IK) to a bone.",                                                 params: "(bone_name, constraint_type, params: object)" },
-  { name: "deformer_warp_add",        profile: "rig", desc: "Adds a warp-pin or curve deformer linked to skeleton motion.",                                                     params: "(target_layer, deformer_type)" },
-  { name: "bind_region_to_bone",      profile: "rig", desc: "Binds a vector region layer to follow a skeleton bone.",                                                           params: "(region_layer, bone_name, weight?)" },
-  { name: "bind_spline_to_bone",      profile: "rig", desc: "Links a spline layer's control points to skeleton bone transforms.",                                               params: "(spline_layer, bone_name)" },
-  { name: "rig_symmetry_mirror",      profile: "rig", desc: "Mirrors bone hierarchy and weights from one side to another (L/R).",                                               params: "(skeleton_layer, axis)" },
-  { name: "rig_export_bvh",           profile: "rig", desc: "Exports skeleton animation to BVH motion capture format.",                                                         params: "(output_path, start_time, end_time)" },
-  { name: "control_rig_add",          profile: "rig", desc: "Adds a simplified control rig over the deform skeleton for animator-friendly IK handles.",                         params: "(character_name, control_spec: object)" },
-  { name: "blend_shape_add",          profile: "rig", desc: "Adds a blend shape (morph target) driven by a named parameter.",                                                   params: "(target_layer, shape_name, driver_param)" },
-  { name: "cloth_sim_add",            profile: "rig", desc: "Attaches a simple cloth physics simulation to a bone chain.",                                                      params: "(bone_chain, stiffness, damping)" },
-  { name: "squash_stretch_rig",       profile: "rig", desc: "Auto-rigs a squash and stretch control network for a character limb.",                                             params: "(limb_bone, controller_name)" },
-  { name: "rig_validate",             profile: "rig", desc: "Validates rig integrity: checks for unbound bones, broken links, and weight normalization.",                       params: "(skeleton_layer)" },
-
-  // ASSETS (12)
-  { name: "asset_search",        profile: "assets", desc: "Searches vetted open-source permissive CC0/MIT asset repositories for vectors and audio.",       params: "(query: string, license?: string)" },
-  { name: "asset_preview",       profile: "assets", desc: "Retrieves low-res thumbnail and metadata for an asset before downloading.",                       params: "(asset_id: string)" },
-  { name: "asset_download",      profile: "assets", desc: "Hardened download with SSRF protection, size limits, and checksum validation.",                   params: "(url: string, local_name: string)" },
-  { name: "asset_import_svg",    profile: "assets", desc: "Sanitizes and imports SVG vector artwork directly into Synfig vector spline layers.",             params: "(file_path: string)" },
-  { name: "asset_import_image",  profile: "assets", desc: "Imports PNG/JPEG bitmap image and anchors onto canvas.",                                          params: "(file_path: string)" },
-  { name: "asset_import_audio",  profile: "assets", desc: "Imports an audio file as a sound layer for lip sync and timing reference.",                      params: "(file_path: string, start_time?)" },
-  { name: "asset_palette_load",  profile: "assets", desc: "Loads a color palette from .gpl or .ase file into the canvas swatch table.",                     params: "(file_path: string)" },
-  { name: "asset_export_frames", profile: "assets", desc: "Exports rendered frames to disk with configurable naming pattern and format.",                    params: "(output_dir, pattern?, format?)" },
-  { name: "asset_export_svg",    profile: "assets", desc: "Exports active canvas vector layers as clean SVG file.",                                          params: "(output_path: string, time?)" },
-  { name: "asset_list_workspace",profile: "assets", desc: "Lists all files in the current workspace sandbox directory.",                                     params: "(subdir?: string)" },
-  { name: "asset_hash",          profile: "assets", desc: "Returns SHA-256 checksum for a file in the sandbox for integrity verification.",                  params: "(file_path: string)" },
-  { name: "asset_cleanup",       profile: "assets", desc: "Removes unused or orphaned asset files from the workspace.",                                     params: "(dry_run?: bool)" },
-
-  // REVIEW (18)
-  { name: "review_ssim",           profile: "review", desc: "Calculates structural similarity index between rendered frame and reference image.",                 params: "(frame_a, frame_b)" },
-  { name: "review_diff_heatmap",   profile: "review", desc: "Generates visual heatmap diff highlighting pixel deviations between two frames.",                   params: "(frame_a, frame_b)" },
-  { name: "review_palette_audit",  profile: "review", desc: "Extracts dominant colors, checks contrast ratios, and flags out-of-gamut hues.",                   params: "(time?: string)" },
-  { name: "review_safe_areas",     profile: "review", desc: "Audits composition against 16:9 Title Safe (80%) and Action Safe (90%) margins.",                  params: "(time?: string)" },
-  { name: "review_strobe_check",   profile: "review", desc: "Analyzes luminance deltas across frame sequence to prevent photosensitive epilepsy risks.",         params: "(start_time, end_time)" },
-  { name: "review_color_grade",    profile: "review", desc: "Applies automated color grading suggestions based on scene mood analysis.",                         params: "(mood?: string)" },
-  { name: "review_motion_blur",    profile: "review", desc: "Analyzes motion vectors and suggests optimal motion blur parameters.",                              params: "(start_time, end_time)" },
-  { name: "review_layer_audit",    profile: "review", desc: "Audits layer naming conventions, group structure, and documentation completeness.",                 params: "()" },
-  { name: "render_sequence",       profile: "review", desc: "Renders continuous sequence of frames to disk with progress reporting.",                            params: "(start_time, end_time, output_dir)" },
-  { name: "render_video",          profile: "review", desc: "Encodes rendered frames into MP4/WebM video via Synfig CLI and ffmpeg.",                           params: "(output_path, fps?, bitrate?)" },
-  { name: "render_contact_sheet",  profile: "review", desc: "Generates multi-frame thumbnail grid contact sheet for rapid timeline review.",                     params: "(frame_count?: int)" },
-  { name: "render_lottie",         profile: "review", desc: "Exports animation as Lottie JSON for web and mobile playback.",                                    params: "(output_path: string)" },
-  { name: "review_benchmark",      profile: "review", desc: "Benchmarks render performance across different quality settings and reports timing stats.",          params: "(frame_count?, quality_levels?)" },
-  { name: "review_accessibility",  profile: "review", desc: "Checks animation for accessibility issues: flash frequency, color contrast, motion intensity.",     params: "(start_time, end_time)" },
-  { name: "review_compare_takes",  profile: "review", desc: "Side-by-side SSIM comparison of multiple animation takes or versions.",                             params: "(takes: array)" },
-  { name: "review_export_report",  profile: "review", desc: "Generates a full QA report as JSON or HTML summarizing all review checks.",                        params: "(output_path: string, format?)" },
-  { name: "review_timeline_gaps",  profile: "review", desc: "Detects gaps in keyframe coverage or un-animated parameters over a time range.",                   params: "(start_time, end_time)" },
-  { name: "review_scene_stats",    profile: "review", desc: "Returns statistical overview of scene complexity: layer count, waypoints, bones, and render time.", params: "()" }
+  // Generated from the live server registry by scripts/generate_website_catalog.py.
+  { name: "anim_animate_param", profiles: ["anim", "all"], desc: "Define a full parameter animation trajectory using a batch of waypoints in ONE single undo step.", params: "(doc_id: string, layer_id: string, param_name: string, waypoints: array)" },
+  { name: "anim_interpolation_set", profiles: ["anim", "all"], desc: "Set default canvas waypoint interpolation or change interpolation on existing waypoints.", params: "(doc_id: string, interpolation: string, layer_id?: any, param_name?: any)" },
+  { name: "anim_keyframe_add", profiles: ["anim", "all"], desc: "Add a keyframe at the specified time to lock parameter values into an animation pose.", params: "(doc_id: string, time: number, description?: string, active?: boolean, canvas_path?: string)" },
+  { name: "anim_keyframe_list", profiles: ["anim", "all"], desc: "List all keyframes defined on the timeline.", params: "(doc_id?: string, canvas_path?: string)" },
+  { name: "anim_keyframe_remove", profiles: ["anim", "all"], desc: "Delete a keyframe at the specified time.", params: "(doc_id: string, time: number, canvas_path?: string)" },
+  { name: "anim_time_get", profiles: ["anim", "all"], desc: "Get the current timeline cursor / playhead position in seconds.", params: "(doc_id?: string)" },
+  { name: "anim_time_set", profiles: ["anim", "all"], desc: "Seek the timeline cursor / playhead to a specific time in seconds.", params: "(doc_id: string, time: number)" },
+  { name: "anim_waypoint_list", profiles: ["anim", "all"], desc: "List the waypoints of an animated parameter.", params: "(doc_id: string, layer_id: string, param_name: string)" },
+  { name: "anim_waypoint_remove", profiles: ["anim", "all"], desc: "Remove a waypoint from a layer parameter at a given time.", params: "(doc_id: string, layer_id: string, param_name: string, time: number)" },
+  { name: "anim_waypoint_set", profiles: ["anim", "all"], desc: "Insert or update a waypoint for a layer parameter at a specific timeline timestamp.", params: "(doc_id: string, layer_id: string, param_name: string, time: number, value: any, interpolation_in?: string, interpolation_out?: string)" },
+  { name: "asset_download", profiles: ["assets", "all"], desc: "Download and verify licensed asset: evaluates license policy, SSRF checks, sanitizes SVG/raster, hashes SHA-256.", params: "(asset_id: string, provider?: string)" },
+  { name: "asset_import_local", profiles: ["assets", "all"], desc: "Register a local file in the project provenance manifest with mandatory rights declaration.", params: "(file_path: string, rights: string, title?: string, creator?: string, license_code?: string)" },
+  { name: "asset_preview", profiles: ["assets", "all"], desc: "Fetch a small thumbnail preview image of an asset in base64.", params: "(asset_id: string, provider?: string)" },
+  { name: "asset_search", profiles: ["assets", "all"], desc: "Search permitted open-license asset providers returning compact text metadata.", params: "(query: string, provider?: string, license_type?: any, page?: integer)" },
+  { name: "canvas_create", profiles: ["rig", "all"], desc: "Create a child canvas (a sub-canvas that group layers can reference).", params: "(doc_id?: string, canvas_id?: string)" },
+  { name: "canvas_delete", profiles: ["rig", "all"], desc: "Delete a child canvas and everything inside it.", params: "(doc_id?: string, canvas_id?: string)" },
+  { name: "canvas_list", profiles: ["all"], desc: "List all canvas paths in the document (root canvas and nested group/subcanvases).", params: "(doc_id?: string)" },
+  { name: "canvas_rename", profiles: ["rig", "all"], desc: "Rename a child canvas.", params: "(doc_id?: string, canvas_id?: string, name?: string)" },
+  { name: "canvas_set_properties", profiles: ["rig", "all"], desc: "Change the resolution, frame rate, time range or background colour of a canvas.", params: "(doc_id?: string, canvas_id?: string, width?: any, height?: any, fps?: any, start_time?: any, end_time?: any, background_color?: any)" },
+  { name: "character_model_sheet", profiles: ["rig", "all"], desc: "Auto-generate a labeled model/rig sheet (front, three-quarter, side) for one character. descriptor: {id, archetype: humanoid|chibi, height, palette, facing, position, z}.", params: "(descriptor: object, style?: string, width?: integer, height?: integer, dry_run?: boolean)" },
+  { name: "character_motion_apply", profiles: ["rig", "all"], desc: "Animate a rigged character: walk, run, idle, talk (loop until end_time), wave, jump, nod, punch (play once), rest, move. move_to={x, y} (canvas pixels) travels there by end_time.", params: "(doc_id?: string, character_id?: string, motion_name?: string, start_time?: number, end_time?: any, speed?: number, move_to?: any)" },
+  { name: "character_pose_apply", profiles: ["rig", "all"], desc: "Key a pose on a rigged character: a preset (idle, punch, jump, walk_contact, walk_passing) or explicit joint angles, e.g. angles={\"upper_arm_r\": 120, \"head\": -10} (degrees from rest).", params: "(doc_id?: string, character_id?: string, pose_name?: string, time?: number, angles?: any)" },
+  { name: "character_rig_from_parts", profiles: ["rig", "all"], desc: "Assemble a jointed cut-out character from part images (or primitives) in an open document. spec: {doc_id, id, manifest | parts: [{name, file, parent?, pivot?: {fx, fy}, attach?: {fx, fy}, z?}], pos...", params: "(spec: object, dry_run?: boolean)" },
+  { name: "doc_close", profiles: ["all"], desc: "Close an open document and unload it from memory.", params: "(doc_id: string, force?: boolean)" },
+  { name: "doc_info", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Get metadata, resolution, framerate, and time bounds for a specific document.", params: "(doc_id?: string)" },
+  { name: "doc_list", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "List all currently open or loaded animation documents.", params: "()" },
+  { name: "doc_new", profiles: ["core", "all"], desc: "Create a new blank Synfig animation document with specified resolution and framerate.", params: "(width?: integer, height?: integer, fps?: number)" },
+  { name: "doc_open", profiles: ["core", "all"], desc: "Open an existing Synfig animation project (.sif, .sifz, or .sfg container).", params: "(file_path: string)" },
+  { name: "doc_save", profiles: ["core", "all"], desc: "Save the document to disk in .sif (XML), .sifz (gzip), or .sfg (ZIP container) format.", params: "(doc_id: string, file_path?: any)" },
+  { name: "doc_set_properties", profiles: ["all"], desc: "Update canvas resolution, frame rate, time bounds, or name.", params: "(doc_id: string, name?: any, desc?: any, width?: any, height?: any, fps?: any, start_time?: any, end_time?: any)" },
+  { name: "doc_set_time_range", profiles: ["anim", "all"], desc: "Set canvas animation playback timeline start time, end time, and framerate.", params: "(doc_id?: string, start_time?: any, end_time?: any, fps?: any)" },
+  { name: "health_check", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Check server readiness, active backend ('live' Synfig Studio vs 'headless' pure-Python SIF engine), and connection status.", params: "()" },
+  { name: "history_list", profiles: ["all"], desc: "Query current undo and redo stack depths.", params: "(doc_id?: string)" },
+  { name: "history_redo", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Redo the previously undone action.", params: "(doc_id?: string)" },
+  { name: "history_undo", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Undo the previous action in Studio or Headless mode. Exactly 1 MCP mutating tool call = 1 undo step.", params: "(doc_id?: string)" },
+  { name: "import_asset", profiles: ["assets", "all"], desc: "Import an external asset file (e.g. .png, .jpg, .svg, .wav, .ogg) into the canvas.", params: "(doc_id: string, file_path: string, canvas_path?: string)" },
+  { name: "layer_add", profiles: ["fx", "all"], desc: "Add a new visual layer (e.g. 'circle', 'rectangle', 'star', 'solid_color', 'text', 'PasteCanvas') to the canvas.", params: "(doc_id: string, layer_type: string, canvas_path?: string, description?: any, params?: any)" },
+  { name: "layer_duplicate", profiles: ["fx", "all"], desc: "Duplicate an existing layer, creating an identical copy placed directly above the original.", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
+  { name: "layer_group", profiles: ["fx", "rig", "all"], desc: "Group multiple layers into a PasteCanvas composite layer.", params: "(doc_id: string, layer_ids: array, group_name?: string, canvas_path?: string)" },
+  { name: "layer_lower", profiles: ["fx", "all"], desc: "Lower a layer by 1 position (further from camera, depth + 1).", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
+  { name: "layer_raise", profiles: ["fx", "all"], desc: "Raise a layer by 1 position (closer to camera, depth - 1).", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
+  { name: "layer_remove", profiles: ["fx", "all"], desc: "Delete a layer from the composition.", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
+  { name: "layer_reorder", profiles: ["fx", "all"], desc: "Move a layer to a specific visual depth (depth 0 is topmost, in front of all other layers).", params: "(doc_id: string, layer_id: string, new_depth: integer, canvas_path?: string)" },
+  { name: "layer_ungroup", profiles: ["fx", "rig", "all"], desc: "Ungroup a PasteCanvas layer, releasing its children into the parent canvas.", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
+  { name: "param_convert", profiles: ["fx", "all"], desc: "Convert a layer parameter into a linkable ValueNode (e.g. 'linear', 'add', 'subtract', 'scale', 'composite', 'sine', 'duplicate', 'range', 'step', 'absolute').", params: "(doc_id: string, layer_id: string, param_name: string, type: string)" },
+  { name: "param_export", profiles: ["rig", "all"], desc: "Export a parameter's ValueNode to the canvas value node library for sharing across layers.", params: "(doc_id: string, layer_id: string, param_name: string, name: string)" },
+  { name: "param_get", profiles: ["anim", "fx", "all"], desc: "Read the typed value of a specific parameter on a layer.", params: "(doc_id: string, layer_id: string, param_name: string, canvas_path?: string)" },
+  { name: "param_link", profiles: ["anim", "fx", "rig", "all"], desc: "Link a parameter to an exported ValueNode so it follows the shared value.", params: "(doc_id: string, layer_id: string, param_name: string, link_id: string)" },
+  { name: "param_list", profiles: ["all"], desc: "List every parameter of a layer with its current value.", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
+  { name: "param_set", profiles: ["anim", "fx", "all"], desc: "Set or update the value of a parameter on a layer.", params: "(doc_id: string, layer_id: string, param_name: string, value: any, canvas_path?: string)" },
+  { name: "param_unexport", profiles: ["rig", "all"], desc: "Unexport a previously exported ValueNode from the canvas library.", params: "(doc_id: string, name: string)" },
+  { name: "procedural_asset_generate", profiles: ["assets", "all"], desc: "Generate one procedural vector asset and add it to a document. kind: background | prop | texture; generator: see procedural_asset_list. position/height are canvas pixels (props only).", params: "(doc_id: string, kind?: string, generator?: string, seed?: integer, position?: any, height?: any, style?: any, dry_run?: boolean)" },
+  { name: "procedural_asset_list", profiles: ["assets", "all"], desc: "List the built-in procedural asset generators (offline, IP-safe).", params: "()" },
+  { name: "produce_anime_project", profiles: ["all"], desc: "Build a whole anime-style project from one brief: storyboard, rigged characters, assets, assembled scene, style stack, render and review. brief: {title, style, width, height, fps, duration, seed, s...", params: "(brief: object, dry_run?: boolean, stages?: any, resume_from?: any)" },
+  { name: "production_plan", profiles: ["all"], desc: "Dry-run the production pipeline: report the stages and layer counts without building. brief: same shape as produce_anime_project (see synfig_help('production')).", params: "(brief: object)" },
+  { name: "recipe_apply", profiles: ["fx", "all"], desc: "Apply a parameterized visual effect recipe atomically as a single undo step.", params: "(doc_id?: string, name?: string, params?: any, target_layer_or_group?: any, dry_run?: boolean)" },
+  { name: "recipe_info", profiles: ["fx", "all"], desc: "Get parameter specification, defaults, and usage notes for a named recipe.", params: "(name: string)" },
+  { name: "recipe_list", profiles: ["fx", "all"], desc: "List all parameterized anime effects recipes (speed lines, vignette, grain, blur, etc.).", params: "()" },
+  { name: "render_cancel", profiles: ["review", "all"], desc: "Cancel an active in-flight render job by its job_id.", params: "(job_id: string)" },
+  { name: "render_contact_sheet", profiles: ["review", "all"], desc: "Render selected keyframe timestamps into a visual contact sheet / storyboard grid image.", params: "(doc_id: string, output_path: string, cols?: integer, rows?: integer, width?: any, height?: any, start_time?: any, end_time?: any)" },
+  { name: "render_frame", profiles: ["core", "review", "all"], desc: "Render a single frame of the animation to an image file (PNG, JPEG, BMP, GIF, PPM).", params: "(doc_id: string, output_path: string, time?: number, width?: any, height?: any, target?: string)" },
+  { name: "render_result", profiles: ["review", "all"], desc: "Retrieve final output frames for a completed render job.", params: "(job_id: string)" },
+  { name: "render_sequence", profiles: ["review", "all"], desc: "Render an image sequence across an animation time range using the rendering pipeline.", params: "(doc_id: string, output_dir: string, start_time?: any, end_time?: any, fps?: any, width?: any, height?: any, target?: string, job_id?: any)" },
+  { name: "render_start", profiles: ["review", "all"], desc: "Start an asynchronous animation render job and immediately return a job_id.", params: "(doc_id: string, output_dir: string, start_time?: any, end_time?: any, fps?: any, width?: any, height?: any, target?: string)" },
+  { name: "render_status", profiles: ["review", "all"], desc: "Query the execution status and progress of an asynchronous render job.", params: "(job_id: string)" },
+  { name: "render_video", profiles: ["review", "all"], desc: "Render an animation time range and compile directly to a video file (.mp4 or .gif).", params: "(doc_id: string, output_path: string, start_time?: any, end_time?: any, fps?: any, width?: any, height?: any)" },
+  { name: "review_compare", profiles: ["review", "all"], desc: "Compare two animation iterations/frames with side-by-side visual diff heatmap and SSIM score.", params: "(doc_id_a?: string, time_a?: number, doc_id_b?: string, time_b?: number, width?: integer, height?: integer)" },
+  { name: "review_frame", profiles: ["review", "all"], desc: "Render a single frame paired with objective vision metrics (clipping, safe-area, empty-check, palette).", params: "(doc_id?: string, time?: number, focus_region?: any, width?: integer, height?: integer)" },
+  { name: "review_sequence", profiles: ["review", "all"], desc: "Render a sequence of frames compiled into a single contact-sheet image with motion and strobe metrics.", params: "(doc_id?: string, start_time?: number, end_time?: number, frame_count?: integer, width?: integer, height?: integer)" },
+  { name: "rig_bone_add", profiles: ["rig", "all"], desc: "Add a bone to a skeleton layer (Synfig's cut-out rigging primitive).", params: "(doc_id?: string, layer_id?: string, time?: number, origin_x?: number, origin_y?: number, angle?: number, width?: number, tip_width?: number, parent_index?: integer)" },
+  { name: "rig_sheet_slice", profiles: ["rig", "assets", "all"], desc: "Cut a character rig sheet (one image, many body parts) into one transparent PNG per part. Call once without names and look at preview_base64 (numbered boxes), then call again with names={\"1\": \"head...", params: "(file_path: string, names?: any, output_dir?: any, min_area?: any, merge_gap?: integer, bg_tolerance?: integer, preview?: boolean)" },
+  { name: "scene_auto_build", profiles: ["rig", "all"], desc: "Build a whole animated shot in one call: background, rigged cut-out characters, props, camera moves and audio. One undo step; everything is validated before the document changes. spec: {width, heig...", params: "(spec: object, dry_run?: boolean)" },
+  { name: "scene_build", profiles: ["core", "all"], desc: "Apply declarative scene build spec. Spec: {doc_id, layers: [{id, type, params}], groups}. Layer 'id' required. Image paths host-resolved or via SYNFIG_MCP_PATH_MAPPING.", params: "(spec: object, dry_run?: boolean)" },
+  { name: "scene_export_spec", profiles: ["core", "all"], desc: "Export current scene state into a declarative SceneBuildSpec JSON.", params: "(doc_id?: string, scope?: string, fields?: any)" },
+  { name: "scene_summary", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Get a token-bounded structural summary of canvas size, framerate, duration, and layer hierarchy.", params: "(doc_id?: string, budget_tokens?: integer)" },
+  { name: "scene_tree", profiles: ["all"], desc: "Get the full visual hierarchy of layers in depth order (topmost layer at index 0).", params: "(doc_id?: string, canvas_path?: string)" },
+  { name: "schema_get_layer", profiles: ["all"], desc: "Get parameter schemas, default values, and hints for a specific layer type.", params: "(layer_type: string)" },
+  { name: "schema_list_layers", profiles: ["all"], desc: "List all layer types supported by the installed Synfig build (e.g. 'circle', 'rectangle', 'star', 'text', 'blur', 'outline').", params: "()" },
+  { name: "schema_list_renderers", profiles: ["all"], desc: "List available rendering engines (e.g. 'software', 'software-draft', 'safe').", params: "()" },
+  { name: "schema_list_targets", profiles: ["all"], desc: "List supported render output targets (e.g. 'png', 'jpeg', 'bmp', 'gif', 'ffmpeg').", params: "()" },
+  { name: "schema_list_valuenodes", profiles: ["all"], desc: "List supported valuenode link converter types (e.g. 'composite', 'add', 'sine', 'random').", params: "()" },
+  { name: "selection_get", profiles: ["rig", "all"], desc: "Get the list of currently selected layer IDs in Studio.", params: "(doc_id?: string)" },
+  { name: "selection_set", profiles: ["rig", "all"], desc: "Set the active layer selection in Studio.", params: "(doc_id: string, layer_ids: array)" },
+  { name: "sprite_slice", profiles: ["rig", "assets", "all"], desc: "Slice a sprite sheet or layered raster into named, rig-ready transparent part PNGs. strategy: grid (rows x cols), alpha (connected components) or trim (tight alpha boxes); pass rectangles [{name, x...", params: "(source: string, output_dir: string, strategy?: string, rows?: integer, cols?: integer, rectangles?: any, bg_tolerance?: integer, padding?: integer, dry_run?: boolean)" },
+  { name: "storyboard_from_script", profiles: ["rig", "all"], desc: "Assemble a multi-shot animatic timeline from a structured storyboard script.", params: "(spec: object, dry_run?: boolean)" },
+  { name: "style_apply", profiles: ["fx", "all"], desc: "Apply a complete anime aesthetic style stack (grading, grain, vignette, recipes) atomically.", params: "(doc_id?: string, name?: string, dry_run?: boolean)" },
+  { name: "style_get", profiles: ["fx", "all"], desc: "Get detailed configuration of a generic style preset.", params: "(name: string)" },
+  { name: "style_list", profiles: ["fx", "all"], desc: "List all generic anime style presets (shonen_action, dark_fantasy, supernatural_noir, etc.).", params: "()" },
+  { name: "synfig_help", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Get detailed guidance on Synfig MCP topics (overview, profiles, declarative_build, animation, characters, review).", params: "(topic?: string)" },
 ];
+// END GENERATED CATALOG
+
+// ============================================================
+// Live capability counts (generated — do not edit by hand)
+// ============================================================
+const MCP_STATS = {
+  total: 89,
+  profiles: { core: 13, anim: 21, fx: 25, rig: 27, assets: 16, review: 18 },
+};
+// END GENERATED STATS
 
 // ============================================================
 // Bootstrap
@@ -258,7 +236,8 @@ function initToolsCatalog() {
     grid.innerHTML = "";
 
     const filtered = TOOLS_CATALOG.filter(tool => {
-      const matchProfile = currentProfile === "all" || tool.profile === currentProfile;
+      const matchProfile =
+        currentProfile === "all" || tool.profiles.includes(currentProfile);
       const q = currentSearch.toLowerCase();
       const matchSearch =
         tool.name.toLowerCase().includes(q) ||
@@ -283,12 +262,14 @@ function initToolsCatalog() {
 
     filtered.forEach(tool => {
       const card = document.createElement("div");
+      const specific = tool.profiles.filter(p => p !== "all");
+      const badge = specific.length >= 6 ? "all" : specific.join(" · ");
       card.className = "tool-item-card";
       card.innerHTML = `
         <div>
           <div class="tool-card-head">
             <span class="tool-fn-name">${escapeHtml(tool.name)}</span>
-            <span class="tool-category-badge">${escapeHtml(tool.profile)}</span>
+            <span class="tool-category-badge">${escapeHtml(badge)}</span>
           </div>
           <p class="tool-card-desc">${escapeHtml(tool.desc)}</p>
         </div>
