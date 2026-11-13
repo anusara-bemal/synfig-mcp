@@ -1386,6 +1386,32 @@ pre {
   gap: 14px;
 }
 
+/* Prompts & Resources section */
+.prompts-section {
+  padding: 72px 0;
+  background-color: var(--zinc-50, #fafafa);
+  border-top: 1px solid var(--border-card);
+}
+
+.prompts-section .section-header {
+  margin-bottom: 32px;
+}
+
+.prompts-subhead {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--zinc-950);
+  margin: 28px 0 14px;
+}
+
+.prompts-subhead:first-of-type {
+  margin-top: 0;
+}
+
+.prompts-section .tool-item-card {
+  height: 100%;
+}
+
 /* Tool cards rendered by JS */
 .tool-item-card {
   background-color: #ffffff;
