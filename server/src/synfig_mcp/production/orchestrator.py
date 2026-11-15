@@ -129,8 +129,7 @@ class ProductionOrchestrator:
             if task.status in (TaskStatus.DONE, TaskStatus.SKIPPED):
                 continue
             if any(
-                (dep_task := plan.task(dep)) is not None
-                and dep_task.status == TaskStatus.FAILED
+                (dep_task := plan.task(dep)) is not None and dep_task.status == TaskStatus.FAILED
                 for dep in task.depends_on
             ):
                 task.status = TaskStatus.SKIPPED
@@ -157,9 +156,7 @@ class ProductionOrchestrator:
                 break
 
             task.status = TaskStatus.RUNNING
-            self.workspace.log_event(
-                {"event": "task.started", "task": task.id, "kind": task.kind}
-            )
+            self.workspace.log_event({"event": "task.started", "task": task.id, "kind": task.kind})
             succeeded = False
             for attempt in range(max(1, max_attempts)):
                 task.attempts += 1
@@ -486,11 +483,7 @@ class ProductionOrchestrator:
         bg_name = shot.get("background")
         if bg_name:
             bg = next(
-                (
-                    b
-                    for b in brief.backgrounds
-                    if str(b.get("name") or b.get("id")) == str(bg_name)
-                ),
+                (b for b in brief.backgrounds if str(b.get("name") or b.get("id")) == str(bg_name)),
                 None,
             )
             if bg:
@@ -707,9 +700,7 @@ class ProductionOrchestrator:
         )
         render_dir = self.workspace.render_dir(shot_id)
         preview = render_dir / "preview.png"
-        await self.backend.render_frame(
-            doc_id, str(preview), time=duration / 2.0, target="png"
-        )
+        await self.backend.render_frame(doc_id, str(preview), time=duration / 2.0, target="png")
         issues = self.quality.validate_render(preview)
         errors = [i for i in issues if i["severity"] == "error"]
         if errors:

@@ -32,9 +32,7 @@ def isolated_access(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Fresh access controller per test; the production root is approved."""
     controller = AccessController(approvals_file=tmp_path / "approvals.json")
     monkeypatch.setattr(access_mod, "_controller", controller)
-    monkeypatch.setattr(
-        "synfig_mcp.security.sandbox.get_temp_root", lambda: tmp_path / "temp_root"
-    )
+    monkeypatch.setattr("synfig_mcp.security.sandbox.get_temp_root", lambda: tmp_path / "temp_root")
     controller.approve_folder(tmp_path, reason="test")
     yield controller
     access_mod.reset_access_controller()

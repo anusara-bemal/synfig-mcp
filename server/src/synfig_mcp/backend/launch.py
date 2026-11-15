@@ -52,9 +52,7 @@ def find_studio_executable() -> Path | None:
                 candidates.append(Path(base) / "Synfig" / "bin" / "synfigstudio.exe")
                 candidates.append(Path(base) / "Synfig Studio" / "bin" / "synfigstudio.exe")
     else:
-        candidates.extend(
-            [Path("/usr/bin/synfigstudio"), Path("/usr/local/bin/synfigstudio")]
-        )
+        candidates.extend([Path("/usr/bin/synfigstudio"), Path("/usr/local/bin/synfigstudio")])
     for candidate in candidates:
         if candidate.is_file():
             return candidate.resolve()
@@ -102,9 +100,7 @@ async def launch_studio(wait_seconds: float = 45.0) -> dict[str, Any]:
         "cwd": str(exe.parent),
     }
     if sys.platform == "win32":
-        kwargs["creationflags"] = (
-            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-        )
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
     else:
         kwargs["start_new_session"] = True
 

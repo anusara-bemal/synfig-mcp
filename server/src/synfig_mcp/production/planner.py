@@ -188,11 +188,7 @@ def build_plan(brief: ProductionBrief) -> ProductionPlan:
                 )
             )
 
-    shot_ends = [
-        t.id
-        for t in tasks
-        if t.kind in ("render_preview", "render_final")
-    ]
+    shot_ends = [t.id for t in tasks if t.kind in ("render_preview", "render_final")]
     tasks.append(
         _task(
             "manifest",

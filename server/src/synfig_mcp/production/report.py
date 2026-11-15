@@ -88,7 +88,15 @@ def build_report(
     ]
     if brief.logline:
         lines.append(f"* **Logline**: {brief.logline}")
-    lines.extend(["", "## Tasks", "", "| Task | Kind | Status | Attempts | Error |", "| --- | --- | --- | --- | --- |"])
+    lines.extend(
+        [
+            "",
+            "## Tasks",
+            "",
+            "| Task | Kind | Status | Attempts | Error |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
     for task in tasks:
         lines.append(
             f"| `{task['id']}` | {task['kind']} | {task['status']} | {task['attempts']} | "
@@ -111,7 +119,13 @@ def build_report(
 
     if manifest.versions:
         lines.extend(
-            ["", "## Versions", "", "| Label | Recorded | SHA-256 | File |", "| --- | --- | --- | --- |"]
+            [
+                "",
+                "## Versions",
+                "",
+                "| Label | Recorded | SHA-256 | File |",
+                "| --- | --- | --- | --- |",
+            ]
         )
         for version in manifest.versions:
             lines.append(

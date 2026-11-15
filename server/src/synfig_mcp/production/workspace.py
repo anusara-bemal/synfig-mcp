@@ -99,9 +99,7 @@ class ProductionWorkspace:
 
     def path(self, *parts: str) -> Path:
         """Return a validated path inside the production directory."""
-        return validate_path(
-            self.project_dir.joinpath(*parts), allowed_roots=[self.project_dir]
-        )
+        return validate_path(self.project_dir.joinpath(*parts), allowed_roots=[self.project_dir])
 
     @property
     def assets_dir(self) -> Path:
@@ -220,7 +218,10 @@ class ProductionWorkspace:
     def assert_inside(self, path: Path | str) -> None:
         """Assert that a path is inside the production directory."""
         resolved = Path(path).resolve()
-        if self.project_dir.resolve() not in resolved.parents and resolved != self.project_dir.resolve():
+        if (
+            self.project_dir.resolve() not in resolved.parents
+            and resolved != self.project_dir.resolve()
+        ):
             raise SecuritySandboxError(
                 f"Path '{path}' is outside the production directory '{self.project_dir}'."
             )
