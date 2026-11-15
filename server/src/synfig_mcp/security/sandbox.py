@@ -180,7 +180,7 @@ def validate_path(
             raise SecuritySandboxError(
                 f"Path '{target_path}' is not yet authorised for Synfig MCP. "
                 f"It is outside the active Synfig project and no approval covers '{folder}'. "
-                f"Approve the folder once with access_approve(folder=\"{folder}\"), "
+                f'Approve the folder once with access_approve(folder="{folder}"), '
                 "or open/import the file in Synfig Studio. No manual copying is required."
             )
 

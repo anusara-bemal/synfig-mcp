@@ -69,3 +69,69 @@ def harden_raster_image(input_path: str | Path, output_path: str | Path) -> dict
             }
     except Exception as exc:
         raise ValueError(f"Raster image decode failed: {exc}") from exc
+
+# New helper to sanitize raw image bytes, used by tests
+def sanitize_raster_bytes(data: bytes) -> Image.Image:
+    """Validate and return a clean PIL Image from raw bytes.
+
+    This mirrors the security checks in ``harden_raster_image`` but operates
+    directly on in‑memory bytes and returns the ``Image`` instance for further
+    inspection in tests.
+    """
+    fmt = detect_image_format(data)
+    if not fmt:
+        raise ValueError("magic bytes do not match a supported raster format")
+    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            w, h = img.size
+            if w * h > MAX_IMAGE_PIXELS:
+                raise ValueError(
+                    f"Image dimension {w}x{h} ({w * h} pixels) exceeds safety limit of {MAX_IMAGE_PIXELS} pixels"
+                )
+            # Strip metadata by creating a new image with the same pixel data
+            clean = Image.new(img.mode, img.size)
+            clean.putdata(list(img.getdata()))
+            return clean
+    except Exception as exc:
+        raise ValueError(f"Raster image decode failed: {exc}") from exc
+    """
+    Validate and harden raster image:
+    1. Checks magic bytes.
+    2. Enforces pixel dimensions <= MAX_IMAGE_PIXELS.
+    3. Strips all EXIF/metadata and re-encodes clean image.
+    Returns: {"width": int, "height": int, "filesize": int}
+    """
+    p_in = Path(input_path)
+    p_out = Path(output_path)
+
+    raw_bytes = p_in.read_bytes()
+    fmt = detect_image_format(raw_bytes)
+    if not fmt:
+        raise ValueError("Invalid image file: magic bytes do not match supported raster formats.")
+
+    # Prevent decompression bomb in PIL
+    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            w, h = img.size
+            if w * h > MAX_IMAGE_PIXELS:
+                raise ValueError(
+                    f"Image dimension {w}x{h} ({w * h} pixels) exceeds safety limit of {MAX_IMAGE_PIXELS} pixels."
+                )
+
+            # Strip EXIF and re-encode
+            clean_img = Image.new(img.mode, img.size)
+            clean_img.putdata(list(img.getdata()))
+
+            p_out.parent.mkdir(parents=True, exist_ok=True)
+            clean_img.save(p_out, format="PNG", optimize=True)
+
+            return {
+                "width": w,
+                "height": h,
+                "filesize": p_out.stat().st_size,
+            }
+    except Exception as exc:
+        raise ValueError(f"Raster image decode failed: {exc}") from exc

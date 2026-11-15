@@ -175,9 +175,7 @@ class QualityControl:
                 continue
             filename = _value_of(params, "filename")
             if not filename:
-                issues.append(
-                    _issue("asset.missing", f"The layer '{label}' has no file name.")
-                )
+                issues.append(_issue("asset.missing", f"The layer '{label}' has no file name."))
                 continue
             path = Path(str(filename))
             if not path.is_absolute():
@@ -223,8 +221,7 @@ class QualityControl:
                 issues.append(
                     _issue(
                         "frame.clipped",
-                        f"A keyframe at {time:.3f}s lies outside the time range "
-                        f"{start}s - {end}s.",
+                        f"A keyframe at {time:.3f}s lies outside the time range {start}s - {end}s.",
                     )
                 )
         return issues
@@ -337,14 +334,10 @@ class QualityControl:
 
         rgb = rgba.convert("RGB")
         if all(lo == hi for lo, hi in rgb.getextrema()):
-            issues.append(
-                _issue("frame.blank", f"The render '{path}' is a single flat colour.")
-            )
+            issues.append(_issue("frame.blank", f"The render '{path}' is a single flat colour."))
         alpha_lo, alpha_hi = rgba.getchannel("A").getextrema()
         if alpha_hi == 0:
-            issues.append(
-                _issue("alpha.broken", f"The render '{path}' is completely transparent.")
-            )
+            issues.append(_issue("alpha.broken", f"The render '{path}' is completely transparent."))
         elif alpha_lo == 255:
             issues.append(
                 _issue(

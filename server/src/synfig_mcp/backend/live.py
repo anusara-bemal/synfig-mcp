@@ -78,7 +78,9 @@ class LiveBackend(BackendBase):
             await self._sync_project_access(self._client)
         return self._client
 
-    async def _sync_project_access(self, client: BridgeClient, doc_id: str | None = None) -> dict[str, Any]:
+    async def _sync_project_access(
+        self, client: BridgeClient, doc_id: str | None = None
+    ) -> dict[str, Any]:
         """Let the open Synfig project authorise its directory and assets.
 
         Best-effort: an unreachable or older bridge must not break document
