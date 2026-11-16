@@ -6,13 +6,13 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 121 tools, 114,463 bytes, **30,723 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 118 tools, 112,441 bytes, **30,199 tokens** (`cl100k_base`).
 - **Minimal Profile (`core`)**: 22 tools, 17,215 bytes, **4,553 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **30,723 tokens** to **4,553 tokens**.
+> from **30,199 tokens** to **4,553 tokens**.
 
 ### Profile Allocations & Measured Counts
 
@@ -21,10 +21,10 @@
 | `core` | 22 | **4,553** | 4,574 | ✅ Pass (< 5000) |
 | `anim` | 29 | **6,742** | 6,763 | ❌ Exceeds (4500) |
 | `fx` | 39 | **9,155** | 9,181 | ❌ Exceeds (4500) |
-| `rig` | 40 | **10,427** | 10,462 | ❌ Exceeds (3000) |
-| `assets` | 29 | **7,075** | 7,091 | ❌ Exceeds (2000) |
+| `rig` | 40 | **10,700** | 10,735 | ❌ Exceeds (3000) |
+| `assets` | 28 | **6,982** | 6,997 | ❌ Exceeds (2000) |
 | `review` | 26 | **6,266** | 6,290 | ❌ Exceeds (4000) |
-| `all` | 121 | **30,723** | 30,796 | ✅ Pass (< 32000) |
+| `all` | 118 | **30,199** | 30,271 | ✅ Pass (< 32000) |
 
 > [!NOTE]
 > The CI gate (`server/tests/unit/test_token_budget.py`) enforces **5,000** tokens for
@@ -40,19 +40,19 @@ Measured against real server output in headless mode:
 
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
-| `health_check()` | 298 | **96** | 97 | < 200 |
-| `doc_new(160x120)` | 193 | **83** | 83 | < 200 |
-| `doc_list()` | 389 | **121** | 121 | < 242 |
-| `layer_add(circle)` | 251 | **84** | 84 | < 200 |
-| `scene_tree()` | 1228 | **362** | 362 | < 724 |
-| `doc_info()` | 389 | **121** | 121 | < 242 |
-| `param_set(radius=2.5)` | 325 | **117** | 117 | < 234 |
+| `health_check()` | 569 | **156** | 158 | < 312 |
+| `doc_new(160x120)` | 193 | **84** | 84 | < 200 |
+| `doc_list()` | 389 | **122** | 122 | < 244 |
+| `layer_add(circle)` | 251 | **85** | 85 | < 200 |
+| `scene_tree()` | 1228 | **363** | 363 | < 726 |
+| `doc_info()` | 389 | **122** | 122 | < 244 |
+| `param_set(radius=2.5)` | 325 | **118** | 118 | < 236 |
 | `param_get(radius)` | 232 | **56** | 56 | < 200 |
 | `anim_time_set(1.5s)` | 17 | **11** | 11 | < 200 |
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 138 | **55** | 55 | < 200 |
+| `render_frame(160x120)` | 138 | **53** | 53 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
 | `schema_get_layer(circle)` | 2709 | **720** | 720 | < 1440 |
 
@@ -87,7 +87,8 @@ Vision model consumption per single preview or contact-sheet image:
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
 | `rig_sheet_from_image` | 2,773 | **736** | 738 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `produce_anime_project` | 1,978 | **504** | 504 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `production_run` | 2,348 | **573** | 574 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `asset_import` | 1,642 | **435** | 434 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `rig_sheet_slice` | 1,576 | **431** | 432 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_sequence` | 1,443 | **427** | 427 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `sprite_slice` | 1,493 | **420** | 421 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
@@ -100,7 +101,6 @@ Vision model consumption per single preview or contact-sheet image:
 | `render_start` | 1,221 | **360** | 360 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_contact_sheet` | 1,231 | **359** | 359 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `render_video` | 1,149 | **340** | 340 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `anim_waypoint_set` | 1,228 | **338** | 336 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 

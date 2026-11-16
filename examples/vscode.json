@@ -2,7 +2,8 @@
   "servers": {
     "synfig": {
       "type": "stdio",
-      "command": "synfig-mcp"
+      "command": "uvx",
+      "args": ["synfig-mcp"]
     }
   }
 }

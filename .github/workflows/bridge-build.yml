@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  SYNFIG_MCP_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '0.8.0-rc2' }}
+  SYNFIG_MCP_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '1.0.6' }}
 
 jobs:
   build-linux:

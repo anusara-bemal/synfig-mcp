@@ -88,7 +88,7 @@ The pipeline automatically compiles and updates `ATTRIBUTION.md` in the workspac
 
 ## 4. Local Imports & Mandatory Rights Declarations
 
-Users may import their own local vector and raster art using `asset_import_local`. To prevent inadvertent licensing violations, callers must provide a valid `rights` declaration:
+Users may import their own local vector and raster art using `asset_import`. To prevent inadvertent licensing violations, callers must provide a valid `rights` declaration:
 
 - `own`: Original artwork created by the author.
 - `licensed`: Commercial or personal license secured from the copyright holder.

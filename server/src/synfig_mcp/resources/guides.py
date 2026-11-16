@@ -21,7 +21,7 @@ GUIDE_TOPICS: dict[str, str] = {
     "profiles": """# Synfig MCP Tool Profiles
 
 Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
-- `all` (default): The complete suite - all 121 tools: documents, canvases, scene
+- `all` (default): The complete suite - all 118 tools: documents, canvases, scene
   building, layers, parameters and value nodes, animation, selection, history,
   effect recipes, style presets, character rigging, storyboards, production
   orchestration, licensed assets, rendering (frame, sequence, video, contact

@@ -176,8 +176,6 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "character_motion_apply": {"rig", "all"},
     "storyboard_from_script": {"rig", "all"},
     # Anime Production Pipeline (Step 0-5)
-    "produce_anime_project": {"all"},
-    "production_plan": {"all"},
     "story_bible": {"all"},
     "character_model_sheet": {"rig", "all"},
     "procedural_asset_list": {"assets", "all"},
@@ -193,11 +191,10 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "history_redo": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "history_list": {"all"},
     # Assets
-    "import_asset": {"assets", "all"},
     "asset_search": {"assets", "all"},
     "asset_preview": {"assets", "all"},
     "asset_download": {"assets", "all"},
-    "asset_import_local": {"assets", "all"},
+    "asset_import": {"assets", "all"},
     # Render & Preview
     "render_frame": {"core", "review", "all"},
     "render_sequence": {"review", "all"},
@@ -741,22 +738,6 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         )
         return {"ungrouped_layers": released}
 
-    @tool_for("import_asset", annotations=MUTATING)
-    async def import_asset(
-        doc_id: str,
-        file_path: str,
-        canvas_path: str = "",
-    ) -> dict[str, Any]:
-        """Import an external asset file (e.g. .png, .jpg, .svg, .wav, .ogg) into the canvas.
-        Returns: Layer dictionary for the newly imported image or sound layer.
-        Gotcha: Verify document ID before invoking.
-        """
-        return await backend.import_asset(
-            doc_id=doc_id,
-            file_path=file_path,
-            canvas_path=canvas_path,
-        )
-
     # -----------------------------------------------------------------------
     # Licensed Asset Pipeline (Phase A5)
     # -----------------------------------------------------------------------
@@ -810,17 +791,27 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         res = await pipeline.download_asset(asset_id=asset_id, provider=provider)
         return wrap_untrusted(res)
 
-    @tool_for("asset_import_local", annotations=MUTATING)
-    async def asset_import_local(
+    @tool_for("asset_import", annotations=MUTATING)
+    async def asset_import(
         file_path: str,
         rights: str,
         title: str = "Untitled",
         creator: str = "Local User",
         license_code: str = "own",
+        doc_id: str | None = None,
+        canvas_path: str = "",
     ) -> dict[str, Any]:
-        """Register a local file in the project provenance manifest with mandatory rights declaration.
-        Returns: {success, asset_id, rights, sha256, local_path}.
-        Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'public-domain'.
+        """Register a local file in the project provenance manifest with mandatory rights
+        declaration, and optionally import it into a canvas as an image or sound layer.
+
+        This is the single asset-import action: it replaces the former `import_asset`
+        (canvas-only) and `asset_import_local` (provenance-only) actions.
+
+        Returns: {success, asset_id, rights, sha256, local_path, layer?}; 'layer' is present
+        only when doc_id was provided.
+        Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or
+        'public-domain'. Pass doc_id to place the asset on a canvas; omit it to register
+        provenance only.
         """
         from synfig_mcp.assets.pipeline import AssetPipeline
 
@@ -832,6 +823,12 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             creator=creator,
             license_code=license_code,
         )
+        if doc_id and res.get("success"):
+            res["layer"] = await backend.import_asset(
+                doc_id=doc_id,
+                file_path=file_path,
+                canvas_path=canvas_path,
+            )
         return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
@@ -1558,53 +1555,16 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     # Anime Production Pipeline (Step 0-5)
     # -----------------------------------------------------------------------
 
-    @tool_for("produce_anime_project", annotations=MUTATING)
-    async def produce_anime_project(
-        brief: dict[str, Any],
-        dry_run: bool = False,
-        stages: list[str] | None = None,
-        resume_from: str | None = None,
-        resume: bool = True,
-    ) -> dict[str, Any]:
-        """Build a whole anime-style project from one brief: storyboard, rigged characters,
-        assets, assembled scene, style stack, render and review.
-
-        brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
-        assets[], background, camera[], transitions[], audio[], render{}, output_dir,
-        save_path}. Call synfig_help('production') for the full brief shape, styles and
-        motion names. transitions[] are {type: 'fade'|'dissolve', time, duration}; audio[]
-        are {file, time, volume} sound cues.
-        Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
-        Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
-        and the render/review stages report "skipped". A run writes pipeline_state.json into the
-        output directory; re-running the same brief (resume=True) reopens the saved document and
-        continues from where it stopped instead of rebuilding. Pass resume=False for a clean run.
-        """
-        from synfig_mcp.production.pipeline import AnimeProductionPipeline
-
-        report = await AnimeProductionPipeline(backend=backend).run(
-            brief, dry_run=dry_run, stages=stages, resume_from=resume_from, resume=resume
-        )
-        return wrap_untrusted(report.model_dump())
-
-    @tool_for("production_plan", annotations=READ_ONLY)
-    async def production_plan(brief: dict[str, Any]) -> dict[str, Any]:
-        """Dry-run the production pipeline: report the stages and layer counts without building.
-
-        brief: same shape as produce_anime_project (see synfig_help('production')).
-        Returns: the ProductionReport for the dry run; no document is created.
-        """
-        from synfig_mcp.production.pipeline import AnimeProductionPipeline
-
-        report = await AnimeProductionPipeline(backend=backend).run(brief, dry_run=True)
-        return wrap_untrusted(report.model_dump())
+    # The former `produce_anime_project` / `production_plan` actions are now the
+    # `engine="pipeline"` mode of `production_run`, so the brief-to-project flow
+    # has a single entry point (see production_run below).
 
     @tool_for("story_bible", annotations=READ_ONLY)
     async def story_bible(brief: dict[str, Any]) -> dict[str, Any]:
         """Derive the continuity story bible (characters, locations, props, scenes, timeline)
         and the screenplay view for a brief, without building anything.
 
-        brief: same shape as produce_anime_project. A 'story' already in the brief is validated
+        brief: same shape as production_run. A 'story' already in the brief is validated
         and returned unchanged; otherwise the server derives a structural bible from the brief's
         own shots/characters/assets.
         Returns: {authored, bible, screenplay, issues[]}; 'issues' lists continuity problems
@@ -2037,17 +1997,46 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     async def production_run(
         brief: dict[str, Any],
         dry_run: bool = False,
+        engine: str = "orchestrator",
+        stages: list[str] | None = None,
+        resume_from: str | None = None,
+        resume: bool = True,
     ) -> dict[str, Any]:
-        """Run a whole production from a structured brief as a dependency-ordered, resumable task
-        graph: documents, characters, backgrounds, layout, animation, effects, QC, previews,
-        manifest and report. brief: {title, episodes[].sequences[].shots[], characters[],
-        backgrounds[], props[], rigs[], style, checkpoints[], root, render_final}. Stages named in
-        checkpoints pause until production_approve; state is saved after every task so
-        production_resume can continue. dry_run=true returns the plan without touching anything.
-        Full brief schema: synfig_help('production'). Returns status, task_states, awaiting_approval.
-        Without a Synfig engine the build completes and render tasks are reported as skipped
-        (status 'built'); install Synfig and resume to render.
+        """Run a whole production from a structured brief. This is the single
+        brief-to-project action: the former `produce_anime_project` and `production_plan`
+        actions are its `engine="pipeline"` (and `dry_run=true`) modes.
+
+        engine='orchestrator' (default): dependency-ordered, resumable task graph producing
+        documents, characters, backgrounds, layout, animation, effects, QC, previews, manifest
+        and report. Stages named in checkpoints pause until production_approve. Returns status,
+        task_states, awaiting_approval, project_dir.
+        engine='pipeline': one-command sequential build (storyboard, rigged characters, assets,
+        scene, style, render, review). Returns a ProductionReport with success, doc_id, stages,
+        artifacts and warnings. Accepts stages[], resume_from and resume (resume=True reopens the
+        saved pipeline_state.json instead of rebuilding).
+
+        brief: {title, style, shots[], characters[], assets[], background, camera[],
+        transitions[], audio[], render{}, episodes[].sequences[].shots[], checkpoints[], root}.
+        Call synfig_help('production') for the full brief schema. dry_run=true returns the plan
+        without touching anything. Without a Synfig engine render tasks report "skipped" — never
+        present that as a successful render.
         """
+        if engine == "pipeline":
+            from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+            report = await AnimeProductionPipeline(backend=backend).run(
+                brief,
+                dry_run=dry_run,
+                stages=stages,
+                resume_from=resume_from,
+                resume=resume,
+            )
+            return wrap_untrusted(report.model_dump())
+        if engine != "orchestrator":
+            raise SynfigError(
+                f"Unknown production engine '{engine}'. Use 'orchestrator' or 'pipeline'."
+            )
+
         from synfig_mcp.config import settings
         from synfig_mcp.production.models import ProductionBrief
         from synfig_mcp.production.orchestrator import ProductionOrchestrator

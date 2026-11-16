@@ -145,8 +145,9 @@ def produce_anime_project(title: str = "Untitled Short", style: str = "anime") -
 
 Steps:
 
-1. Run `production_plan` first to see the stages, shot list and layer counts
-   without building anything. Confirm the plan with the user if it looks large.
+1. Run `production_run` with `engine="pipeline", dry_run=true` first to see the
+   stages, shot list and layer counts without building anything. Confirm the plan
+   with the user if it looks large.
 2. Run `story_bible` to derive the continuity bible and screenplay. The server
    cannot write prose, so if the user wants a real logline, character bios or
    scene breaks, author them here and pass the edited bible back as `brief.story`.
@@ -154,8 +155,8 @@ Steps:
    then generate what you need with `procedural_asset_generate`.
 4. Optionally create a labelled turnaround with `character_model_sheet`, and
    slice sprite sheets with `sprite_slice`.
-5. Run the full pipeline with `produce_anime_project`. It writes the .sif, a
-   render and a contact sheet, and reports per-stage status.
+5. Run the full pipeline with `production_run` and `engine="pipeline"`. It writes
+   the .sif, a render and a contact sheet, and reports per-stage status.
 6. Report each stage's status honestly. Render/review stages report "skipped"
    when no Synfig engine is on PATH - never present that as a successful render.
 

@@ -100,7 +100,7 @@ async def test_asset_preview_mock(
 
 
 @pytest.mark.asyncio
-async def test_asset_import_local_rights_validation(
+async def test_asset_import_rights_validation(
     mcp_server: tuple[str, MCPServer], tmp_path: Path
 ) -> None:
     _, app = mcp_server
@@ -115,7 +115,7 @@ async def test_asset_import_local_rights_validation(
     async with Client(app) as client:
         # Invalid rights declaration must be rejected
         bad_res = await client.call_tool(
-            "asset_import_local",
+            "asset_import",
             {
                 "file_path": str(test_img),
                 "rights": "unknown_rights",
@@ -131,7 +131,7 @@ async def test_asset_import_local_rights_validation(
 
         # Valid rights declaration must succeed
         good_res = await client.call_tool(
-            "asset_import_local",
+            "asset_import",
             {
                 "file_path": str(test_img),
                 "rights": "own",

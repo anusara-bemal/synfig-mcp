@@ -1,19 +1,20 @@
 # Synfig MCP
 
-[![Server CI](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml)
-[![Bridge Build](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/bridge-build.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/bridge-build.yml)
-[![CodeQL](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/codeql.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/codeql.yml)
+[![Server CI](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml/badge.svg?branch=main)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/server-ci.yml)
+[![Bridge Build](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/bridge-build.yml/badge.svg?branch=main)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/bridge-build.yml)
+[![CodeQL](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/codeql.yml)
 [![Website](https://img.shields.io/badge/website-live-1e73be.svg)](https://anusara-bemal.github.io/synfig-mcp/)
-[![Docs](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/docs.yml/badge.svg?branch=v1.0.0)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/docs.yml)
+[![Docs](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/anusara-bemal/synfig-mcp/actions/workflows/docs.yml)
 [![Release](https://img.shields.io/github/v/release/anusara-bemal/synfig-mcp?include_prereleases&sort=semver)](https://github.com/anusara-bemal/synfig-mcp/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/Model_Context_Protocol-compatible-6f42c1.svg)](https://modelcontextprotocol.io)
 [![M8ven Score](https://m8ven.ai/badge/mcp/anusara-bemal-synfig-mcp-14pggi?v=2d55135f5f2e7364d661a41fe1959b56)](https://m8ven.ai/mcp/anusara-bemal-synfig-mcp-14pggi?s=readme)
+[![MCP Badge](https://lobehub.com/badge/mcp/anusara-bemal-synfig-mcp?style=flat)](https://lobehub.com/mcp/anusara-bemal-synfig-mcp)
 
 **Production-grade Model Context Protocol server for [Synfig Studio](https://www.synfig.org/) — live canvas automation, headless rendering, and AI-assisted 2D animation pipelines.**
 
-**Website:** [anusara-bemal.github.io/synfig-mcp](https://anusara-bemal.github.io/synfig-mcp/) · **Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 83 · **Profile:** `all` enabled by default
+**Website:** [anusara-bemal.github.io/synfig-mcp](https://anusara-bemal.github.io/synfig-mcp/) · **Author:** ABM · **License:** MIT (server) / GPL-3.0 (native bridge) · **Tools:** 118 · **Profile:** `all` enabled by default
 
 Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any MCP-compatible client to Synfig Studio. Every edit is applied on the GTK main thread as a regular `synfigapp` action, so it appears instantly on the canvas, takes part in undo/redo, and coexists safely with manual artist work.
 
@@ -29,6 +30,7 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 - [Connect an MCP client](#connect-an-mcp-client)
 - [Operating modes](#operating-modes)
 - [Tool profiles](#tool-profiles)
+- [Skills, prompts and resources](#skills-prompts-and-resources)
 - [What you can do](#what-you-can-do)
 - [Configuration](#configuration)
 - [Docker](#docker)
@@ -47,7 +49,7 @@ Synfig MCP connects Claude Desktop, Claude Code, Cursor, VS Code, Codex, and any
 |---|---|
 | **Live editing** | Drives a running, patched Synfig Studio through an authenticated local bridge. Every mutation is an undoable Studio action. |
 | **Headless fallback** | Works without a GUI through a lossless `.sif` / `.sifz` / `.sfg` engine and the `synfig` CLI. Ideal for CI, containers, and render farms. |
-| **Complete surface** | All 83 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
+| **Complete surface** | All 118 tools ship enabled: every layer type, parameter type, keyframe, value node, render target, effect recipe and review metric. |
 | **Rig sheet to scene** | `rig_sheet_slice` cuts a character sheet into parts, `scene_auto_build` assembles jointed characters, background, props, camera and motion (walk, run, wave, jump, ...) in one call and one undo step. See [`docs/characters.md`](docs/characters.md). |
 | **Verified output** | Every generated document is loaded by the *real* Synfig engine in CI — a document the engine rejects never passes. |
 | **Visual feedback loop** | Renders frames and returns base64 previews plus objective metrics: SSIM, palette, safe areas, clipping, strobe/photosensitivity, diff heatmaps. |
@@ -68,7 +70,7 @@ graph TB
     end
 
     subgraph server["synfig-mcp server (Python · MIT)"]
-        TOOLS["83 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
+        TOOLS["118 typed MCP tools<br/>profiles: all · core · anim · fx · rig · assets · review"]
         SCHEMA["Schema introspection<br/>layer types · parameters · value nodes · targets"]
         PIPE["Render pipeline<br/>frame · sequence · video · contact sheet"]
         REVIEW["Visual review<br/>SSIM · palette · clipping · strobe"]
@@ -157,7 +159,25 @@ sequenceDiagram
 
 ## Installation
 
-### Option A — one command (recommended)
+### Option A — zero-install with `uvx` (recommended)
+
+No installation step: `uvx` fetches the published server and runs it on demand.
+
+```bash
+uvx synfig-mcp doctor
+```
+
+Paste this into any MCP client (no path, no virtualenv):
+
+```json
+{
+  "mcpServers": {
+    "synfig": { "command": "uvx", "args": ["synfig-mcp"] }
+  }
+}
+```
+
+### Option B — one-command installer
 
 ```bash
 # Linux / macOS
@@ -170,7 +190,7 @@ irm https://raw.githubusercontent.com/anusara-bemal/synfig-mcp/main/scripts/inst
 The script installs the server with `uv`, verifies the installation with
 `synfig-mcp doctor`, and prints the ready-to-paste client configuration.
 
-### Option B — from source
+### Option C — from source
 
 ```bash
 git clone https://github.com/anusara-bemal/synfig-mcp.git
@@ -179,7 +199,7 @@ cd server && uv sync --all-extras && cd ..
 server/.venv/bin/synfig-mcp doctor      # or server\.venv\Scripts\synfig-mcp.exe doctor
 ```
 
-### Option C — release wheel
+### Option D — release wheel
 
 ```bash
 pip install synfig-mcp
@@ -225,7 +245,8 @@ graph LR
 {
   "mcpServers": {
     "synfig": {
-      "command": "synfig-mcp",
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": {
         "SYNFIG_MCP_PROFILE": "all",
         "SYNFIG_MCP_BACKEND": "auto"
@@ -238,7 +259,7 @@ graph LR
 ### Claude Code
 
 ```bash
-claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
+claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- uvx synfig-mcp
 ```
 
 ### Cursor
@@ -247,7 +268,8 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
 {
   "mcpServers": {
     "synfig": {
-      "command": "synfig-mcp",
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": { "SYNFIG_MCP_PROFILE": "all", "SYNFIG_MCP_BACKEND": "auto" }
     }
   }
@@ -261,7 +283,8 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
   "servers": {
     "synfig": {
       "type": "stdio",
-      "command": "synfig-mcp",
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": { "SYNFIG_MCP_PROFILE": "all" }
     }
   }
@@ -274,8 +297,8 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
 {
   "mcpServers": {
     "synfig": {
-      "command": "/absolute/path/to/synfig-mcp",
-      "args": [],
+      "command": "uvx",
+      "args": ["synfig-mcp"],
       "env": {
         "SYNFIG_MCP_PROFILE": "all",
         "SYNFIG_MCP_BACKEND": "auto",
@@ -285,6 +308,9 @@ claude mcp add synfig --env SYNFIG_MCP_PROFILE=all -- synfig-mcp
   }
 }
 ```
+
+Replace `uvx synfig-mcp` with an absolute path to the installed `synfig-mcp`
+executable if the client cannot launch `uvx`.
 
 ---
 
@@ -319,21 +345,41 @@ flowchart TD
 
 ## Tool profiles
 
-All 83 tools are exposed by default. Narrow the surface when the client has a tight context budget:
+All 118 tools are exposed by default. Narrow the surface when the client has a tight context budget:
 
 | Profile | Tools | ≈ tokens (cl100k) | Focus |
 |---|---:|---:|---|
-| `all` *(default)* | 80 | ~20,100 | Everything: documents, layers, parameters, animation, FX, rigging, review, assets |
-| `core` | 13 | ~2,980 | Scene build/export, inspection, undo/redo, single-frame render |
-| `anim` | 21 | ~5,000 | Keyframes, timeline, waypoints, interpolation |
-| `fx` | 25 | ~6,000 | Layer hierarchy, effect recipes, style presets |
-| `rig` | 25 | ~4,500 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
-| `assets` | 13 | ~2,800 | Licensed asset search, hardened downloads, attribution |
-| `review` | 18 | ~5,200 | Frame/sequence/compare review, objective metrics, jobs |
+| `all` *(default)* | 118 | ~30,200 | Everything: documents, layers, parameters, animation, FX, rigging, review, assets |
+| `core` | 22 | ~4,550 | Scene build/export, inspection, undo/redo, single-frame render |
+| `anim` | 29 | ~6,740 | Keyframes, timeline, waypoints, interpolation |
+| `fx` | 39 | ~9,155 | Layer hierarchy, effect recipes, style presets |
+| `rig` | 40 | ~10,700 | Cut-out rigging, poses, motion cycles, storyboards, canvases |
+| `assets` | 28 | ~6,980 | Licensed asset search, hardened downloads, attribution |
+| `review` | 26 | ~6,270 | Frame/sequence/compare review, objective metrics, jobs |
 
 ```bash
 SYNFIG_MCP_PROFILE=core synfig-mcp
 ```
+
+---
+
+## Skills, prompts and resources
+
+The server advertises the full MCP surface — tools, prompts, resources and an Agent
+Skill — so clients and marketplaces can discover everything without guessing:
+
+- **Skill** — [`skills/synfig-mcp/SKILL.md`](skills/synfig-mcp/SKILL.md) is an
+  installable Agent Skill describing when and how to drive Synfig, the consolidated
+  actions (`asset_import`, `production_run`), and the safety rules.
+- **Prompts** — five guided workflows: `create_animation_scene`,
+  `rig_and_animate_character`, `render_and_review`, `produce_anime_project`, and
+  `troubleshoot_connection`.
+- **Resources** — `synfig://index` plus `synfig://guide/*`, `synfig://templates/*`
+  and `synfig://rubrics/*` documents, readable without spending a tool call.
+
+`server/tests/contract/test_prompts_and_resources.py` locks this in: the server must
+advertise at least one working prompt and one readable resource, so a scanner never
+sees an empty surface.
 
 ---
 
@@ -376,7 +422,7 @@ graph LR
 - **Characters** — cut-out puppet assembly, pose presets, motion cycles, storyboard animatics.
 - **Rendering** — single frames, sequences, MP4/GIF video, contact sheets, plus the visual review loop.
 
-Full reference: [`docs/tools.md`](docs/tools.md) (all 83 tools) and [`docs/api.md`](docs/api.md).
+Full reference: [`docs/tools.md`](docs/tools.md) (all 118 tools) and [`docs/api.md`](docs/api.md).
 
 ---
 
@@ -512,7 +558,7 @@ bash bridge/scripts/build_linux.sh            # Linux
 
 | Document | Contents |
 |---|---|
-| [`docs/tools.md`](docs/tools.md) | All 83 tools with typed parameters |
+| [`docs/tools.md`](docs/tools.md) | All 118 tools with typed parameters |
 | [`docs/api.md`](docs/api.md) | Tool surface per profile |
 | [`docs/architecture.md`](docs/architecture.md) | Bridge protocol, threading, undo model |
 | [`docs/protocol.md`](docs/protocol.md) | JSON-RPC wire format |
@@ -529,6 +575,7 @@ bash bridge/scripts/build_linux.sh            # Linux
 
 - The Python **server** (`server/`) is MIT licensed — see [`LICENSE`](LICENSE).
 - The native **bridge** (`bridge/`) is compiled into Synfig Studio and is a
-  derivative work, therefore **GPL-3.0** — see [`bridge/GPL_NOTICE.txt`](bridge/GPL_NOTICE.txt)
-  and [`docs/gpl-compliance.md`](docs/gpl-compliance.md).
+  derivative work, therefore **GPL-3.0** — see [`LICENSE-BRIDGE`](LICENSE-BRIDGE),
+  [`bridge/GPL_NOTICE.txt`](bridge/GPL_NOTICE.txt) and
+  [`docs/gpl-compliance.md`](docs/gpl-compliance.md).
 - Synfig Studio itself is © the Synfig Project, GPL-3.0.

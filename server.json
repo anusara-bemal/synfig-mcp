@@ -2,17 +2,53 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.anusara-bemal/synfig-mcp",
   "title": "Synfig MCP",
-  "description": "MCP server for Synfig Studio with live canvas automation and headless rendering.",
-  "version": "0.8.0-rc2",
-  "websiteUrl": "https://github.com/anusara-bemal/synfig-mcp",
+  "description": "MCP server for Synfig Studio: live canvas, headless rendering, prompts, resources, Agent Skill.",
+  "version": "1.0.6",
+  "websiteUrl": "https://anusara-bemal.github.io/synfig-mcp/",
   "repository": {
     "url": "https://github.com/anusara-bemal/synfig-mcp",
     "source": "github"
   },
   "packages": [
     {
+      "registryType": "pypi",
+      "identifier": "synfig-mcp",
+      "version": "1.0.6",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "SYNFIG_MCP_PROFILE",
+          "description": "Tool profile to expose ('all' exposes every tool)",
+          "default": "all",
+          "choices": [
+            "core",
+            "anim",
+            "fx",
+            "rig",
+            "assets",
+            "review",
+            "all"
+          ],
+          "isRequired": false
+        },
+        {
+          "name": "SYNFIG_MCP_BACKEND",
+          "description": "Backend selection: auto, live, or headless",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "live",
+            "headless"
+          ],
+          "isRequired": false
+        }
+      ]
+    },
+    {
       "registryType": "oci",
-      "identifier": "ghcr.io/anusara-bemal/synfig-mcp:0.8.0-rc2",
+      "identifier": "ghcr.io/anusara-bemal/synfig-mcp:1.0.6",
       "transport": {
         "type": "stdio"
       },

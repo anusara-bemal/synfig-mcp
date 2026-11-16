@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 121 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 118 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -14,11 +14,11 @@
 - [Document Management](#document-management) (8 tools)
 - [Effect Recipes](#effect-recipes) (3 tools)
 - [History & Undo](#history-undo) (3 tools)
-- [Layer Manipulation](#layer-manipulation) (12 tools)
+- [Layer Manipulation](#layer-manipulation) (11 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (31 tools)
+- [Other](#other) (30 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
-- [Production Orchestration](#production-orchestration) (5 tools)
+- [Production Orchestration](#production-orchestration) (4 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
 - [Selection](#selection) (2 tools)
@@ -26,7 +26,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 121 tools.**
+**Total: 118 tools.**
 
 ## Animation & Keyframes
 
@@ -947,26 +947,6 @@ Gotcha: Calling ungroup on a non-group layer (e.g. a circle).
 
 ---
 
-### `import_asset`
-
-*Profiles: all, assets*
-
-Import an external asset file (e.g. .png, .jpg, .svg, .wav, .ogg) into the canvas.
-
-Returns: Layer dictionary for the newly imported image or sound layer.
-
-Gotcha: Verify document ID before invoking.
-
-#### Parameters
-
-| Name | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `doc_id` | `string` | Yes | - |
-| `file_path` | `string` | Yes | - |
-| `canvas_path` | `string` | No | - |
-
----
-
 ### `layer_set_visibility`
 
 *Profiles: all, fx*
@@ -1109,15 +1089,27 @@ Gotcha: Non-commercial (NC) and No-Derivatives (ND) licenses are blocked by defa
 
 ---
 
-### `asset_import_local`
+### `asset_import`
 
 *Profiles: all, assets*
 
-Register a local file in the project provenance manifest with mandatory rights declaration.
+Register a local file in the project provenance manifest with mandatory rights
 
-Returns: {success, asset_id, rights, sha256, local_path}.
+declaration, and optionally import it into a canvas as an image or sound layer.
 
-Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'public-domain'.
+This is the single asset-import action: it replaces the former `import_asset`
+
+(canvas-only) and `asset_import_local` (provenance-only) actions.
+
+Returns: {success, asset_id, rights, sha256, local_path, layer?}; 'layer' is present
+
+only when doc_id was provided.
+
+Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or
+
+'public-domain'. Pass doc_id to place the asset on a canvas; omit it to register
+
+provenance only.
 
 #### Parameters
 
@@ -1128,6 +1120,8 @@ Gotcha: Rights must be explicitly declared as 'own', 'licensed', 'cc0', or 'publ
 | `title` | `string` | No | - |
 | `creator` | `string` | No | - |
 | `license_code` | `string` | No | - |
+| `doc_id` | `any` | No | - |
+| `canvas_path` | `string` | No | - |
 
 ---
 
@@ -1463,46 +1457,6 @@ parts by body role (head, torso, upper_arm_l, ...) so rigs auto-assemble. See sy
 
 ---
 
-### `produce_anime_project`
-
-*Profiles: all*
-
-Build a whole anime-style project from one brief: storyboard, rigged characters,
-
-assets, assembled scene, style stack, render and review.
-
-brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
-
-assets[], background, camera[], transitions[], audio[], render{}, output_dir,
-
-save_path}. Call synfig_help('production') for the full brief shape, styles and
-
-motion names. transitions[] are {type: 'fade'|'dissolve', time, duration}; audio[]
-
-are {file, time, volume} sound cues.
-
-Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
-
-Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
-
-and the render/review stages report "skipped". A run writes pipeline_state.json into the
-
-output directory; re-running the same brief (resume=True) reopens the saved document and
-
-continues from where it stopped instead of rebuilding. Pass resume=False for a clean run.
-
-#### Parameters
-
-| Name | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `brief` | `object` | Yes | - |
-| `dry_run` | `boolean` | No | - |
-| `stages` | `any` | No | - |
-| `resume_from` | `any` | No | - |
-| `resume` | `boolean` | No | - |
-
----
-
 ### `story_bible`
 
 *Profiles: all*
@@ -1511,7 +1465,7 @@ Derive the continuity story bible (characters, locations, props, scenes, timelin
 
 and the screenplay view for a brief, without building anything.
 
-brief: same shape as produce_anime_project. A 'story' already in the brief is validated
+brief: same shape as production_run. A 'story' already in the brief is validated
 
 and returned unchanged; otherwise the server derives a structural bible from the brief's
 
@@ -1999,45 +1953,41 @@ Gotcha: Attempting to unexport a node that is still referenced by multiple activ
 
 ## Production Orchestration
 
-### `production_plan`
-
-*Profiles: all*
-
-Dry-run the production pipeline: report the stages and layer counts without building.
-
-brief: same shape as produce_anime_project (see synfig_help('production')).
-
-Returns: the ProductionReport for the dry run; no document is created.
-
-#### Parameters
-
-| Name | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `brief` | `object` | Yes | - |
-
----
-
 ### `production_run`
 
 *Profiles: all, rig*
 
-Run a whole production from a structured brief as a dependency-ordered, resumable task
+Run a whole production from a structured brief. This is the single
 
-graph: documents, characters, backgrounds, layout, animation, effects, QC, previews,
+brief-to-project action: the former `produce_anime_project` and `production_plan`
 
-manifest and report. brief: {title, episodes[].sequences[].shots[], characters[],
+actions are its `engine="pipeline"` (and `dry_run=true`) modes.
 
-backgrounds[], props[], rigs[], style, checkpoints[], root, render_final}. Stages named in
+engine='orchestrator' (default): dependency-ordered, resumable task graph producing
 
-checkpoints pause until production_approve; state is saved after every task so
+documents, characters, backgrounds, layout, animation, effects, QC, previews, manifest
 
-production_resume can continue. dry_run=true returns the plan without touching anything.
+and report. Stages named in checkpoints pause until production_approve. Returns status,
 
-Full brief schema: synfig_help('production'). Returns status, task_states, awaiting_approval.
+task_states, awaiting_approval, project_dir.
 
-Without a Synfig engine the build completes and render tasks are reported as skipped
+engine='pipeline': one-command sequential build (storyboard, rigged characters, assets,
 
-(status 'built'); install Synfig and resume to render.
+scene, style, render, review). Returns a ProductionReport with success, doc_id, stages,
+
+artifacts and warnings. Accepts stages[], resume_from and resume (resume=True reopens the
+
+saved pipeline_state.json instead of rebuilding).
+
+brief: {title, style, shots[], characters[], assets[], background, camera[],
+
+transitions[], audio[], render{}, episodes[].sequences[].shots[], checkpoints[], root}.
+
+Call synfig_help('production') for the full brief schema. dry_run=true returns the plan
+
+without touching anything. Without a Synfig engine render tasks report "skipped" — never
+
+present that as a successful render.
 
 #### Parameters
 
@@ -2045,6 +1995,10 @@ Without a Synfig engine the build completes and render tasks are reported as ski
 | :--- | :--- | :---: | :--- |
 | `brief` | `object` | Yes | - |
 | `dry_run` | `boolean` | No | - |
+| `engine` | `string` | No | - |
+| `stages` | `any` | No | - |
+| `resume_from` | `any` | No | - |
+| `resume` | `boolean` | No | - |
 
 ---
 

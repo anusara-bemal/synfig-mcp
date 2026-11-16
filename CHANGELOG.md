@@ -5,6 +5,19 @@ All notable changes to `synfig-mcp` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-11-16
+
+### Added
+- **Agent Skill**: `skills/synfig-mcp/SKILL.md` documents when and how to drive Synfig, the core workflow, the consolidated actions, and the safety rules. The README now links it and advertises the five guided prompts and the `synfig://` resources alongside tools.
+- **Friendly install**: `server.json` now lists a PyPI package (`uvx synfig-mcp`) in addition to the OCI image. README, website and `examples/*.json` client configs consistently launch the server with `uvx`.
+- **LobeHub ownership badge** in the README so the listing can be claimed and verified.
+
+### Changed
+- **One action per intent (no duplicate tools)**: `asset_import` now replaces `import_asset` and `asset_import_local` — it registers provenance with a mandatory rights declaration and, when `doc_id` is supplied, imports the file onto that canvas. `production_run` replaces `produce_anime_project` and `production_plan`: `engine="pipeline"` is the one-command brief-to-project build, `dry_run=true` is the planner, and the default `engine="orchestrator"` keeps the resumable task graph. The tool surface is now 118 tools (was 121); the `produce_anime_project` *prompt* is unchanged.
+- **License clarity**: `LICENSE` is now the plain MIT license so license detectors and marketplaces identify it correctly. The bridge's GPL-3.0 obligations remain fully documented in `LICENSE-BRIDGE`, `bridge/GPL_NOTICE.txt` and `docs/gpl-compliance.md`.
+- **Version single source**: `server.json`, `server/pyproject.toml`, CI suggestions and release notes now agree on `1.0.6`.
+- Regenerated `docs/tools.md`, `docs/TOKEN_BUDGET.md` and the website tool catalog from the live registry.
+
 ## [Unreleased]
 
 ### Added

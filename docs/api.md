@@ -2,7 +2,7 @@
 
 `synfig-mcp` exposes tools grouped into functional **profiles** configured via the `SYNFIG_MCP_PROFILE` environment variable (default: `all`).
 
-The default profile exposes the **complete** Synfig feature set (all 121 tools) so a freshly installed server can create, animate, render and review animations without further configuration. The narrower profiles exist for clients with a tight context budget.
+The default profile exposes the **complete** Synfig feature set (all 118 tools) so a freshly installed server can create, animate, render and review animations without further configuration. The narrower profiles exist for clients with a tight context budget.
 
 ---
 
@@ -10,12 +10,12 @@ The default profile exposes the **complete** Synfig feature set (all 121 tools) 
 
 | Profile | Target Tokens (cl100k) | Tools Count | Primary Purpose |
 |---|---|---|---|
-| `all` (default) | < 32,000 (~30,700 actual) | 121 | Unrestricted full access to every tool: documents, layers, parameters, animation, rendering, review, assets. |
+| `all` (default) | < 32,000 | 118 | Unrestricted full access to every tool: documents, layers, parameters, animation, rendering, review, assets. |
 | `core` | < 5,000 (~4,550 actual) | 22 | Scene setup, declarative build, inspection, undo/redo, single-frame render. |
 | `anim` | < 6,800 (~6,740 actual) | 29 | Timeline navigation, keyframe manipulation, parameter animation, waypoints. |
 | `fx` | < 9,200 (~9,150 actual) | 39 | Layer tree modifications, effects recipes, style presets, parameters. |
 | `rig` | < 10,500 (~10,430 actual) | 40 | Bone hierarchies, cut-out character rigging, pose application, storyboards. |
-| `assets` | < 7,100 (~7,080 actual) | 29 | Licensed asset search, previews, hardened downloads, local imports. |
+| `assets` | < 7,100 | 28 | Licensed asset search, previews, hardened downloads, and one consolidated local import action. |
 | `review` | < 6,300 (~6,270 actual) | 26 | Visual critique, objective quality metrics, sequence review, diff heatmaps. |
 
 ---
@@ -86,8 +86,7 @@ Safe internet asset search, vetting, downloading, and local ingest.
 - `asset_search(query, provider?, license_type?, media_type?, page?, page_size?)`: Searches open media (Openverse / Wikimedia). Returns compact text metadata.
 - `asset_preview(id, provider?)`: Returns a small image preview for visual inspection.
 - `asset_download(id, provider?, target_name?)`: Downloads, validates, sanitizes, and registers asset in `assets/manifest.json`.
-- `asset_import_local(source_path, target_name?, rights?, creator?, license?)`: Imports and sanitizes local vector/raster art with mandatory rights declaration.
-- `import_asset(file_path, layer_name?)`: Instantiates an imported asset into the active canvas.
+- `asset_import(file_path, rights, title?, creator?, license_code?, doc_id?, canvas_path?)`: The single local-asset action — registers provenance with a mandatory rights declaration (imports and sanitizes vector/raster art), and, when `doc_id` is supplied, instantiates the asset in that canvas as an image or sound layer.
 
 ---
 
@@ -104,7 +103,7 @@ Closed-loop visual critique, objective image analytics, and rendering pipelines.
 ---
 
 ### Profile: `all` (Default Profile)
-Includes every tool of every profile above - all 121 tools: documents, canvases, scene building, layers, parameters and value nodes, animation and keyframes, selection, history, effects recipes, style presets, character rigging, storyboards, licensed assets, rendering (frame, sequence, video, contact sheet, async jobs), visual review and low-level schema inspection:
+Includes every tool of every profile above - all 118 tools: documents, canvases, scene building, layers, parameters and value nodes, animation and keyframes, selection, history, effects recipes, style presets, character rigging, storyboards, licensed assets, rendering (frame, sequence, video, contact sheet, async jobs), visual review and low-level schema inspection:
 - `schema_list_layers()` / `schema_get_layer(layer_type)`
 - `schema_list_valuenodes()`
 - `schema_list_renderers()`

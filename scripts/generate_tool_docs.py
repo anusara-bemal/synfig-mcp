@@ -23,7 +23,7 @@ def categorize_tool(name: str) -> str:
         return "Document Management"
     if name.startswith("canvas_") or name.startswith("scene_"):
         return "Canvas & Scene"
-    if name.startswith("layer_") or name == "import_asset":
+    if name.startswith("layer_"):
         return "Layer Manipulation"
     if name.startswith("param_"):
         return "Parameters & ValueNodes"

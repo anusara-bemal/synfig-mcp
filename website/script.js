@@ -23,7 +23,7 @@ const TOOLS_CATALOG = [
   { name: "anim_waypoint_remove", profiles: ["anim", "all"], desc: "Remove a waypoint from a layer parameter at a given time.", params: "(doc_id: string, layer_id: string, param_name: string, time: number)" },
   { name: "anim_waypoint_set", profiles: ["anim", "all"], desc: "Insert or update a waypoint for a layer parameter at a specific timeline timestamp.", params: "(doc_id: string, layer_id: string, param_name: string, time: number, value: any, interpolation_in?: string, interpolation_out?: string)" },
   { name: "asset_download", profiles: ["assets", "all"], desc: "Download and verify licensed asset: evaluates license policy, SSRF checks, sanitizes SVG/raster, hashes SHA-256.", params: "(asset_id: string, provider?: string)" },
-  { name: "asset_import_local", profiles: ["assets", "all"], desc: "Register a local file in the project provenance manifest with mandatory rights declaration.", params: "(file_path: string, rights: string, title?: string, creator?: string, license_code?: string)" },
+  { name: "asset_import", profiles: ["assets", "all"], desc: "Register a local file in the project provenance manifest with mandatory rights declaration, and optionally import it into a canvas as an image or sound layer. This is the single asset-import action...", params: "(file_path: string, rights: string, title?: string, creator?: string, license_code?: string, doc_id?: any, canvas_path?: string)" },
   { name: "asset_preview", profiles: ["assets", "all"], desc: "Fetch a small thumbnail preview image of an asset in base64.", params: "(asset_id: string, provider?: string)" },
   { name: "asset_search", profiles: ["assets", "all"], desc: "Search permitted open-license asset providers returning compact text metadata.", params: "(query: string, provider?: string, license_type?: any, page?: integer)" },
   { name: "canvas_create", profiles: ["rig", "all"], desc: "Create a child canvas (a sub-canvas that group layers can reference).", params: "(doc_id?: string, canvas_id?: string)" },
@@ -58,7 +58,6 @@ const TOOLS_CATALOG = [
   { name: "history_list", profiles: ["all"], desc: "Query current undo and redo stack depths.", params: "(doc_id?: string)" },
   { name: "history_redo", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Redo the previously undone action. Returns success. A new mutating action clears the redo stack.", params: "(doc_id?: string)" },
   { name: "history_undo", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Undo the previous action. One mutating MCP call = one undo step. Returns success (false when the stack is empty).", params: "(doc_id?: string)" },
-  { name: "import_asset", profiles: ["assets", "all"], desc: "Import an external asset file (e.g. .png, .jpg, .svg, .wav, .ogg) into the canvas.", params: "(doc_id: string, file_path: string, canvas_path?: string)" },
   { name: "layer_add", profiles: ["fx", "all"], desc: "Add a visual layer (circle, rectangle, star, solid_color, text, PasteCanvas, ...). Returns layer_id, layer_type, depth, diff. Query schema_list_layers for valid types.", params: "(doc_id: string, layer_type: string, canvas_path?: string, description?: any, params?: any)" },
   { name: "layer_align", profiles: ["fx", "all"], desc: "Align multiple layers along an edge or distribute them evenly. Args: doc_id: Target document. layer_ids: List of layer IDs to align (minimum 2 layers required). edge: Alignment edge: 'left', 'right...", params: "(doc_id?: string, layer_ids?: any, edge?: string)" },
   { name: "layer_duplicate", profiles: ["fx", "all"], desc: "Duplicate an existing layer, creating an identical copy placed directly above the original.", params: "(doc_id: string, layer_id: string, canvas_path?: string)" },
@@ -82,11 +81,9 @@ const TOOLS_CATALOG = [
   { name: "permission_revoke", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Revoke a previously granted directory root. Args: path: The directory root to remove from the grant list.", params: "(path: string)" },
   { name: "procedural_asset_generate", profiles: ["assets", "all"], desc: "Generate one procedural vector asset and add it to a document. kind: background | prop | texture; generator: see procedural_asset_list. position/height are canvas pixels (props only).", params: "(doc_id: string, kind?: string, generator?: string, seed?: integer, position?: any, height?: any, style?: any, dry_run?: boolean)" },
   { name: "procedural_asset_list", profiles: ["assets", "all"], desc: "List the built-in procedural asset generators (offline, IP-safe).", params: "()" },
-  { name: "produce_anime_project", profiles: ["all"], desc: "Build a whole anime-style project from one brief: storyboard, rigged characters, assets, assembled scene, style stack, render and review. brief: {title, style, width, height, fps, duration, seed, s...", params: "(brief: object, dry_run?: boolean, stages?: any, resume_from?: any, resume?: boolean)" },
   { name: "production_approve", profiles: ["rig", "all"], desc: "Approve a human-approval checkpoint (e.g. 'layout', 'animation') so the paused production can continue. Call production_resume afterwards to run the next stages.", params: "(slug: string, checkpoint: string, root?: any)" },
-  { name: "production_plan", profiles: ["all"], desc: "Dry-run the production pipeline: report the stages and layer counts without building. brief: same shape as produce_anime_project (see synfig_help('production')).", params: "(brief: object)" },
   { name: "production_resume", profiles: ["rig", "all"], desc: "Continue an interrupted production from its last checkpoint. Completed tasks are not repeated; shot files on disk are re-opened and verified. root defaults to the configured workspace. Returns the...", params: "(slug: string, root?: any, max_attempts?: integer)" },
-  { name: "production_run", profiles: ["rig", "all"], desc: "Run a whole production from a structured brief as a dependency-ordered, resumable task graph: documents, characters, backgrounds, layout, animation, effects, QC, previews, manifest and report. brie...", params: "(brief: object, dry_run?: boolean)" },
+  { name: "production_run", profiles: ["rig", "all"], desc: "Run a whole production from a structured brief. This is the single brief-to-project action: the former `produce_anime_project` and `production_plan` actions are its `engine=\"pipeline\"` (and `dry_ru...", params: "(brief: object, dry_run?: boolean, engine?: string, stages?: any, resume_from?: any, resume?: boolean)" },
   { name: "production_status", profiles: ["rig", "all"], desc: "Inspect a production: manifest status, per-task states, pending approvals, versions, registered assets and the latest log events. Read-only.", params: "(slug: string, root?: any)" },
   { name: "project_refresh", profiles: ["assets", "all"], desc: "Re-read the open project via the native bridge; authorise its dir and imported assets.", params: "()" },
   { name: "recipe_apply", profiles: ["fx", "all"], desc: "Apply a parameterized visual effect recipe atomically as a single undo step.", params: "(doc_id?: string, name?: string, params?: any, target_layer_or_group?: any, dry_run?: boolean)" },
@@ -119,7 +116,7 @@ const TOOLS_CATALOG = [
   { name: "selection_get", profiles: ["rig", "all"], desc: "Get the list of currently selected layer IDs in Studio.", params: "(doc_id?: string)" },
   { name: "selection_set", profiles: ["rig", "all"], desc: "Set the active layer selection in Studio.", params: "(doc_id: string, layer_ids: array)" },
   { name: "sprite_slice", profiles: ["rig", "assets", "all"], desc: "Slice a sprite sheet or layered raster into named, rig-ready transparent part PNGs. strategy: grid (rows x cols), alpha (connected components) or trim (tight alpha boxes); pass rectangles [{name, x...", params: "(source: string, output_dir: string, strategy?: string, rows?: integer, cols?: integer, rectangles?: any, bg_tolerance?: integer, padding?: integer, dry_run?: boolean)" },
-  { name: "story_bible", profiles: ["all"], desc: "Derive the continuity story bible (characters, locations, props, scenes, timeline) and the screenplay view for a brief, without building anything. brief: same shape as produce_anime_project. A 'sto...", params: "(brief: object)" },
+  { name: "story_bible", profiles: ["all"], desc: "Derive the continuity story bible (characters, locations, props, scenes, timeline) and the screenplay view for a brief, without building anything. brief: same shape as production_run. A 'story' alr...", params: "(brief: object)" },
   { name: "storyboard_from_script", profiles: ["rig", "all"], desc: "Assemble a multi-shot animatic timeline from a structured storyboard script.", params: "(spec: object, dry_run?: boolean)" },
   { name: "studio_events", profiles: ["fx", "all"], desc: "Poll recent Studio notifications (manual artist edits) and the state version. Args: doc_id: Only return events for this document. limit: Maximum number of most-recent events to return.", params: "(doc_id?: string, limit?: integer)" },
   { name: "studio_info", profiles: ["core", "anim", "fx", "rig", "assets", "review", "all"], desc: "Inspect connected Studio: versions and open documents with file paths.", params: "()" },
@@ -137,8 +134,8 @@ const TOOLS_CATALOG = [
 // Live capability counts (generated — do not edit by hand)
 // ============================================================
 const MCP_STATS = {
-  total: 121,
-  profiles: { core: 22, anim: 29, fx: 39, rig: 40, assets: 29, review: 26 },
+  total: 118,
+  profiles: { core: 22, anim: 29, fx: 39, rig: 40, assets: 28, review: 26 },
 };
 // END GENERATED STATS
 

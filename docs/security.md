@@ -72,5 +72,5 @@ All strings extracted from SIF XML or live Studio instances (including canvas na
 
 The filesystem sandbox canonicalizes all paths and resolves directory junctions (NTFS reparse points) and POSIX symlinks before checking allowed boundaries:
 - Any path attempting to escape configured workspace roots through a directory junction or symlink pointing outside is rejected with `SecuritySandboxError`.
-- Validated for both read operations (`doc_open`, `import_asset`) and write operations (`render_frame`, `render_sequence`, `doc_save`).
+- Validated for both read operations (`doc_open`, `asset_import`) and write operations (`render_frame`, `render_sequence`, `doc_save`).
 - Default workspace roots are strictly confined to `~/Documents/SynfigMCP`. Working directory (`cwd`), user home directories, drive roots (`C:\`), and system folders are explicitly rejected as overly broad.

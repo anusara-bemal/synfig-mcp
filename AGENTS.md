@@ -73,6 +73,14 @@ a missing header or a forward-declared-only type. After touching GUI code, run a
   bible is a structural summary (`authored=False`); a client authors prose by
   editing the bible and passing it back as `ProductionBrief.story`. Validation is
   structural (`validate_story`): an inconsistent bible fails the `story` stage.
+- One action per intent on the MCP tool surface. `asset_import` is the single
+  local-asset import (provenance + optional canvas placement); `production_run`
+  is the single brief-to-project entry (`engine="pipeline"` or
+  `engine="orchestrator"`). Do not re-add `import_asset`, `asset_import_local`,
+  `produce_anime_project` or `production_plan` — extend the canonical tool instead.
+- The Agent Skill is `skills/synfig-mcp/SKILL.md`. Keep it in step with the
+  canonical tool names, the guided prompts and the `synfig://` resources; the
+  README links it and LobeHub uses it to satisfy the "at least one Skill" check.
 - The motion library lives in `characters/cutout.py` (`MOTIONS` /
   `SPECIAL_MOTIONS`). Add a motion there and a parametrized test in
   `tests/unit/test_cutout_rig.py`; the guide (`resources/guides.py`) and

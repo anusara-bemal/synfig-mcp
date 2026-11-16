@@ -42,7 +42,7 @@ Analysis performed across source, bridge, documentation, and test suites:
 ## 3. Naming and API Inconsistencies
 
 1. **Tool Naming (`verb_noun` consistency)**:
-   - Current names: `layer_remove` vs `layer_delete`, `layer_reorder` vs `layer_move`, `scene_tree` (noun phrase) vs `canvas_list`, `import_asset` vs `asset_import`.
+   - Current names: `layer_remove` vs `layer_delete`, `layer_reorder` vs `layer_move`, `scene_tree` (noun phrase) vs `canvas_list`, `import_asset` vs `asset_import`. *(Resolved in v1.0.6: the duplicate asset actions were consolidated into a single `asset_import` tool.)*
    - C++ Bridge methods: Accepts both `layer.remove` and `layer.delete`, `layer.move` and `layer.reorder`.
    - *Resolution*: Standardize Python MCP tool names strictly on `noun_verb` or `verb_noun` convention in Phase A1 / A7.
 2. **Parameter Conventions**:
