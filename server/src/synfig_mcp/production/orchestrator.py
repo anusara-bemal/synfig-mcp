@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from synfig_mcp.backend.base import BackendBase
 from synfig_mcp.characters.production import SceneAutoBuilder
@@ -303,7 +303,7 @@ class ProductionOrchestrator:
         """Return the shot description of a shot id."""
         for shot in brief.shots:
             if shot.id == shot_id:
-                return shot.model_dump(mode="json")
+                return cast(dict[str, Any], shot.model_dump(mode="json"))
         raise SynfigError(f"The shot '{shot_id}' is not part of the brief.")
 
     # -- stages --------------------------------------------------------------

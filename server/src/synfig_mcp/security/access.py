@@ -22,6 +22,7 @@ import os
 import re
 import tempfile
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -124,6 +125,17 @@ def is_overly_broad_root(path: Path | str) -> tuple[bool, str]:
 def is_system_path(resolved: Path) -> bool:
     """True when the resolved path lives inside OS / program installation folders."""
     text = _norm(resolved)
+    # Clients may send Windows paths to a non-Windows server (for example
+    # through a container).  Reject those virtual system locations before
+    # relative-path resolution can turn them into workspace paths.
+    windows_text = text
+    drive_prefix = re.search(r"(?:^|/)([a-z]):/(.*)$", windows_text)
+    if drive_prefix:
+        windows_root = drive_prefix.group(2)
+        if windows_root == "windows" or windows_root.startswith(
+            ("windows/", "program files", "program files (x86)/")
+        ):
+            return True
     if os.name == "nt":
         prefixes = []
         for env in ("SYSTEMROOT", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
@@ -273,7 +285,7 @@ class AccessController:
         self._project_dirs.add(_norm(directory))
         return directory
 
-    def register_project_assets(self, paths: list[Path | str]) -> int:
+    def register_project_assets(self, paths: Sequence[Path | str]) -> int:
         """Register asset files referenced by the open Synfig project."""
         added = 0
         for raw in paths:

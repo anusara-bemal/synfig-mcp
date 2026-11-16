@@ -5,8 +5,10 @@ Exposes typed, categorized tools over BackendBase with ToolAnnotations and LLM-o
 
 import contextlib
 import json
+import tempfile
 from collections.abc import Callable
 from functools import wraps
+from pathlib import Path
 from typing import Any, TypeVar, cast
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -14,6 +16,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from synfig_mcp.backend.base import BackendBase
+from synfig_mcp.capabilities import CapabilityRegistry, WorkflowRunner, build_capabilities
 from synfig_mcp.errors import (
     BridgeConnectionError,
     DocumentNotFoundError,
@@ -87,7 +90,12 @@ DESTRUCTIVE = ToolAnnotations(read_only_hint=False, destructive_hint=True, idemp
 TOOL_PROFILES: dict[str, set[str]] = {
     # Core & Diagnostics
     "health_check": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    # Filesystem permissions
+    "permission_list": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "permission_grant": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "permission_revoke": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     "synfig_help": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    # Live Studio control & introspection
     "studio_launch": {"all"},
     "studio_info": {"core", "anim", "fx", "rig", "assets", "review", "all"},
     # Project-aware file access
@@ -152,14 +160,29 @@ TOOL_PROFILES: dict[str, set[str]] = {
     # Selection
     "selection_get": {"rig", "all"},
     "selection_set": {"rig", "all"},
+    "view_get": {"fx", "all"},
+    "view_set": {"fx", "all"},
+    "studio_events": {"fx", "all"},
+    "layer_set_visibility": {"fx", "all"},
+    "layer_set_blend": {"fx", "all"},
+    "layer_align": {"fx", "all"},
     # Cut-out Characters & Storyboards (Phase A4)
     "rig_sheet_slice": {"rig", "assets", "all"},
+    "rig_sheet_from_image": {"rig", "assets", "all"},
     "scene_auto_build": {"rig", "all"},
     "character_rig_from_parts": {"rig", "all"},
     "rig_bone_add": {"rig", "all"},
     "character_pose_apply": {"rig", "all"},
     "character_motion_apply": {"rig", "all"},
     "storyboard_from_script": {"rig", "all"},
+    # Anime Production Pipeline (Step 0-5)
+    "produce_anime_project": {"all"},
+    "production_plan": {"all"},
+    "story_bible": {"all"},
+    "character_model_sheet": {"rig", "all"},
+    "procedural_asset_list": {"assets", "all"},
+    "procedural_asset_generate": {"assets", "all"},
+    "sprite_slice": {"assets", "rig", "all"},
     # Production orchestration
     "production_run": {"rig", "all"},
     "production_resume": {"rig", "all"},
@@ -194,6 +217,21 @@ TOOL_PROFILES: dict[str, set[str]] = {
     "schema_list_renderers": {"all"},
     "schema_list_targets": {"all"},
     "schema_list_valuenodes": {"all"},
+    # Capability Registry & Meta-Tools
+    # The four essential meta-tools are available in every profile so any
+    # client can discover and invoke the rest of the surface compactly; the
+    # remainder are only exposed in the full 'all' profile.
+    "capability_search": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_inspect": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_execute": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_discover": {"core", "anim", "fx", "rig", "assets", "review", "all"},
+    "capability_list": {"all"},
+    "capability_batch_execute": {"all"},
+    "capability_validate": {"all"},
+    "capability_load_profile": {"all"},
+    "capability_unload_profile": {"all"},
+    "capability_workflow_execute": {"all"},
+    "capability_workflow_resume": {"all"},
 }
 
 
@@ -202,6 +240,10 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     from synfig_mcp.config import settings
 
     active_profile = (profile or settings.profile).lower()
+
+    #: Tool functions defined during this registration, so profiles can be
+    #: loaded/unloaded at runtime by the capability_* meta-tools.
+    _TOOL_FUNCTIONS: dict[str, tuple[Callable[..., Any], ToolAnnotations | None]] = {}
 
     def diagnostic(exc: SynfigError) -> str:
         """Return an actionable message for common tool failures."""
@@ -227,36 +269,31 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
     def tool_for(name: str, annotations: ToolAnnotations | None = None) -> Callable[[F], F]:
         def decorator(fn: F) -> F:
             allowed = TOOL_PROFILES.get(name, {"all"})
+
+            @wraps(fn)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await fn(*args, **kwargs)
+                except SynfigError as exc:
+                    # Return clear structured error with tool name and actionable hint
+                    raise ToolError(f"[{name}] {diagnostic(exc)}") from exc
+                except FileNotFoundError as exc:
+                    raise ToolError(f"[{name}] File not found: {exc}") from exc
+                except Exception as exc:
+                    # Catch Pydantic or any internal exception and return explicit diagnostic
+                    # rather than generic MCP SDK 'Error executing tool <name>'
+                    raise ToolError(f"[{name}] Failed with {type(exc).__name__}: {exc}") from exc
+
+            # Every tool function is retained so profiles can be loaded/unloaded
+            # at runtime (see capability_load_profile); only the active profile
+            # is registered with the MCP server up front.
+            _TOOL_FUNCTIONS[name] = (cast(F, wrapper), annotations)
+
             if active_profile == "all" or active_profile in allowed:
-
-                @wraps(fn)
-                async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                    try:
-                        return await fn(*args, **kwargs)
-                    except SynfigError as exc:
-                        # Return clear structured error with tool name and actionable hint
-                        raise ToolError(f"[{name}] {diagnostic(exc)}") from exc
-                    except FileNotFoundError as exc:
-                        raise ToolError(f"[{name}] File not found: {exc}") from exc
-                    except Exception as exc:
-                        # Catch Pydantic or any internal exception and return explicit diagnostic
-                        # rather than generic MCP SDK 'Error executing tool <name>'
-                        raise ToolError(
-                            f"[{name}] Failed with {type(exc).__name__}: {exc}"
-                        ) from exc
-
                 mcp.tool(name=name, annotations=annotations)(wrapper)
-                return cast(F, wrapper)
-            return fn
+            return cast(F, wrapper)
 
         return decorator
-
-    @mcp.resource("synfig://guide/{topic}")
-    def guide_resource(topic: str) -> str:
-        """Resource providing detailed guidance on Synfig concepts, recipes, and tools."""
-        from synfig_mcp.resources.guides import get_guide_content
-
-        return get_guide_content(topic)
 
     @tool_for("synfig_help", annotations=READ_ONLY)
     async def synfig_help(topic: str = "overview") -> dict[str, Any]:
@@ -290,6 +327,53 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         Returns: 'backend', 'studio_version', 'docs' [{doc_id, name, file_path}].
         """
         return wrap_untrusted(await backend.studio_info())
+
+    # -----------------------------------------------------------------------
+    # Filesystem permissions
+    # -----------------------------------------------------------------------
+
+    @tool_for("permission_list", annotations=READ_ONLY)
+    async def permission_list() -> dict[str, Any]:
+        """List the directory roots the user has granted the server read/write access to.
+        Returns: Object with 'roots' (each: path, read, write, source) and 'default' (the fallback project dir).
+        Gotcha: A path must be inside one of these roots for any file tool to accept it; grant more with permission_grant.
+        """
+        from synfig_mcp.security.permissions import permissions
+
+        roots = [g.as_dict() for g in permissions.grants()]
+        return {"roots": roots, "count": len(roots)}
+
+    @tool_for("permission_grant", annotations=MUTATING)
+    async def permission_grant(path: str, read: bool = True, write: bool = True) -> dict[str, Any]:
+        """Grant the server access to a directory root for this session (the user authorizes a folder).
+        Args:
+            path: Absolute or relative path to a directory (or a file inside it) to authorize.
+            read: Allow reading from the root (default True).
+            write: Allow creating/overwriting files under the root (default True).
+        Returns: The resulting grant (path, read, write, source).
+        Gotcha: The path must exist. Granting a drive root, system folder or the user home root directly is rejected as overly broad.
+        """
+        from synfig_mcp.security.permissions import permissions
+        from synfig_mcp.security.sandbox import is_overly_broad_root
+
+        resolved = Path(path).expanduser().resolve()
+        broad, reason = is_overly_broad_root(resolved)
+        if broad:
+            raise SecuritySandboxError(f"Cannot grant '{resolved}': {reason}.")
+        grant = permissions.grant(resolved, read=read, write=write, source="user")
+        return grant.as_dict()
+
+    @tool_for("permission_revoke", annotations=MUTATING)
+    async def permission_revoke(path: str) -> dict[str, Any]:
+        """Revoke a previously granted directory root.
+        Args:
+            path: The directory root to remove from the grant list.
+        Returns: Object with 'revoked' (bool) and the path.
+        """
+        from synfig_mcp.security.permissions import permissions
+
+        resolved = Path(path).expanduser().resolve()
+        return {"revoked": permissions.revoke(resolved), "path": str(resolved)}
 
     # -----------------------------------------------------------------------
     # Project-aware file access
@@ -1166,6 +1250,87 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         selected = await backend.selection_set(doc_id, layer_ids)
         return {"selected_layers": selected}
 
+    @tool_for("view_get", annotations=READ_ONLY)
+    async def view_get(doc_id: str = "doc_0") -> dict[str, Any]:
+        """Read the live canvas viewport (zoom and pan focus).
+        Returns: {zoom, focus: {x, y}, gui}. gui is false in headless mode.
+        Gotcha: Only a running Studio reports a real zoom; headless returns a nominal 1.0.
+        """
+        return wrap_untrusted(await backend.view_get(doc_id))
+
+    @tool_for("view_set", annotations=IDEMPOTENT)
+    async def view_set(
+        doc_id: str = "doc_0",
+        mode: str | None = None,
+        zoom: float | None = None,
+        x: float | None = None,
+        y: float | None = None,
+    ) -> dict[str, Any]:
+        """Drive the live Studio viewport so the artist sees the same frame as the model.
+        Args:
+            doc_id: Target document.
+            mode: 'in', 'out', 'fit', or 'normal'. Use zoom for an exact value.
+            zoom: Explicit zoom factor (1.0 = 100%). Wins over mode.
+            x: Pan focus X in Synfig units (pans when given).
+            y: Pan focus Y in Synfig units.
+        Returns: {zoom, focus: {x, y}, gui}.
+        Gotcha: Requires a live Studio backend; the headless engine has no viewport.
+        """
+        return await backend.view_set(doc_id, mode=mode, zoom=zoom, x=x, y=y)
+
+    @tool_for("studio_events", annotations=READ_ONLY)
+    async def studio_events(doc_id: str = "doc_0", limit: int = 20) -> dict[str, Any]:
+        """Poll recent Studio notifications (manual artist edits) and the state version.
+        Args:
+            doc_id: Only return events for this document.
+            limit: Maximum number of most-recent events to return.
+        Returns: {events: [{method, params, state_version}], state_version, doc_id}.
+        Gotcha: Compare state_version across calls to detect external changes; headless reports 'headless'.
+        """
+        return wrap_untrusted(await backend.recent_events(doc_id=doc_id, limit=limit))
+
+    @tool_for("layer_set_visibility", annotations=MUTATING)
+    async def layer_set_visibility(
+        doc_id: str = "doc_0", layer_id: str = "", visible: bool = True
+    ) -> dict[str, Any]:
+        """Show or hide a layer in the document.
+        Args:
+            doc_id: Target document.
+            layer_id: ID or description of the layer to toggle.
+            visible: True to show, False to hide (sets the 'active' parameter).
+        Returns: {layer_id, visible}.
+        """
+        return await backend.layer_set_visibility(doc_id=doc_id, layer_id=layer_id, visible=visible)
+
+    @tool_for("layer_set_blend", annotations=MUTATING)
+    async def layer_set_blend(
+        doc_id: str = "doc_0", layer_id: str = "", amount: float = 1.0, blend_method: int = 0
+    ) -> dict[str, Any]:
+        """Set a layer's opacity and composite blend mode.
+        Args:
+            doc_id: Target document.
+            layer_id: ID or description of the layer.
+            amount: Opacity from 0.0 (transparent) to 1.0 (opaque).
+            blend_method: Composite mode enum (0 = composite/normal, 1 = straight, 13 = add, etc.).
+        Returns: {layer_id, amount, blend_method}.
+        """
+        return await backend.layer_set_blend(
+            doc_id=doc_id, layer_id=layer_id, amount=amount, blend_method=blend_method
+        )
+
+    @tool_for("layer_align", annotations=MUTATING)
+    async def layer_align(
+        doc_id: str = "doc_0", layer_ids: list[str] | None = None, edge: str = "center"
+    ) -> dict[str, Any]:
+        """Align multiple layers along an edge or distribute them evenly.
+        Args:
+            doc_id: Target document.
+            layer_ids: List of layer IDs to align (minimum 2 layers required).
+            edge: Alignment edge: 'left', 'right', 'top', 'bottom', 'center_h', 'center_v', or 'center'.
+        Returns: {edge, layers_aligned: int}.
+        """
+        return await backend.layer_align(doc_id=doc_id, layer_ids=layer_ids or [], edge=edge)
+
     # -----------------------------------------------------------------------
     # Cut-out Characters & Storyboards (Phase A4)
     # -----------------------------------------------------------------------
@@ -1193,6 +1358,64 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
             tip_width=tip_width,
             parent_index=parent_index,
         )
+
+    @tool_for("rig_sheet_from_image", annotations=MUTATING)
+    async def rig_sheet_from_image(
+        image_base64: str | None = None,
+        file_path: str | None = None,
+        names: dict[str, str] | None = None,
+        output_dir: str | None = None,
+        filename: str = "reference",
+        mime_type: str | None = None,
+        min_area: int | None = None,
+        merge_gap: int = 6,
+        bg_tolerance: int = 28,
+        reconstruct: bool = True,
+        preview: bool = True,
+    ) -> dict[str, Any]:
+        """Ingest an uploaded image (MCP ImageContent base64, or a local path) and slice it into rig parts.
+        Give exactly one of image_base64 / file_path. The image is hardened (magic-byte check, 16MP
+        cap, EXIF stripped) and written into an authorized directory, then sliced like rig_sheet_slice.
+        Args:
+            image_base64: The data field of an ImageContent block (raw base64 or a data: URL).
+            file_path: A local image the server may already read (alternative to image_base64).
+            names: Optional {part number -> name} mapping from the numbered preview, e.g. {"1": "head"}.
+            output_dir: Directory for the PNGs and manifest (defaults to the first granted root).
+            filename: Base name for the written sheet when image_base64 is used.
+            mime_type: Declared mime type of the uploaded block (informational).
+            reconstruct: Best-effort occlusion fill of enclosed gaps in each part.
+        Returns: {sheet, parts: [{index, name, file, bbox, role, parent, pivot, z, transparency,
+            confidence}], manifest, rig_compatibility, reconstruction, requires_approval, preview_base64}.
+        Gotcha: Look at preview_base64 first, then call again with names to label the parts by body role.
+        """
+        from synfig_mcp.characters.image_input import (
+            require_authorized_output_dir,
+            resolve_image_input,
+        )
+        from synfig_mcp.characters.sheet import slice_rig_sheet
+
+        target_dir = require_authorized_output_dir(output_dir)
+        resolved = resolve_image_input(
+            target_dir,
+            image_base64=image_base64,
+            file_path=file_path,
+            filename=filename,
+            mime_type=mime_type,
+        )
+        parts_dir = Path(resolved["path"]).parent / f"{Path(resolved['path']).stem}_parts"
+        res = slice_rig_sheet(
+            Path(resolved["path"]),
+            parts_dir,
+            names=names,
+            min_area=min_area,
+            merge_gap=merge_gap,
+            bg_tolerance=bg_tolerance,
+            reconstruct=reconstruct,
+            preview=preview,
+            source=str(resolved["source"]),
+        )
+        res["ingested"] = resolved
+        return wrap_untrusted(res)
 
     @tool_for("rig_sheet_slice", annotations=IDEMPOTENT)
     async def rig_sheet_slice(
@@ -1332,10 +1555,474 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         return wrap_untrusted(res)
 
     # -----------------------------------------------------------------------
+    # Anime Production Pipeline (Step 0-5)
+    # -----------------------------------------------------------------------
+
+    @tool_for("produce_anime_project", annotations=MUTATING)
+    async def produce_anime_project(
+        brief: dict[str, Any],
+        dry_run: bool = False,
+        stages: list[str] | None = None,
+        resume_from: str | None = None,
+        resume: bool = True,
+    ) -> dict[str, Any]:
+        """Build a whole anime-style project from one brief: storyboard, rigged characters,
+        assets, assembled scene, style stack, render and review.
+
+        brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
+        assets[], background, camera[], transitions[], audio[], render{}, output_dir,
+        save_path}. Call synfig_help('production') for the full brief shape, styles and
+        motion names. transitions[] are {type: 'fade'|'dissolve', time, duration}; audio[]
+        are {file, time, volume} sound cues.
+        Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
+        Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
+        and the render/review stages report "skipped". A run writes pipeline_state.json into the
+        output directory; re-running the same brief (resume=True) reopens the saved document and
+        continues from where it stopped instead of rebuilding. Pass resume=False for a clean run.
+        """
+        from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+        report = await AnimeProductionPipeline(backend=backend).run(
+            brief, dry_run=dry_run, stages=stages, resume_from=resume_from, resume=resume
+        )
+        return wrap_untrusted(report.model_dump())
+
+    @tool_for("production_plan", annotations=READ_ONLY)
+    async def production_plan(brief: dict[str, Any]) -> dict[str, Any]:
+        """Dry-run the production pipeline: report the stages and layer counts without building.
+
+        brief: same shape as produce_anime_project (see synfig_help('production')).
+        Returns: the ProductionReport for the dry run; no document is created.
+        """
+        from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+        report = await AnimeProductionPipeline(backend=backend).run(brief, dry_run=True)
+        return wrap_untrusted(report.model_dump())
+
+    @tool_for("story_bible", annotations=READ_ONLY)
+    async def story_bible(brief: dict[str, Any]) -> dict[str, Any]:
+        """Derive the continuity story bible (characters, locations, props, scenes, timeline)
+        and the screenplay view for a brief, without building anything.
+
+        brief: same shape as produce_anime_project. A 'story' already in the brief is validated
+        and returned unchanged; otherwise the server derives a structural bible from the brief's
+        own shots/characters/assets.
+        Returns: {authored, bible, screenplay, issues[]}; 'issues' lists continuity problems
+        (unknown ids, timeline drift), empty when consistent.
+        Honesty: the server has no LLM, so a derived bible is a structural summary, not creative
+        writing. To author one, call this tool, edit 'bible', and pass it back as
+        ProductionBrief.story; the pipeline validates and consumes it.
+        """
+        from synfig_mcp.production.models import ProductionBrief
+        from synfig_mcp.production.story import (
+            build_screenplay,
+            compile_story,
+            validate_story,
+        )
+
+        validated = ProductionBrief.model_validate(brief)
+        bible = compile_story(validated)
+        issues = validate_story(validated, bible)
+        screenplay = build_screenplay(validated, bible)
+        return wrap_untrusted(
+            {
+                "authored": bible.authored,
+                "bible": bible.model_dump(),
+                "screenplay": screenplay.model_dump(),
+                "issues": issues,
+            }
+        )
+
+    @tool_for("character_model_sheet", annotations=MUTATING)
+    async def character_model_sheet(
+        descriptor: dict[str, Any],
+        style: str = "shonen_action",
+        width: int = 1280,
+        height: int = 720,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Auto-generate a labeled model/rig sheet (front, three-quarter, side) for one character.
+
+        descriptor: {id, archetype: humanoid|chibi, height, palette, facing, position, z}.
+        Returns: {success, sheet_doc_id, sheet_group, views, layers}.
+        Gotcha: the sheet is vector cut-out geometry, not a re-drawn turnaround.
+        """
+        from synfig_mcp.production.models import CharacterDescriptor, ProductionBrief
+        from synfig_mcp.production.pipeline import AnimeProductionPipeline
+
+        pipeline = AnimeProductionPipeline(backend=backend)
+        brief = ProductionBrief(
+            title=str(descriptor.get("id", "character")),
+            style=style,
+            width=width,
+            height=height,
+        )
+        result = await pipeline.model_sheet(
+            CharacterDescriptor.model_validate(descriptor), brief, dry_run=dry_run
+        )
+        return wrap_untrusted(result)
+
+    @tool_for("procedural_asset_list", annotations=READ_ONLY)
+    async def procedural_asset_list() -> dict[str, Any]:
+        """List the built-in procedural asset generators (offline, IP-safe).
+
+        Returns: {background: [...], prop: [...], texture: [...]} to pass as
+        asset "procedural": {generator: <name>}.
+        """
+        from synfig_mcp.production.asset_generator import AssetGenerator
+
+        return wrap_untrusted(AssetGenerator.list_generators())
+
+    @tool_for("procedural_asset_generate", annotations=MUTATING)
+    async def procedural_asset_generate(
+        doc_id: str,
+        kind: str = "prop",
+        generator: str = "tree",
+        seed: int = 0,
+        position: dict[str, float] | None = None,
+        height: float | None = None,
+        style: str | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Generate one procedural vector asset and add it to a document.
+
+        kind: background | prop | texture; generator: see procedural_asset_list.
+        position/height are canvas pixels (props only). Returns: {success, created, dry_run}.
+        """
+        from synfig_mcp.production.asset_generator import AssetGenerator
+
+        generator_engine = AssetGenerator(style=style)
+        frame = await _document_frame(backend, doc_id)
+        if kind == "background":
+            layers = generator_engine.background(generator, frame, seed=seed)
+        elif kind == "texture":
+            layers = generator_engine.texture(generator, frame, seed=seed)
+        else:
+            left, top, right, bottom = frame
+            x_px = float(position["x"]) if position and "x" in position else (right - left) / 2
+            y_px = (
+                float(position["y"])
+                if position and "y" in position
+                else bottom + abs(top - bottom) * 0.2
+            )
+            info = await backend.doc_info(doc_id)
+            width_px = info.width if info else 1280
+            height_px = info.height if info else 720
+            ux = left + (right - left) * (x_px / max(1, width_px))
+            uy = top + (bottom - top) * (y_px / max(1, height_px))
+            size = abs(top - bottom) * ((height or height_px * 0.2) / max(1, height_px))
+            layers = generator_engine.prop(generator, (ux, uy), size, seed=seed)
+        if dry_run:
+            return wrap_untrusted(
+                {
+                    "success": True,
+                    "dry_run": True,
+                    "generator": generator,
+                    "kind": kind,
+                    "layers": [layer["id"] for layer in layers],
+                }
+            )
+        res = await backend.scene_build(spec={"doc_id": doc_id, "layers": layers})
+        return wrap_untrusted(
+            {
+                "success": res.get("success", True),
+                "generator": generator,
+                "kind": kind,
+                "created": res.get("diff", {}).get("created", []),
+                "dry_run": False,
+            }
+        )
+
+    @tool_for("sprite_slice", annotations=IDEMPOTENT)
+    async def sprite_slice(
+        source: str,
+        output_dir: str,
+        strategy: str = "alpha",
+        rows: int = 1,
+        cols: int = 1,
+        rectangles: list[dict[str, Any]] | None = None,
+        bg_tolerance: int = 28,
+        padding: int = 2,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Slice a sprite sheet or layered raster into named, rig-ready transparent part PNGs.
+
+        strategy: grid (rows x cols), alpha (connected components) or trim (tight alpha boxes);
+        pass rectangles [{name, x, y, width, height}] for exact control.
+        Returns: {success, detected_parts, parts: [{name, file, bbox}], output_dir}.
+        """
+        from pathlib import Path
+
+        from synfig_mcp.production.slicer import PartSlicer
+
+        if dry_run:
+            return wrap_untrusted(
+                {"success": True, "dry_run": True, "source": source, "output_dir": output_dir}
+            )
+        slicer = PartSlicer(Path(output_dir))
+        result = slicer.slice(
+            source,
+            strategy=strategy,  # type: ignore[arg-type]
+            rows=rows,
+            cols=cols,
+            rectangles=rectangles,
+            bg_tolerance=bg_tolerance,
+            padding=padding,
+        )
+        return wrap_untrusted(result)
+
+    # -----------------------------------------------------------------------
+    # Capability Registry & Meta-Tools
+    # -----------------------------------------------------------------------
+
+    def _capabilities() -> CapabilityRegistry:
+        return CapabilityRegistry(build_capabilities(mcp))
+
+    def _workflow_runner() -> WorkflowRunner:
+        state_dir = Path(tempfile.gettempdir()) / "synfig_mcp_workflows"
+        return WorkflowRunner(_capabilities(), mcp, state_dir)
+
+    @tool_for("capability_search", annotations=READ_ONLY)
+    async def capability_search(
+        query: str, domain: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        """Search the capability registry (server tools + bridge methods) by keyword.
+        Args:
+            query: Free-text query, e.g. 'render', 'bone', 'layer add'.
+            domain: Optional domain filter, e.g. 'rendering', 'animation', 'layer_operations'.
+            limit: Maximum results (default 20).
+        Returns: {count, capabilities: [{id, domain, summary, required, permission}]}.
+        Gotcha: Prefer this over reading all tool schemas; then call capability_inspect for the one you need.
+        """
+        caps = _capabilities().search(query, domain=domain, limit=limit)
+        registry = _capabilities()
+        return {"count": len(caps), "capabilities": [registry.compact(c) for c in caps]}
+
+    @tool_for("capability_list", annotations=READ_ONLY)
+    async def capability_list(domain: str | None = None) -> dict[str, Any]:
+        """List every capability, optionally filtered to one domain, as compact summaries.
+        Returns: {count, domains: [...], capabilities: [{id, domain, summary, required, permission}]}.
+        Gotcha: The full surface is large; use capability_search when you already know roughly what you want.
+        """
+        registry = _capabilities()
+        caps = [c for c in registry.all() if domain is None or c.domain == domain]
+        domains = sorted({c.domain for c in registry.all()})
+        return {
+            "count": len(caps),
+            "domains": domains,
+            "capabilities": [registry.compact(c) for c in caps],
+        }
+
+    @tool_for("capability_inspect", annotations=READ_ONLY)
+    async def capability_inspect(capability_id: str) -> dict[str, Any]:
+        """Return the full descriptor (params, schemas, permission, error codes, undo, verification) for one capability.
+        Args:
+            capability_id: The capability id, e.g. 'render_frame' or a bridge method like 'rig.bone_add'.
+        Returns: The complete Capability object, or {error} if unknown.
+        """
+        cap = _capabilities().get(capability_id)
+        if cap is None:
+            return {
+                "error": f"Unknown capability '{capability_id}'",
+                "hint": "Try capability_search.",
+            }
+        return cap.model_dump()
+
+    @tool_for("capability_validate", annotations=READ_ONLY)
+    async def capability_validate(capability_id: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Validate arguments against a capability's input schema without executing it.
+        Args:
+            capability_id: The capability id to validate against.
+            args: The arguments you intend to pass.
+        Returns: {valid, missing, unexpected, error?}.
+        Gotcha: Cheap pre-flight check to avoid a failed capability_execute round-trip.
+        """
+        cap = _capabilities().get(capability_id)
+        if cap is None:
+            return {"valid": False, "error": f"Unknown capability '{capability_id}'"}
+        props = cap.input_schema.get("properties", {})
+        missing = [p for p in cap.required_params if p not in args]
+        unexpected = [p for p in args if props and p not in props]
+        return {
+            "valid": not missing and not unexpected,
+            "missing": missing,
+            "unexpected": unexpected,
+        }
+
+    @tool_for("capability_execute", annotations=MUTATING)
+    async def capability_execute(
+        capability_id: str, args: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Invoke any registered capability by id with keyword arguments (the compact alternative to per-tool calls).
+        Args:
+            capability_id: The capability id to run, e.g. 'doc_new'.
+            args: Keyword arguments for the capability (see capability_inspect).
+        Returns: {capability, result} on success.
+        Gotcha: Only server tools (kind 'tool') are executable; bridge methods are introspected, not dispatched here.
+        """
+        from synfig_mcp.capabilities import _call_result_to_data
+
+        if capability_id not in _TOOL_FUNCTIONS:
+            return {
+                "error": f"Capability '{capability_id}' is not executable",
+                "hint": "Use capability_search.",
+            }
+        result = await mcp.call_tool(capability_id, args or {})
+        return {"capability": capability_id, "result": _call_result_to_data(result)}
+
+    @tool_for("capability_batch_execute", annotations=MUTATING)
+    async def capability_batch_execute(
+        operations: list[dict[str, Any]], stop_on_error: bool = True
+    ) -> dict[str, Any]:
+        """Run several capabilities in sequence, stopping early on the first failure unless disabled.
+        Args:
+            operations: List of {capability, args} objects.
+            stop_on_error: Stop at the first error (default True).
+        Returns: {completed, failed, results: [{capability, ok, result|error}]}.
+        Gotcha: Steps share no implicit state; thread ids through explicitly.
+        """
+        from synfig_mcp.capabilities import _call_result_to_data
+
+        results: list[dict[str, Any]] = []
+        for op in operations:
+            name = op.get("capability", "")
+            if name not in _TOOL_FUNCTIONS:
+                results.append({"capability": name, "ok": False, "error": "not executable"})
+                if stop_on_error:
+                    break
+                continue
+            try:
+                out = await mcp.call_tool(name, op.get("args") or {})
+                results.append(
+                    {"capability": name, "ok": True, "result": _call_result_to_data(out)}
+                )
+            except Exception as exc:  # noqa: BLE001 - surfaced to the caller
+                results.append({"capability": name, "ok": False, "error": str(exc)})
+                if stop_on_error:
+                    break
+        failed = [r for r in results if not r["ok"]]
+        return {"completed": len(results) - len(failed), "failed": len(failed), "results": results}
+
+    @tool_for("capability_discover", annotations=READ_ONLY)
+    async def capability_discover() -> dict[str, Any]:
+        """Report what the server can currently do: live backend, domains, counts, and ready-made workflows.
+        Returns: {backend, domains, tool_count, protocol_count, workflows: [{id, name, description}]}.
+        Gotcha: Call this first in a fresh session to see the real (honest) surface before planning.
+        """
+        from synfig_mcp.capabilities import BUILTIN_WORKFLOWS
+
+        registry = _capabilities()
+        caps = registry.all()
+        status = await backend.health_check()
+        return {
+            "backend": status.model_dump().get("backend", "unknown"),
+            "domains": sorted({c.domain for c in caps}),
+            "tool_count": sum(1 for c in caps if c.kind == "tool"),
+            "protocol_count": sum(1 for c in caps if c.kind == "protocol"),
+            "workflows": [w.model_dump() for w in BUILTIN_WORKFLOWS],
+        }
+
+    @tool_for("capability_load_profile", annotations=MUTATING)
+    async def capability_load_profile(profile: str) -> dict[str, Any]:
+        """Register additional tools for a profile at runtime, on top of those already active.
+        Args:
+            profile: One of core, anim, fx, rig, assets, review, all.
+        Returns: {profile, added: [...], already_active: [...], active_count}.
+        Gotcha: Loading 'all' exposes the full surface and raises the tools/list token cost.
+        """
+        if profile not in ("core", "anim", "fx", "rig", "assets", "review", "all"):
+            return {"error": f"Unknown profile '{profile}'"}
+        added, already = [], []
+        for name, (fn, annotations) in _TOOL_FUNCTIONS.items():
+            allowed = TOOL_PROFILES.get(name, {"all"})
+            wanted = profile == "all" or profile in allowed
+            if not wanted:
+                continue
+            if mcp._tool_manager.get_tool(name) is None:
+                mcp.tool(name=name, annotations=annotations)(fn)
+                added.append(name)
+            else:
+                already.append(name)
+        return {
+            "profile": profile,
+            "added": added,
+            "already_active": already,
+            "active_count": len(mcp._tool_manager.list_tools()),
+        }
+
+    @tool_for("capability_unload_profile", annotations=MUTATING)
+    async def capability_unload_profile(profile: str) -> dict[str, Any]:
+        """Unregister tools that belong to a profile, shrinking the active surface.
+        Args:
+            profile: One of core, anim, fx, rig, assets, review, all.
+        Returns: {profile, removed: [...], active_count}.
+        Gotcha: Never removes the capability_* meta-tools themselves.
+        """
+        if profile not in ("core", "anim", "fx", "rig", "assets", "review", "all"):
+            return {"error": f"Unknown profile '{profile}'"}
+        removed = []
+        for name in list(_TOOL_FUNCTIONS):
+            if name.startswith("capability_"):
+                continue
+            allowed = TOOL_PROFILES.get(name, {"all"})
+            in_profile = profile == "all" or profile in allowed
+            if in_profile and mcp._tool_manager.get_tool(name) is not None:
+                mcp.remove_tool(name)
+                removed.append(name)
+        return {
+            "profile": profile,
+            "removed": removed,
+            "active_count": len(mcp._tool_manager.list_tools()),
+        }
+
+    @tool_for("capability_workflow_execute", annotations=MUTATING)
+    async def capability_workflow_execute(
+        workflow_id: str, run_id: str | None = None
+    ) -> dict[str, Any]:
+        """Run a built-in multi-step workflow by id (see capability_discover for the list).
+        Args:
+            workflow_id: The workflow id, e.g. 'new_document' or 'build_scene'.
+            run_id: Optional run id for later resume (defaults to the workflow id).
+        Returns: {status, run_id, context, results} or a failure with the failing step.
+        """
+        from synfig_mcp.capabilities import BUILTIN_WORKFLOWS
+
+        workflow = next((w for w in BUILTIN_WORKFLOWS if w.id == workflow_id), None)
+        if workflow is None:
+            return {"error": f"Unknown workflow '{workflow_id}'"}
+        return await _workflow_runner().execute(workflow, run_id=run_id)
+
+    @tool_for("capability_workflow_resume", annotations=MUTATING)
+    async def capability_workflow_resume(run_id: str) -> dict[str, Any]:
+        """Resume a previously failed workflow run from its last saved step.
+        Args:
+            run_id: The run id returned by capability_workflow_execute.
+        Returns: {status, run_id, context, results}.
+        Gotcha: Requires that the earlier run persisted state (it does on any failure).
+        """
+        return await _workflow_runner().resume(run_id)
+
+    async def _document_frame(
+        backend: BackendBase, doc_id: str
+    ) -> tuple[float, float, float, float]:
+        from synfig_mcp.characters.cutout import CanvasFrame
+
+        info = await backend.doc_info(doc_id)
+        view_box = await backend.doc_view_box(doc_id)
+        width = info.width if info else 1280
+        height = info.height if info else 720
+        frame = CanvasFrame.for_document(width, height, view_box, coords="pixels")
+        return (
+            frame.left,
+            frame.top,
+            frame.right,
+            frame.bottom,
+        )  # -----------------------------------------------------------------------
+
     # Production orchestration
     # -----------------------------------------------------------------------
 
-    def _production_workspace(root: str | None, slug: str):
+    def _production_workspace(root: str | None, slug: str) -> Any:
         from synfig_mcp.config import settings
         from synfig_mcp.production.workspace import ProductionWorkspace
         from synfig_mcp.security.sandbox import get_default_allowed_roots, validate_path

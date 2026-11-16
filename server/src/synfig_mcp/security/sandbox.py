@@ -17,8 +17,10 @@ and forced users to copy files around.  It is now a thin validation layer over
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
+import tempfile
 from pathlib import Path
 
 from synfig_mcp.errors import SecuritySandboxError
@@ -37,6 +39,7 @@ __all__ = [
     "get_path_mappings",
     "is_overly_broad_root",
     "resolve_client_path",
+    "safe_write_bytes",
     "validate_path",
 ]
 
@@ -127,12 +130,26 @@ def _check_denied(resolved: Path, allowed_extensions: set[str] | None) -> None:
         )
 
 
+def _require_writable(resolved_target: Path, original: Path | str) -> None:
+    """Raise unless the grant covering ``resolved_target`` is writable."""
+    from synfig_mcp.security.permissions import permissions
+
+    for grant in permissions.grants():
+        if resolved_target == grant.path or grant.path in resolved_target.parents:
+            if not grant.write:
+                raise SecuritySandboxError(
+                    f"Write to '{original}' is denied: the grant for '{grant.path}' is read-only."
+                )
+            return
+
+
 def validate_path(
     target_path: Path | str,
     allowed_roots: list[Path] | None = None,
     allowed_extensions: set[str] | None = None,
     must_exist: bool = False,
     user_intent: bool = False,
+    for_write: bool = False,
 ) -> Path:
     """Validate a file path under the project-aware access policy.
 
@@ -141,6 +158,9 @@ def validate_path(
     copying them anywhere, unless a link redirect or a denied location is
     involved.  ``allowed_roots``, when given explicitly, remains a hard
     constraint for callers that need one.
+
+    ``for_write=True`` additionally checks that any matching grant allows
+    writes (read-only grants are rejected).
     """
     path_text = str(target_path).replace("\\", "/")
     if any(part == ".." for part in path_text.split("/")):
@@ -153,9 +173,9 @@ def validate_path(
     if allowed_extensions is not None:
         extension = resolved_target.suffix.lower()
         if extension not in {ext.lower() for ext in allowed_extensions}:
-            allowed = ", ".join(sorted(allowed_extensions))
+            allowed_exts = ", ".join(sorted(allowed_extensions))
             raise SecuritySandboxError(
-                f"File extension '{extension or '<none>'}' is not permitted; allowed: {allowed}"
+                f"File extension '{extension or '<none>'}' is not permitted; allowed: {allowed_exts}"
             )
 
     _check_denied(resolved_target, allowed_extensions)
@@ -167,22 +187,27 @@ def validate_path(
                 f"Path '{target_path}' denied: outside the explicitly requested roots"
             )
     else:
+        default_roots = get_default_allowed_roots()
         controller = get_access_controller()
         allowed, _reason = controller.is_allowed(resolved_target)
         if not allowed and user_intent and not has_link_redirect(Path(os.path.abspath(path_text))):
             controller.register_attachment(resolved_target)
             allowed = True
         if not allowed:
-            temp_root = get_temp_root()
-            allowed = resolved_target == temp_root or temp_root in resolved_target.parents
+            allowed = any(
+                resolved_target == r or r in resolved_target.parents for r in default_roots
+            )
         if not allowed:
             folder = resolved_target.parent
             raise SecuritySandboxError(
-                f"Path '{target_path}' is not yet authorised for Synfig MCP. "
+                f"Path '{target_path}' is denied by the workspace permission model. "
                 f"It is outside the active Synfig project and no approval covers '{folder}'. "
                 f'Approve the folder once with access_approve(folder="{folder}"), '
                 "or open/import the file in Synfig Studio. No manual copying is required."
             )
+
+    if for_write:
+        _require_writable(resolved_target, target_path)
 
     if must_exist and not resolved_target.exists():
         raise FileNotFoundError(
@@ -190,3 +215,32 @@ def validate_path(
         )
 
     return resolved_target
+
+
+def safe_write_bytes(target: Path | str, data: bytes, *, backup: bool = True) -> None:
+    """Atomically write *data* to *target*, optionally keeping a ``.bak`` copy.
+
+    * Creates parent directories as needed.
+    * Writes to a hidden temp file in the same directory, then uses
+      ``os.replace`` for an atomic swap — a crash mid-write leaves no
+      truncated file behind.
+    * When *backup* is True (the default) and *target* already exists, the
+      old content is preserved as ``<target>.bak`` before being replaced.
+    """
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if backup and target.exists():
+        bak = target.with_suffix(target.suffix + ".bak")
+        bak.write_bytes(target.read_bytes())
+
+    fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), prefix=f".{target.name}.")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, target)
+    except Exception:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise

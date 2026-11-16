@@ -24,8 +24,8 @@ from mcp.types import TextContent
 from synfig_mcp.backend.headless import HeadlessBackend
 from synfig_mcp.backend.live import LiveBackend
 from synfig_mcp.protocol.client import BridgeClient
-from tests.support.fake_bridge import FakeBridgeServer
 from synfig_mcp.server import create_server
+from tests.support.fake_bridge import FakeBridgeServer
 from tests.support.rig_assets import PART_NAMES, make_assets, scene_spec
 
 

@@ -384,8 +384,8 @@ class FakeBridgeServer:
 
         if method == "project.assets":
             doc_id = params.get("doc_id") or next(iter(self._fake_docs), "doc_0")
-            doc = self._fake_docs.get(doc_id)
-            file_path = doc.get("file_path") if doc else None
+            doc = self._fake_docs.get(doc_id, {})
+            file_path = doc.get("file_path")
             project_dir = str(Path(file_path).parent) if file_path else None
             return {
                 "jsonrpc": "2.0",
