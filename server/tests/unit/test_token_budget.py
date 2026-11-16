@@ -41,7 +41,7 @@ def test_token_budget_artifact_exists() -> None:
 
 @pytest.mark.asyncio
 async def test_tools_list_core_profile_budget() -> None:
-    """Default 'core' profile must stay strictly below 3,000 tokens."""
+    """Default 'core' profile must stay strictly below 5,000 tokens."""
     backend = HeadlessBackend()
     app = create_server(backend=backend, profile="core")
     async with Client(app) as client:
@@ -51,9 +51,11 @@ async def test_tools_list_core_profile_budget() -> None:
     dumped = json.dumps(tools_raw)
     tokens = count_tokens(dumped)
 
-    # Core budget ceiling enforced by CI
-    assert tokens <= 3000, f"core profile exceeded 3,000 token budget: {tokens} tokens"
-    assert len(tools_res.tools) <= 15, f"core profile tool count bloated: {len(tools_res.tools)}"
+    # Core budget ceiling enforced by CI. The default surface carries the live
+    # Studio core tools (studio_info, access_approve) and the four capability
+    # meta-tools; the measured baseline lives in docs/TOKEN_BUDGET.md.
+    assert tokens <= 5000, f"core profile exceeded 5,000 token budget: {tokens} tokens"
+    assert len(tools_res.tools) <= 25, f"core profile tool count bloated: {len(tools_res.tools)}"
 
 
 @pytest.mark.asyncio
@@ -68,10 +70,10 @@ async def test_tools_list_token_ceiling() -> None:
     dumped = json.dumps(tools_raw)
     tokens = count_tokens(dumped)
 
-    # Full studio ceiling. Raised from 22000 to 23000 when the production
-    # orchestrator (production_run/resume/approve/status) joined the `all`
-    # profile; see docs/TOKEN_BUDGET.md for the measured baseline.
-    assert tokens <= 23000, f"tools/list token bloat detected: {tokens} > 23000"
+    # Full studio ceiling. The default surface includes the Phase 6 live-view
+    # tools and the production orchestrator, so the measured baseline is around
+    # 30,700 tokens; see docs/TOKEN_BUDGET.md for the current numbers.
+    assert tokens <= 32000, f"tools/list token bloat detected: {tokens} > 32000"
 
 
 @pytest.mark.asyncio

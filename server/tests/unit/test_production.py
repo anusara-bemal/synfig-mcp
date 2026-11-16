@@ -216,16 +216,50 @@ async def test_orchestrator_end_to_end(tmp_path: Path, headless_backend: Headles
     result = await orch.run(brief, max_attempts=1)
 
     assert result["failed"] == 0, result
-    assert result["done"] == result["tasks"]
-    assert result["status"] == "previewed"
     assert ws.shot_file("sh010").is_file()
-    assert (ws.render_dir("sh010") / "preview.png").is_file()
     assert (ws.reports_dir / "production-report.md").is_file()
     assert (ws.reports_dir / "production-report.json").is_file()
     manifest = ws.read_manifest()
-    assert manifest.status == "previewed"
     assert manifest.project_file and Path(manifest.project_file).is_file()
     assert manifest.versions  # master + shot layout recorded
+
+    preview = {t["id"]: t for t in result["task_states"]}["shot:sh010:preview"]
+    if headless_backend.runner.is_available:
+        assert result["done"] == result["tasks"]
+        assert result["status"] == "previewed"
+        assert manifest.status == "previewed"
+        assert (ws.render_dir("sh010") / "preview.png").is_file()
+    else:
+        # Without the Synfig engine the document is still built, and the render
+        # task reports an explicit skip instead of a fake preview or a failure.
+        assert result["status"] == "built"
+        assert manifest.status == "built"
+        assert preview["status"] == TaskStatus.SKIPPED.value
+        assert "No Synfig engine" in (preview["error"] or "")
+        assert not (ws.render_dir("sh010") / "preview.png").exists()
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_skips_renders_without_engine(
+    tmp_path: Path, headless_backend: HeadlessBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without a Synfig engine the build still completes and says what it skipped."""
+    monkeypatch.setattr(
+        "synfig_mcp.cli.runner.CliRunner.is_available", property(lambda _self: False)
+    )
+    brief = _brief()
+    ws = ProductionWorkspace.create(brief, tmp_path)
+    orch = ProductionOrchestrator(headless_backend, ws)
+
+    result = await orch.run(brief, max_attempts=1)
+
+    assert result["failed"] == 0, result
+    assert result["status"] == "built"
+    states = {t["id"]: t for t in result["task_states"]}
+    assert states["shot:sh010:preview"]["status"] == TaskStatus.SKIPPED.value
+    assert "No Synfig engine" in (states["shot:sh010:preview"]["error"] or "")
+    assert not (ws.render_dir("sh010") / "preview.png").exists()
+    assert ws.read_manifest().status == "built"
 
 
 @pytest.mark.asyncio
@@ -249,7 +283,8 @@ async def test_orchestrator_checkpoint_approve_resume(
     resumed = ProductionOrchestrator(headless_backend, ws)
     second = await resumed.resume(max_attempts=1)
     assert second["failed"] == 0, second
-    assert second["status"] == "previewed"
+    expected = "previewed" if headless_backend.runner.is_available else "built"
+    assert second["status"] == expected
     assert ws.shot_file("sh010").is_file()
 
 
@@ -340,12 +375,16 @@ async def test_orchestrator_rigged_character_render_final(
     result = await orch.run(brief, max_attempts=1)
 
     assert result["failed"] == 0, result
-    assert result["status"] == "rendered"
     manifest = ws.read_manifest()
     assert {a.id for a in manifest.assets} == {"character:hero:torso", "character:hero:head"}
     assert all(a.sha256 for a in manifest.assets)
     finals = list((ws.render_dir("sh010") / "final").glob("*.png"))
-    assert len(finals) >= 6
+    if headless_backend.runner.is_available:
+        assert result["status"] == "rendered"
+        assert len(finals) >= 6
+    else:
+        assert result["status"] == "built"
+        assert finals == []
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +422,8 @@ async def test_production_tools_dry_run_run_status(
 
         run = _tool_data(await client.call_tool("production_run", {"brief": brief}))
         assert run["failed"] == 0, run
-        assert run["status"] == "previewed"
+        expected = "previewed" if headless_backend.runner.is_available else "built"
+        assert run["status"] == expected
         assert Path(run["project_dir"]).is_dir()
 
         status = _tool_data(
@@ -391,8 +431,12 @@ async def test_production_tools_dry_run_run_status(
                 "production_status", {"slug": run["project"], "root": str(tmp_path)}
             )
         )
-        assert status["status"] == "previewed"
-        assert status["tasks"] and all(t["status"] == "done" for t in status["tasks"])
+        assert status["status"] == expected
+        statuses = {t["id"]: t["status"] for t in status["tasks"]}
+        assert statuses.pop("shot:sh010:preview") == (
+            "done" if headless_backend.runner.is_available else "skipped"
+        )
+        assert statuses and all(s == "done" for s in statuses.values())
         assert status["versions"]
 
 
@@ -421,4 +465,6 @@ async def test_production_tools_checkpoint_flow(
 
         resumed = _tool_data(await client.call_tool("production_resume", args))
         assert resumed["failed"] == 0, resumed
-        assert resumed["status"] == "previewed"
+        assert resumed["status"] == (
+            "previewed" if headless_backend.runner.is_available else "built"
+        )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Measure token baseline for synfig-mcp:
-1. tools/list per profile (current 52 tools + projected Phase A1 profiles)
+1. tools/list per profile (core, anim, fx, rig, assets, review, all)
 2. Response sizes and token counts for 15 most common tool calls
 3. Vision model image tokens per preview resolution
 Outputs docs/TOKEN_BUDGET.md.
@@ -267,13 +267,13 @@ async def main() -> None:
     ]
 
     ceilings = {
-        "core": 3000,
+        "core": 5000,
         "anim": 4500,
         "fx": 4500,
         "rig": 3000,
         "assets": 2000,
         "review": 4000,
-        "all": 16000,
+        "all": 32000,
     }
 
     for stat in profile_stats:
@@ -285,6 +285,12 @@ async def main() -> None:
         )
 
     md_lines.extend([
+        "",
+        "> [!NOTE]",
+        "> The CI gate (`server/tests/unit/test_token_budget.py`) enforces **5,000** tokens for",
+        "> `core` and **32,000** tokens for `all`.  The `core` surface carries the live-Studio",
+        "> tools (`studio_info`, `access_approve`) and the four capability meta-tools, so the",
+        "> earlier 3,000-token target no longer reflects the shipped surface.",
         "",
         "---",
         "",

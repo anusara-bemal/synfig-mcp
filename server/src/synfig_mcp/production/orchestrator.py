@@ -44,6 +44,15 @@ from synfig_mcp.security.sandbox import validate_path
 STATE_FILE = "state.json"
 MASTER_FILE = "project.sif"
 
+#: Task kinds that need a real renderer (the Synfig engine, not just the SIF writer).
+RENDER_TASK_KINDS: tuple[str, ...] = ("render_preview", "render_final")
+
+#: Why render tasks are skipped when the backend has no engine on PATH.
+NO_ENGINE_REASON = (
+    "No Synfig engine was found on PATH, so the frames were skipped. "
+    "Install Synfig or point SYNFIG_BIN at the CLI and run the production again."
+)
+
 
 class ProductionOrchestrator:
     """Executes a production plan against a Synfig backend."""
@@ -113,6 +122,14 @@ class ProductionOrchestrator:
 
     # -- execution -----------------------------------------------------------
 
+    async def _render_available(self) -> bool:
+        """Whether the backend can render frames (needs the Synfig engine)."""
+        try:
+            health = await self.backend.health_check()
+        except Exception:  # noqa: BLE001 - an unknown backend is assumed capable
+            return True
+        return bool(health.details.get("cli_available", True))
+
     async def _execute(
         self,
         brief: ProductionBrief,
@@ -124,9 +141,31 @@ class ProductionOrchestrator:
         """Execute the pending tasks of a plan."""
         shot_docs: dict[str, str] = dict(state.get("shot_docs", {}))
         awaiting: list[str] = []
+        render_available = await self._render_available()
+        state["render_available"] = render_available
 
         for task in order_tasks(plan):
             if task.status in (TaskStatus.DONE, TaskStatus.SKIPPED):
+                # A render that was skipped for a missing engine runs once the
+                # engine appears (install Synfig, then resume the production).
+                if (
+                    task.status == TaskStatus.SKIPPED
+                    and task.kind in RENDER_TASK_KINDS
+                    and task.error == NO_ENGINE_REASON
+                    and render_available
+                ):
+                    task.status = TaskStatus.PENDING
+                    task.error = None
+                else:
+                    continue
+            if task.kind in RENDER_TASK_KINDS and not render_available:
+                # No Synfig engine means no frames: report the skip instead of a
+                # failed render so a headless client can still finish the build.
+                task.status = TaskStatus.SKIPPED
+                task.error = NO_ENGINE_REASON
+                self.workspace.log_event(
+                    {"event": "task.skipped", "task": task.id, "reason": NO_ENGINE_REASON}
+                )
                 continue
             if any(
                 (dep_task := plan.task(dep)) is not None and dep_task.status == TaskStatus.FAILED
@@ -773,7 +812,15 @@ class ProductionOrchestrator:
                 entry["sha256"] = ProductionWorkspace.sha256_of(shot_file)
             shots.append(entry)
         manifest.shots = shots
-        manifest.status = "rendered" if brief.render_final else "previewed"
+        render_skipped = any(
+            t.kind in RENDER_TASK_KINDS and t.status == TaskStatus.SKIPPED for t in plan.tasks
+        )
+        if render_skipped:
+            # The document is built and saved, but nothing was rendered: say so
+            # instead of claiming a preview/final that does not exist on disk.
+            manifest.status = "built"
+        else:
+            manifest.status = "rendered" if brief.render_final else "previewed"
         self.workspace.write_manifest(manifest)
         return {"shots": len(shots), "status": manifest.status}
 

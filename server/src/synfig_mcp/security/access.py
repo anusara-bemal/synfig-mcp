@@ -32,6 +32,11 @@ from synfig_mcp.logging import get_logger
 logger = get_logger("synfig_mcp.security.access")
 
 #: Directory names that hold credentials or private keys; never importable.
+#:
+#: Names must be specific enough not to collide with ordinary folders: a bare
+#: ``private`` is deliberately *not* here, because macOS keeps every temporary
+#: directory under ``/private/var/folders`` and projects commonly use a
+#: ``private/`` folder for non-secret files.
 DENIED_DIR_NAMES = {
     ".ssh",
     ".aws",
@@ -40,7 +45,6 @@ DENIED_DIR_NAMES = {
     ".kube",
     ".docker",
     "credentials",
-    "private",
     "privatekeys",
     "private_keys",
     "secret",
@@ -127,8 +131,10 @@ def is_system_path(resolved: Path) -> bool:
     text = _norm(resolved)
     # Clients may send Windows paths to a non-Windows server (for example
     # through a container).  Reject those virtual system locations before
-    # relative-path resolution can turn them into workspace paths.
-    windows_text = text
+    # relative-path resolution can turn them into workspace paths.  The check
+    # is case-insensitive because the drive letter arrives as sent ("C:/...")
+    # and the bridge lower-cases the same path before matching.
+    windows_text = text.casefold()
     drive_prefix = re.search(r"(?:^|/)([a-z]):/(.*)$", windows_text)
     if drive_prefix:
         windows_root = drive_prefix.group(2)

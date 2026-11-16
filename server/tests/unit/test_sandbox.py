@@ -145,6 +145,27 @@ def test_system_and_credential_paths_denied(tmp_path: Path) -> None:
         validate_path(creds, user_intent=True)
 
 
+def test_windows_system_path_denied_case_insensitively() -> None:
+    """A Windows path sent to a POSIX server is still recognised as a system path.
+
+    ``C:/Windows/...`` is resolved against the POSIX cwd, so the drive letter
+    survives only inside the path text; the check must not depend on the client
+    lower-casing it.
+    """
+    resolved = Path("/home/runner/work/synfig-mcp/synfig-mcp/C:/Windows/System32/hosts.sif")
+    assert access_mod.is_system_path(resolved)
+    assert access_mod.is_system_path(Path("/srv/C:/Program Files/Tool/x.sif"))
+    assert access_mod.is_system_path(Path("/srv/projects/C:/Users/artist/scene.sif")) is False
+
+
+def test_macos_private_temp_is_not_a_credential_location(tmp_path: Path) -> None:
+    """macOS keeps temp directories under /private, which is not a credential dir."""
+    private_tmp = Path("/private/var/folders/ab/cdef/T/pytest-of-runner/pytest-0/test_asset")
+    assert access_mod.is_credentials_path(private_tmp) is False
+    assert access_mod.is_credentials_path(private_tmp / ".ssh" / "id_rsa") is True
+    assert access_mod.is_credentials_path(tmp_path / "private_keys" / "key.txt") is True
+
+
 def test_overly_broad_roots_rejected() -> None:
     controller = access_mod.get_access_controller()
     with pytest.raises(SecuritySandboxError):

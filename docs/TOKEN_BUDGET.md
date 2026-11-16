@@ -6,37 +6,31 @@
 
 ## 1. `tools/list` Token Budget & Profile Ceilings
 
-- **Default Profile (`all`)**: 81 tools, 75,641 bytes, **20,479 tokens** (`cl100k_base`).
-- **Minimal Profile (`core`)**: 13 tools, 11,262 bytes, **2,984 tokens** (`cl100k_base`).
+- **Default Profile (`all`)**: 121 tools, 114,463 bytes, **30,723 tokens** (`cl100k_base`).
+- **Minimal Profile (`core`)**: 22 tools, 17,215 bytes, **4,553 tokens** (`cl100k_base`).
 
 > [!NOTE]
 > The server ships with the complete `all` profile enabled by default. Clients with a
 > tight context budget can switch to `core`, which reduces the initial system prompt payload
-> from **20,479 tokens** to **2,984 tokens**.
+> from **30,723 tokens** to **4,553 tokens**.
 
 ### Profile Allocations & Measured Counts
 
 | Profile (`SYNFIG_MCP_PROFILE`) | Tool Count | Measured Tokens (`cl100k`) | Measured Tokens (`o200k`) | Status vs Ceiling |
 |---|---|---|---|---|
-| `core` | 13 | **2,984** | 2,991 | ✅ Pass (< 3000) |
-| `anim` | 21 | **5,158** | 5,164 | ❌ Exceeds (4500) |
-| `fx` | 25 | **5,900** | 5,907 | ❌ Exceeds (4500) |
-| `rig` | 23 | **5,493** | 5,504 | ❌ Exceeds (3000) |
-| `assets` | 12 | **2,682** | 2,687 | ❌ Exceeds (2000) |
-| `review` | 18 | **4,904** | 4,915 | ❌ Exceeds (4000) |
-| `all` | 81 | **20,479** | 20,503 | ❌ Exceeds (16000) |
+| `core` | 22 | **4,553** | 4,574 | ✅ Pass (< 5000) |
+| `anim` | 29 | **6,742** | 6,763 | ❌ Exceeds (4500) |
+| `fx` | 39 | **9,155** | 9,181 | ❌ Exceeds (4500) |
+| `rig` | 40 | **10,427** | 10,462 | ❌ Exceeds (3000) |
+| `assets` | 29 | **7,075** | 7,091 | ❌ Exceeds (2000) |
+| `review` | 26 | **6,266** | 6,290 | ❌ Exceeds (4000) |
+| `all` | 121 | **30,723** | 30,796 | ✅ Pass (< 32000) |
 
-### Baseline update — production orchestrator (v1.0.0)
-
-The `all` profile now exposes **93 tools** at **22,634 tokens** (`cl100k_base`),
-after the production orchestrator added `production_run`, `production_resume`,
-`production_approve` and `production_status` (~967 tokens combined). Their full
-brief schema lives in `synfig_help('production')`, not the tool docstrings.
-
-- The `all` CI ceiling was raised **22,000 → 23,000** to accommodate this
-  deliberate feature addition (`test_tools_list_token_ceiling`).
-- The `core` profile is **unchanged**: 15 tools, **2,880 tokens** (< 3,000), so
-  tight-context clients pay nothing for the orchestrator.
+> [!NOTE]
+> The CI gate (`server/tests/unit/test_token_budget.py`) enforces **5,000** tokens for
+> `core` and **32,000** tokens for `all`.  The `core` surface carries the live-Studio
+> tools (`studio_info`, `access_approve`) and the four capability meta-tools, so the
+> earlier 3,000-token target no longer reflects the shipped surface.
 
 ---
 
@@ -47,20 +41,20 @@ Measured against real server output in headless mode:
 | Tool Invocation | Response Chars | `cl100k_base` Tokens | `o200k_base` Tokens | Token Budget Ceiling |
 |---|---|---|---|---|
 | `health_check()` | 298 | **96** | 97 | < 200 |
-| `doc_new(160x120)` | 193 | **82** | 82 | < 200 |
-| `doc_list()` | 389 | **120** | 120 | < 240 |
-| `layer_add(circle)` | 251 | **83** | 83 | < 200 |
-| `scene_tree()` | 1228 | **361** | 361 | < 722 |
-| `doc_info()` | 389 | **120** | 120 | < 240 |
-| `param_set(radius=2.5)` | 325 | **116** | 116 | < 232 |
+| `doc_new(160x120)` | 193 | **83** | 83 | < 200 |
+| `doc_list()` | 389 | **121** | 121 | < 242 |
+| `layer_add(circle)` | 251 | **84** | 84 | < 200 |
+| `scene_tree()` | 1228 | **362** | 362 | < 724 |
+| `doc_info()` | 389 | **121** | 121 | < 242 |
+| `param_set(radius=2.5)` | 325 | **117** | 117 | < 234 |
 | `param_get(radius)` | 232 | **56** | 56 | < 200 |
 | `anim_time_set(1.5s)` | 17 | **11** | 11 | < 200 |
 | `anim_time_get()` | 17 | **11** | 11 | < 200 |
 | `anim_keyframe_list()` | 0 | **0** | 0 | < 200 |
 | `history_undo()` | 21 | **8** | 8 | < 200 |
-| `render_frame(160x120)` | 138 | **53** | 53 | < 200 |
+| `render_frame(160x120)` | 138 | **55** | 55 | < 200 |
 | `schema_list_layers()` | 11 | **2** | 2 | < 200 |
-| `schema_get_layer(circle)` | 1683 | **454** | 453 | < 908 |
+| `schema_get_layer(circle)` | 2709 | **720** | 720 | < 1440 |
 
 ---
 
@@ -92,21 +86,21 @@ Vision model consumption per single preview or contact-sheet image:
 
 | Tool Name | Schema Size (chars) | `cl100k_base` Tokens | `o200k_base` Tokens | Optimization Target in A1 |
 |---|---|---|---|---|
-| `render_sequence` | 1,544 | **445** | 445 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `canvas_set_properties` | 1,468 | **413** | 413 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `doc_set_properties` | 1,380 | **405** | 405 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `rig_bone_add` | 1,300 | **392** | 392 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_start` | 1,351 | **390** | 390 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_contact_sheet` | 1,332 | **380** | 380 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_video` | 1,298 | **377** | 377 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `rig_sheet_from_image` | 2,773 | **736** | 738 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `produce_anime_project` | 1,978 | **504** | 504 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `rig_sheet_slice` | 1,576 | **431** | 432 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_sequence` | 1,443 | **427** | 427 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `sprite_slice` | 1,493 | **420** | 421 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `view_set` | 1,377 | **403** | 403 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `canvas_set_properties` | 1,381 | **393** | 393 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `character_motion_apply` | 1,391 | **393** | 394 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `procedural_asset_generate` | 1,396 | **392** | 389 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `doc_set_properties` | 1,315 | **389** | 389 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `rig_bone_add` | 1,173 | **365** | 365 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_start` | 1,221 | **360** | 360 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_contact_sheet` | 1,231 | **359** | 359 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
+| `render_video` | 1,149 | **340** | 340 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 | `anim_waypoint_set` | 1,228 | **338** | 336 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `render_frame` | 1,174 | **335** | 336 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `layer_add` | 1,195 | **332** | 332 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `review_compare` | 1,152 | **328** | 330 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `review_frame` | 1,126 | **324** | 324 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `review_sequence` | 1,139 | **319** | 319 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `param_convert` | 1,133 | **312** | 314 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
-| `recipe_apply` | 1,147 | **309** | 310 | Move detailed guidance to synfig://guide/ and trim enum descriptions |
 
 ---
 

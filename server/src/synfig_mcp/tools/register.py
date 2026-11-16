@@ -2045,6 +2045,8 @@ def register_all_tools(mcp: MCPServer, backend: BackendBase, profile: str | None
         checkpoints pause until production_approve; state is saved after every task so
         production_resume can continue. dry_run=true returns the plan without touching anything.
         Full brief schema: synfig_help('production'). Returns status, task_states, awaiting_approval.
+        Without a Synfig engine the build completes and render tasks are reported as skipped
+        (status 'built'); install Synfig and resume to render.
         """
         from synfig_mcp.config import settings
         from synfig_mcp.production.models import ProductionBrief

@@ -2035,6 +2035,10 @@ production_resume can continue. dry_run=true returns the plan without touching a
 
 Full brief schema: synfig_help('production'). Returns status, task_states, awaiting_approval.
 
+Without a Synfig engine the build completes and render tasks are reported as skipped
+
+(status 'built'); install Synfig and resume to render.
+
 #### Parameters
 
 | Name | Type | Required | Description |

@@ -21,13 +21,13 @@ GUIDE_TOPICS: dict[str, str] = {
     "profiles": """# Synfig MCP Tool Profiles
 
 Control tool footprint using environment variable `SYNFIG_MCP_PROFILE`:
-- `all` (default): The complete suite - all 93 tools: documents, canvases, scene
+- `all` (default): The complete suite - all 121 tools: documents, canvases, scene
   building, layers, parameters and value nodes, animation, selection, history,
   effect recipes, style presets, character rigging, storyboards, production
   orchestration, licensed assets, rendering (frame, sequence, video, contact
   sheet, async jobs), visual review and schema introspection.
 - `core`: Minimal set for document lifecycle, declarative build, inspection, undo
-  (< 3,000 tokens).
+  (< 5,000 tokens).
 - `anim`: Waypoint and keyframe animation tools, time controls, interpolation modes.
 - `fx`: Layer filters, composites, parameter conversions, and recipes.
 - `rig`: Cut-out character assembly, bone skeletons, valuenode exports and linking.
