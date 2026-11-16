@@ -333,9 +333,9 @@ class QualityControl:
             )
 
         rgb = rgba.convert("RGB")
-        if all(lo == hi for lo, hi in rgb.getextrema()):
+        if all(lo == hi for lo, hi in rgb.getextrema()):  # type: ignore[no-untyped-call]
             issues.append(_issue("frame.blank", f"The render '{path}' is a single flat colour."))
-        alpha_lo, alpha_hi = rgba.getchannel("A").getextrema()
+        alpha_lo, alpha_hi = rgba.getchannel("A").getextrema()  # type: ignore[no-untyped-call]
         if alpha_hi == 0:
             issues.append(_issue("alpha.broken", f"The render '{path}' is completely transparent."))
         elif alpha_lo == 255:

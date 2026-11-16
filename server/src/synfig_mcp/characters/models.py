@@ -84,7 +84,7 @@ class StoryboardShot(BaseModel):
     """Single scene/shot within an animatic storyboard."""
 
     shot_id: str = Field(description="Shot identifier (e.g. 'shot_01', 'shot_02').")
-    description: str = Field(description="Action and narrative description.")
+    description: str = Field(default="", description="Action and narrative description.")
     duration_seconds: float = Field(default=2.0, description="Duration of this shot in seconds.")
     camera_movement: str = Field(
         default="static",
@@ -94,6 +94,14 @@ class StoryboardShot(BaseModel):
         default_factory=list, description="Characters involved in this shot."
     )
     dialogue: str = Field(default="", description="Dialogue or audio cue.")
+
+    @property
+    def id(self) -> str:
+        return self.shot_id
+
+    @property
+    def duration(self) -> float:
+        return self.duration_seconds
 
 
 class StoryboardSpec(BaseModel):

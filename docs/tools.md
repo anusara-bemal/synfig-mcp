@@ -1,6 +1,6 @@
 # Synfig MCP Tool Reference
 
-> Complete typed reference for all 93 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
+> Complete typed reference for all 121 Model Context Protocol (MCP) tools provided by the `synfig-mcp` server.
 > Each tool includes typed input schemas, execution semantics, and LLM-targeted guidance.
 
 > Generated from the live tool registry by `scripts/generate_tool_docs.py`.
@@ -9,16 +9,16 @@
 
 - [Animation & Keyframes](#animation-keyframes) (10 tools)
 - [Canvas & Scene](#canvas-scene) (10 tools)
-- [Character Rigging](#character-rigging) (3 tools)
+- [Character Rigging](#character-rigging) (4 tools)
 - [Core & Diagnostics](#core-diagnostics) (2 tools)
 - [Document Management](#document-management) (8 tools)
 - [Effect Recipes](#effect-recipes) (3 tools)
 - [History & Undo](#history-undo) (3 tools)
-- [Layer Manipulation](#layer-manipulation) (9 tools)
+- [Layer Manipulation](#layer-manipulation) (12 tools)
 - [Licensed Assets](#licensed-assets) (4 tools)
-- [Other](#other) (8 tools)
+- [Other](#other) (31 tools)
 - [Parameters & ValueNodes](#parameters-valuenodes) (7 tools)
-- [Production Orchestration](#production-orchestration) (4 tools)
+- [Production Orchestration](#production-orchestration) (5 tools)
 - [Render & Preview](#render-preview) (8 tools)
 - [Schema & Introspection](#schema-introspection) (5 tools)
 - [Selection](#selection) (2 tools)
@@ -26,7 +26,7 @@
 - [Style Presets](#style-presets) (3 tools)
 - [Visual Review](#visual-review) (3 tools)
 
-**Total: 93 tools.**
+**Total: 121 tools.**
 
 ## Animation & Keyframes
 
@@ -493,6 +493,30 @@ count, animated layers, skipped joints. Character must come from character_rig_f
 
 ---
 
+### `character_model_sheet`
+
+*Profiles: all, rig*
+
+Auto-generate a labeled model/rig sheet (front, three-quarter, side) for one character.
+
+descriptor: {id, archetype: humanoid|chibi, height, palette, facing, position, z}.
+
+Returns: {success, sheet_doc_id, sheet_group, views, layers}.
+
+Gotcha: the sheet is vector cut-out geometry, not a re-drawn turnaround.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `descriptor` | `object` | Yes | - |
+| `style` | `string` | No | - |
+| `width` | `integer` | No | - |
+| `height` | `integer` | No | - |
+| `dry_run` | `boolean` | No | - |
+
+---
+
 ## Core & Diagnostics
 
 ### `synfig_help`
@@ -943,6 +967,87 @@ Gotcha: Verify document ID before invoking.
 
 ---
 
+### `layer_set_visibility`
+
+*Profiles: all, fx*
+
+Show or hide a layer in the document.
+
+Args:
+
+doc_id: Target document.
+
+layer_id: ID or description of the layer to toggle.
+
+visible: True to show, False to hide (sets the 'active' parameter).
+
+Returns: {layer_id, visible}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_id` | `string` | No | - |
+| `visible` | `boolean` | No | - |
+
+---
+
+### `layer_set_blend`
+
+*Profiles: all, fx*
+
+Set a layer's opacity and composite blend mode.
+
+Args:
+
+doc_id: Target document.
+
+layer_id: ID or description of the layer.
+
+amount: Opacity from 0.0 (transparent) to 1.0 (opaque).
+
+blend_method: Composite mode enum (0 = composite/normal, 1 = straight, 13 = add, etc.).
+
+Returns: {layer_id, amount, blend_method}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_id` | `string` | No | - |
+| `amount` | `number` | No | - |
+| `blend_method` | `integer` | No | - |
+
+---
+
+### `layer_align`
+
+*Profiles: all, fx*
+
+Align multiple layers along an edge or distribute them evenly.
+
+Args:
+
+doc_id: Target document.
+
+layer_ids: List of layer IDs to align (minimum 2 layers required).
+
+edge: Alignment edge: 'left', 'right', 'top', 'bottom', 'center_h', 'center_v', or 'center'.
+
+Returns: {edge, layers_aligned: int}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `layer_ids` | `any` | No | - |
+| `edge` | `string` | No | - |
+
+---
+
 ## Licensed Assets
 
 ### `asset_search`
@@ -1058,6 +1163,70 @@ Returns: 'backend', 'studio_version', 'docs' [{doc_id, name, file_path}].
 
 ---
 
+### `permission_list`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+List the directory roots the user has granted the server read/write access to.
+
+Returns: Object with 'roots' (each: path, read, write, source) and 'default' (the fallback project dir).
+
+Gotcha: A path must be inside one of these roots for any file tool to accept it; grant more with permission_grant.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `permission_grant`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Grant the server access to a directory root for this session (the user authorizes a folder).
+
+Args:
+
+path: Absolute or relative path to a directory (or a file inside it) to authorize.
+
+read: Allow reading from the root (default True).
+
+write: Allow creating/overwriting files under the root (default True).
+
+Returns: The resulting grant (path, read, write, source).
+
+Gotcha: The path must exist. Granting a drive root, system folder or the user home root directly is rejected as overly broad.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `path` | `string` | Yes | - |
+| `read` | `boolean` | No | - |
+| `write` | `boolean` | No | - |
+
+---
+
+### `permission_revoke`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Revoke a previously granted directory root.
+
+Args:
+
+path: The directory root to remove from the grant list.
+
+Returns: Object with 'revoked' (bool) and the path.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `path` | `string` | Yes | - |
+
+---
+
 ### `access_approve`
 
 *Profiles: all, assets, core*
@@ -1117,6 +1286,83 @@ Returns: 'registered', 'project_dir', 'file_path', asset counts.
 
 ---
 
+### `view_get`
+
+*Profiles: all, fx*
+
+Read the live canvas viewport (zoom and pan focus).
+
+Returns: {zoom, focus: {x, y}, gui}. gui is false in headless mode.
+
+Gotcha: Only a running Studio reports a real zoom; headless returns a nominal 1.0.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+
+---
+
+### `view_set`
+
+*Profiles: all, fx*
+
+Drive the live Studio viewport so the artist sees the same frame as the model.
+
+Args:
+
+doc_id: Target document.
+
+mode: 'in', 'out', 'fit', or 'normal'. Use zoom for an exact value.
+
+zoom: Explicit zoom factor (1.0 = 100%). Wins over mode.
+
+x: Pan focus X in Synfig units (pans when given).
+
+y: Pan focus Y in Synfig units.
+
+Returns: {zoom, focus: {x, y}, gui}.
+
+Gotcha: Requires a live Studio backend; the headless engine has no viewport.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `mode` | `any` | No | - |
+| `zoom` | `any` | No | - |
+| `x` | `any` | No | - |
+| `y` | `any` | No | - |
+
+---
+
+### `studio_events`
+
+*Profiles: all, fx*
+
+Poll recent Studio notifications (manual artist edits) and the state version.
+
+Args:
+
+doc_id: Only return events for this document.
+
+limit: Maximum number of most-recent events to return.
+
+Returns: {events: [{method, params, state_version}], state_version, doc_id}.
+
+Gotcha: Compare state_version across calls to detect external changes; headless reports 'headless'.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | No | - |
+| `limit` | `integer` | No | - |
+
+---
+
 ### `rig_bone_add`
 
 *Profiles: all, rig*
@@ -1136,6 +1382,56 @@ Add a bone to a skeleton layer (cut-out rigging). Returns the created bone and d
 | `width` | `number` | No | - |
 | `tip_width` | `number` | No | - |
 | `parent_index` | `integer` | No | - |
+
+---
+
+### `rig_sheet_from_image`
+
+*Profiles: all, assets, rig*
+
+Ingest an uploaded image (MCP ImageContent base64, or a local path) and slice it into rig parts.
+
+Give exactly one of image_base64 / file_path. The image is hardened (magic-byte check, 16MP
+
+cap, EXIF stripped) and written into an authorized directory, then sliced like rig_sheet_slice.
+
+Args:
+
+image_base64: The data field of an ImageContent block (raw base64 or a data: URL).
+
+file_path: A local image the server may already read (alternative to image_base64).
+
+names: Optional {part number -> name} mapping from the numbered preview, e.g. {"1": "head"}.
+
+output_dir: Directory for the PNGs and manifest (defaults to the first granted root).
+
+filename: Base name for the written sheet when image_base64 is used.
+
+mime_type: Declared mime type of the uploaded block (informational).
+
+reconstruct: Best-effort occlusion fill of enclosed gaps in each part.
+
+Returns: {sheet, parts: [{index, name, file, bbox, role, parent, pivot, z, transparency,
+
+confidence}], manifest, rig_compatibility, reconstruction, requires_approval, preview_base64}.
+
+Gotcha: Look at preview_base64 first, then call again with names to label the parts by body role.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `image_base64` | `any` | No | - |
+| `file_path` | `any` | No | - |
+| `names` | `any` | No | - |
+| `output_dir` | `any` | No | - |
+| `filename` | `string` | No | - |
+| `mime_type` | `any` | No | - |
+| `min_area` | `any` | No | - |
+| `merge_gap` | `integer` | No | - |
+| `bg_tolerance` | `integer` | No | - |
+| `reconstruct` | `boolean` | No | - |
+| `preview` | `boolean` | No | - |
 
 ---
 
@@ -1164,6 +1460,393 @@ parts by body role (head, torso, upper_arm_l, ...) so rigs auto-assemble. See sy
 | `merge_gap` | `integer` | No | - |
 | `bg_tolerance` | `integer` | No | - |
 | `preview` | `boolean` | No | - |
+
+---
+
+### `produce_anime_project`
+
+*Profiles: all*
+
+Build a whole anime-style project from one brief: storyboard, rigged characters,
+
+assets, assembled scene, style stack, render and review.
+
+brief: {title, style, width, height, fps, duration, seed, shots[], characters[],
+
+assets[], background, camera[], transitions[], audio[], render{}, output_dir,
+
+save_path}. Call synfig_help('production') for the full brief shape, styles and
+
+motion names. transitions[] are {type: 'fade'|'dissolve', time, duration}; audio[]
+
+are {file, time, volume} sound cues.
+
+Returns: {success, doc_id, total_shots, duration_seconds, stages[], artifacts, warnings}.
+
+Gotcha: rendering needs the Synfig CLI on PATH; without it the document is still saved
+
+and the render/review stages report "skipped". A run writes pipeline_state.json into the
+
+output directory; re-running the same brief (resume=True) reopens the saved document and
+
+continues from where it stopped instead of rebuilding. Pass resume=False for a clean run.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+| `dry_run` | `boolean` | No | - |
+| `stages` | `any` | No | - |
+| `resume_from` | `any` | No | - |
+| `resume` | `boolean` | No | - |
+
+---
+
+### `story_bible`
+
+*Profiles: all*
+
+Derive the continuity story bible (characters, locations, props, scenes, timeline)
+
+and the screenplay view for a brief, without building anything.
+
+brief: same shape as produce_anime_project. A 'story' already in the brief is validated
+
+and returned unchanged; otherwise the server derives a structural bible from the brief's
+
+own shots/characters/assets.
+
+Returns: {authored, bible, screenplay, issues[]}; 'issues' lists continuity problems
+
+(unknown ids, timeline drift), empty when consistent.
+
+Honesty: the server has no LLM, so a derived bible is a structural summary, not creative
+
+writing. To author one, call this tool, edit 'bible', and pass it back as
+
+ProductionBrief.story; the pipeline validates and consumes it.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+
+---
+
+### `procedural_asset_list`
+
+*Profiles: all, assets*
+
+List the built-in procedural asset generators (offline, IP-safe).
+
+Returns: {background: [...], prop: [...], texture: [...]} to pass as
+
+asset "procedural": {generator: <name>}.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `procedural_asset_generate`
+
+*Profiles: all, assets*
+
+Generate one procedural vector asset and add it to a document.
+
+kind: background | prop | texture; generator: see procedural_asset_list.
+
+position/height are canvas pixels (props only). Returns: {success, created, dry_run}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `doc_id` | `string` | Yes | - |
+| `kind` | `string` | No | - |
+| `generator` | `string` | No | - |
+| `seed` | `integer` | No | - |
+| `position` | `any` | No | - |
+| `height` | `any` | No | - |
+| `style` | `any` | No | - |
+| `dry_run` | `boolean` | No | - |
+
+---
+
+### `sprite_slice`
+
+*Profiles: all, assets, rig*
+
+Slice a sprite sheet or layered raster into named, rig-ready transparent part PNGs.
+
+strategy: grid (rows x cols), alpha (connected components) or trim (tight alpha boxes);
+
+pass rectangles [{name, x, y, width, height}] for exact control.
+
+Returns: {success, detected_parts, parts: [{name, file, bbox}], output_dir}.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `source` | `string` | Yes | - |
+| `output_dir` | `string` | Yes | - |
+| `strategy` | `string` | No | - |
+| `rows` | `integer` | No | - |
+| `cols` | `integer` | No | - |
+| `rectangles` | `any` | No | - |
+| `bg_tolerance` | `integer` | No | - |
+| `padding` | `integer` | No | - |
+| `dry_run` | `boolean` | No | - |
+
+---
+
+### `capability_search`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Search the capability registry (server tools + bridge methods) by keyword.
+
+Args:
+
+query: Free-text query, e.g. 'render', 'bone', 'layer add'.
+
+domain: Optional domain filter, e.g. 'rendering', 'animation', 'layer_operations'.
+
+limit: Maximum results (default 20).
+
+Returns: {count, capabilities: [{id, domain, summary, required, permission}]}.
+
+Gotcha: Prefer this over reading all tool schemas; then call capability_inspect for the one you need.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `query` | `string` | Yes | - |
+| `domain` | `any` | No | - |
+| `limit` | `integer` | No | - |
+
+---
+
+### `capability_list`
+
+*Profiles: all*
+
+List every capability, optionally filtered to one domain, as compact summaries.
+
+Returns: {count, domains: [...], capabilities: [{id, domain, summary, required, permission}]}.
+
+Gotcha: The full surface is large; use capability_search when you already know roughly what you want.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `domain` | `any` | No | - |
+
+---
+
+### `capability_inspect`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Return the full descriptor (params, schemas, permission, error codes, undo, verification) for one capability.
+
+Args:
+
+capability_id: The capability id, e.g. 'render_frame' or a bridge method like 'rig.bone_add'.
+
+Returns: The complete Capability object, or {error} if unknown.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `capability_id` | `string` | Yes | - |
+
+---
+
+### `capability_validate`
+
+*Profiles: all*
+
+Validate arguments against a capability's input schema without executing it.
+
+Args:
+
+capability_id: The capability id to validate against.
+
+args: The arguments you intend to pass.
+
+Returns: {valid, missing, unexpected, error?}.
+
+Gotcha: Cheap pre-flight check to avoid a failed capability_execute round-trip.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `capability_id` | `string` | Yes | - |
+| `args` | `object` | Yes | - |
+
+---
+
+### `capability_execute`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Invoke any registered capability by id with keyword arguments (the compact alternative to per-tool calls).
+
+Args:
+
+capability_id: The capability id to run, e.g. 'doc_new'.
+
+args: Keyword arguments for the capability (see capability_inspect).
+
+Returns: {capability, result} on success.
+
+Gotcha: Only server tools (kind 'tool') are executable; bridge methods are introspected, not dispatched here.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `capability_id` | `string` | Yes | - |
+| `args` | `any` | No | - |
+
+---
+
+### `capability_batch_execute`
+
+*Profiles: all*
+
+Run several capabilities in sequence, stopping early on the first failure unless disabled.
+
+Args:
+
+operations: List of {capability, args} objects.
+
+stop_on_error: Stop at the first error (default True).
+
+Returns: {completed, failed, results: [{capability, ok, result|error}]}.
+
+Gotcha: Steps share no implicit state; thread ids through explicitly.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `operations` | `array` | Yes | - |
+| `stop_on_error` | `boolean` | No | - |
+
+---
+
+### `capability_discover`
+
+*Profiles: all, anim, assets, core, fx, review, rig*
+
+Report what the server can currently do: live backend, domains, counts, and ready-made workflows.
+
+Returns: {backend, domains, tool_count, protocol_count, workflows: [{id, name, description}]}.
+
+Gotcha: Call this first in a fresh session to see the real (honest) surface before planning.
+
+#### Parameters
+
+*No parameters required.*
+
+---
+
+### `capability_load_profile`
+
+*Profiles: all*
+
+Register additional tools for a profile at runtime, on top of those already active.
+
+Args:
+
+profile: One of core, anim, fx, rig, assets, review, all.
+
+Returns: {profile, added: [...], already_active: [...], active_count}.
+
+Gotcha: Loading 'all' exposes the full surface and raises the tools/list token cost.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `profile` | `string` | Yes | - |
+
+---
+
+### `capability_unload_profile`
+
+*Profiles: all*
+
+Unregister tools that belong to a profile, shrinking the active surface.
+
+Args:
+
+profile: One of core, anim, fx, rig, assets, review, all.
+
+Returns: {profile, removed: [...], active_count}.
+
+Gotcha: Never removes the capability_* meta-tools themselves.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `profile` | `string` | Yes | - |
+
+---
+
+### `capability_workflow_execute`
+
+*Profiles: all*
+
+Run a built-in multi-step workflow by id (see capability_discover for the list).
+
+Args:
+
+workflow_id: The workflow id, e.g. 'new_document' or 'build_scene'.
+
+run_id: Optional run id for later resume (defaults to the workflow id).
+
+Returns: {status, run_id, context, results} or a failure with the failing step.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `workflow_id` | `string` | Yes | - |
+| `run_id` | `any` | No | - |
+
+---
+
+### `capability_workflow_resume`
+
+*Profiles: all*
+
+Resume a previously failed workflow run from its last saved step.
+
+Args:
+
+run_id: The run id returned by capability_workflow_execute.
+
+Returns: {status, run_id, context, results}.
+
+Gotcha: Requires that the earlier run persisted state (it does on any failure).
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `run_id` | `string` | Yes | - |
 
 ---
 
@@ -1315,6 +1998,24 @@ Gotcha: Attempting to unexport a node that is still referenced by multiple activ
 ---
 
 ## Production Orchestration
+
+### `production_plan`
+
+*Profiles: all*
+
+Dry-run the production pipeline: report the stages and layer counts without building.
+
+brief: same shape as produce_anime_project (see synfig_help('production')).
+
+Returns: the ProductionReport for the dry run; no document is created.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `brief` | `object` | Yes | - |
+
+---
 
 ### `production_run`
 

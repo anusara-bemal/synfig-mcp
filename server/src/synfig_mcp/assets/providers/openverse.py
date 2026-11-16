@@ -56,11 +56,11 @@ class OpenverseAssetProvider(BaseAssetProvider):
             results.append(
                 {
                     "id": f"ov_{item.get('id', '')}",
-                    "title": item.get("title", "Untitled"),
-                    "creator": item.get("creator", "Unknown"),
+                    "title": item.get("title") or "Untitled",
+                    "creator": item.get("creator") or "Unknown",
                     "license": item.get("license", "unknown"),
                     "provider": self.name,
-                    "filesize": item.get("filesize", 0),
+                    "filesize": item.get("filesize") or 0,
                 }
             )
         return results
@@ -82,14 +82,14 @@ class OpenverseAssetProvider(BaseAssetProvider):
         return AssetMetadata(
             id=asset_id,
             provider=self.name,
-            title=data.get("title", "Untitled"),
-            creator=data.get("creator", "Unknown"),
-            license_code=data.get("license", "unknown"),
+            title=data.get("title") or "Untitled",
+            creator=data.get("creator") or "Unknown",
+            license_code=data.get("license") or "unknown",
             license_url=data.get("license_url", ""),
             attribution_text=data.get("attribution", ""),
             download_url=data.get("url", ""),
             thumbnail_url=data.get("thumbnail", None),
-            filesize_bytes=data.get("filesize", 0),
+            filesize_bytes=data.get("filesize") or 0,
             mature=bool(data.get("mature", False)),
         )
 

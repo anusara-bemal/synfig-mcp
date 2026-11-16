@@ -87,6 +87,9 @@ ignore = [
     "E501", # line too long (handled by formatter)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"src/synfig_mcp/production/orchestrator.py" = ["ARG002"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

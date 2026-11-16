@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
@@ -15,6 +16,8 @@ from synfig_mcp.backend.base import BackendBase
 from synfig_mcp.backend.select import get_backend
 from synfig_mcp.config import ProfileType
 from synfig_mcp.logging import configure_logging, get_logger
+from synfig_mcp.prompts import register_all_prompts
+from synfig_mcp.resources import register_all_resources
 from synfig_mcp.tools import register_all_tools
 
 configure_logging()
@@ -27,12 +30,110 @@ def create_server(
 ) -> MCPServer:
     """Create and configure the MCPServer instance with tools filtered by profile."""
     active_backend = backend or get_backend()
-    mcp_app = MCPServer("synfig-mcp")
+    mcp_app = MCPServer(
+        "synfig-mcp",
+        instructions=(
+            "Synfig Studio automation. Inspect the current document before editing, prefer "
+            "one-call scene_build over sequential calls, and verify visual results with "
+            "render_frame. See the synfig://index resource for guides and scene templates."
+        ),
+    )
     register_all_tools(mcp_app, active_backend, profile=profile)
+    register_all_prompts(mcp_app)
+    register_all_resources(mcp_app)
     return mcp_app
 
 
 mcp = create_server()
+
+
+def _load_brief(path: str) -> Any:
+    """Load and validate a ProductionBrief from a path or '-' (stdin).
+
+    Raises SystemExit(2) with a message on any read or validation error.
+    """
+    import json
+    from pathlib import Path
+
+    from synfig_mcp.production import ProductionBrief
+
+    if path == "-":
+        raw = sys.stdin.read()
+    else:
+        try:
+            raw = Path(path).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"Cannot read brief '{path}': {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
+    try:
+        return ProductionBrief.model_validate(json.loads(raw))
+    except (ValueError, json.JSONDecodeError) as exc:
+        print(f"Invalid brief: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+
+def _run_story(parsed: argparse.Namespace) -> int:
+    """Derive the story bible and screenplay for a brief and print them."""
+    import json
+
+    from synfig_mcp.production.story import build_screenplay, compile_story, validate_story
+
+    brief = _load_brief(parsed.brief)
+    bible = compile_story(brief)
+    issues = validate_story(brief, bible)
+    screenplay = build_screenplay(brief, bible)
+
+    if parsed.json:
+        print(
+            json.dumps(
+                {
+                    "authored": bible.authored,
+                    "bible": bible.model_dump(),
+                    "screenplay": screenplay.model_dump(),
+                    "issues": issues,
+                },
+                indent=2,
+                default=str,
+            )
+        )
+        return 0
+
+    source = "authored" if bible.authored else "derived from the brief"
+    print(f"{brief.title}  [{brief.style}]  bible {source}")
+    print(f"  logline: {bible.logline}")
+    print(f"  characters: {', '.join(c.id for c in bible.characters) or 'none'}")
+    print(
+        f"  scenes: {len(bible.scenes)}  shots: {screenplay.shot_count}  ({screenplay.total_duration:.2f}s)"
+    )
+    for issue in issues:
+        print(f"  issue: {issue}")
+    return 0
+
+
+def _run_produce(parsed: argparse.Namespace) -> int:
+    """Load a brief, run the production pipeline, and print the report."""
+    import asyncio
+    import json
+
+    from synfig_mcp.backend.select import get_backend
+    from synfig_mcp.production import AnimeProductionPipeline
+
+    brief = _load_brief(parsed.brief)
+
+    pipeline = AnimeProductionPipeline(backend=get_backend(), output_dir=parsed.output_dir)
+    report = asyncio.run(pipeline.run(brief, dry_run=parsed.dry_run, resume=not parsed.no_resume))
+
+    if parsed.json:
+        print(json.dumps(report.model_dump(), indent=2, default=str))
+    else:
+        print(f"{report.title}  [{report.style}]  success={report.success}")
+        for stage in report.stages:
+            print(f"  {stage.name:<12} {stage.status:<8} {stage.detail}")
+        for label, path in report.artifacts.items():
+            print(f"  {label}: {path}")
+        for warning in report.warnings:
+            print(f"  warning: {warning}")
+    return 0 if report.success else 1
 
 
 def main(args: list[str] | None = None) -> None:
@@ -51,6 +152,51 @@ def main(args: list[str] | None = None) -> None:
     # synfig-mcp usage-report
     subparsers.add_parser(
         "usage-report", help="Display token budget baseline and profile consumption metrics"
+    )
+
+    # synfig-mcp produce BRIEF.json
+    produce = subparsers.add_parser(
+        "produce",
+        help="Run the one-command anime production pipeline from a JSON brief",
+    )
+    produce.add_argument(
+        "brief",
+        help="Path to a JSON brief, or '-' to read the brief from standard input",
+    )
+    produce.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Plan the run and report the stages without building a document",
+    )
+    produce.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory for the .sif, video and contact sheet (default: <slug>_production)",
+    )
+    produce.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Ignore any pipeline_state.json and rebuild from scratch",
+    )
+    produce.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the full ProductionReport as JSON instead of a summary",
+    )
+
+    # synfig-mcp story BRIEF.json
+    story = subparsers.add_parser(
+        "story",
+        help="Derive the continuity story bible + screenplay for a brief (no build)",
+    )
+    story.add_argument(
+        "brief",
+        help="Path to a JSON brief, or '-' to read the brief from standard input",
+    )
+    story.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the bible, screenplay and issues as JSON instead of a summary",
     )
 
     # server options
@@ -106,6 +252,12 @@ def main(args: list[str] | None = None) -> None:
         else:
             print("Token budget documentation not found at docs/TOKEN_BUDGET.md")
         sys.exit(0)
+
+    if parsed.command == "produce":
+        sys.exit(_run_produce(parsed))
+
+    if parsed.command == "story":
+        sys.exit(_run_story(parsed))
 
     if parsed.transport == "streamable-http":
         from synfig_mcp.http_transport import run_http_server

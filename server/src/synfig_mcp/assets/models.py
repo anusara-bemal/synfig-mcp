@@ -5,8 +5,9 @@ Data models for the Licensed Asset Pipeline, Provenance Manifest, and License Po
 from __future__ import annotations
 
 import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class LicensePolicy(BaseModel):
@@ -90,6 +91,26 @@ class AssetMetadata(BaseModel):
         default="", description="Declared rights basis ('own', 'licensed', 'cc0', 'public-domain')."
     )
     mature: bool = Field(default=False, description="Whether asset is flagged as mature.")
+
+    @field_validator("creator", mode="before")
+    @classmethod
+    def _coerce_creator(cls, v: Any) -> str:
+        return v or "Unknown"
+
+    @field_validator("filesize_bytes", mode="before")
+    @classmethod
+    def _coerce_filesize(cls, v: Any) -> int:
+        return v or 0
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _coerce_title(cls, v: Any) -> str:
+        return v or "Untitled"
+
+    @field_validator("license_code", mode="before")
+    @classmethod
+    def _coerce_license(cls, v: Any) -> str:
+        return v or "unknown"
 
 
 class AssetManifest(BaseModel):

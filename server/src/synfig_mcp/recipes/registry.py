@@ -68,7 +68,7 @@ RECIPES: dict[str, RecipeManifest] = {
         name="impact_frame",
         category="action",
         description="Single-frame or two-frame visual shock with inverted silhouette or high-contrast flash.",
-        native_layers_used=["solid_color", "invert"],
+        native_layers_used=["solid_color", "inside_out"],
         parameters={
             "mode": RecipeParamDefinition(
                 name="mode",

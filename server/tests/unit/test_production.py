@@ -6,7 +6,9 @@ verified end-to-end run against the headless backend.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from PIL import Image
@@ -28,7 +30,7 @@ from synfig_mcp.security.access import AccessController
 
 
 @pytest.fixture(autouse=True)
-def isolated_access(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def isolated_access(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[AccessController]:
     """Fresh access controller per test; the production root is approved."""
     controller = AccessController(approvals_file=tmp_path / "approvals.json")
     monkeypatch.setattr(access_mod, "_controller", controller)
@@ -38,7 +40,7 @@ def isolated_access(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     access_mod.reset_access_controller()
 
 
-def _brief(**overrides) -> ProductionBrief:
+def _brief(**overrides: Any) -> ProductionBrief:
     data = {
         "title": "Unit Production",
         "width": 160,
@@ -351,14 +353,14 @@ async def test_orchestrator_rigged_character_render_final(
 # ---------------------------------------------------------------------------
 
 
-def _tool_data(res) -> dict:
+def _tool_data(res: Any) -> dict[str, Any]:
     import json
 
     from mcp.types import TextContent
 
     first = res.content[0] if res.content else None
     text = first.text if isinstance(first, TextContent) else ""
-    return json.loads(text)
+    return cast(dict[str, Any], json.loads(text))
 
 
 @pytest.mark.asyncio

@@ -43,8 +43,9 @@ def build_report(
         for t in plan.tasks
     ]
     task_counts: dict[str, int] = {}
-    for task in tasks:
-        task_counts[task["status"]] = task_counts.get(task["status"], 0) + 1
+    for t in plan.tasks:
+        s_val = t.status.value
+        task_counts[s_val] = task_counts.get(s_val, 0) + 1
 
     shots = [
         {
@@ -114,8 +115,8 @@ def build_report(
 
     if failures:
         lines.extend(["", "## Failures", ""])
-        for task in failures:
-            lines.append(f"* `{task.id}`: {task.error}")
+        for fail in failures:
+            lines.append(f"* `{fail.id}`: {fail.error}")
 
     if manifest.versions:
         lines.extend(

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -24,7 +25,7 @@ from synfig_mcp.security.sandbox import validate_path
 
 
 @pytest.fixture(autouse=True)
-def isolated_access(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def isolated_access(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[AccessController]:
     """Fresh access controller per test; approvals never touch the real home."""
     controller = AccessController(approvals_file=tmp_path / "approvals.json")
     monkeypatch.setattr(access_mod, "_controller", controller)
@@ -144,7 +145,7 @@ def test_system_and_credential_paths_denied(tmp_path: Path) -> None:
         validate_path(creds, user_intent=True)
 
 
-def test_overly_broad_roots_rejected(tmp_path: Path) -> None:
+def test_overly_broad_roots_rejected() -> None:
     controller = access_mod.get_access_controller()
     with pytest.raises(SecuritySandboxError):
         controller.approve_folder(Path.home())
