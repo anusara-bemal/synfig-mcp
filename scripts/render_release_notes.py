@@ -150,7 +150,7 @@ def render(tag: str, dist: Path) -> str:
         "",
         "## Documentation",
         "",
-        f"- [Quick start and client setup]({REPO_URL}#quick-start)",
+        f"- [Quick start and client setup]({REPO_URL}#installation)",
         f"- [Tools API]({REPO_URL}/blob/{tag}/docs/api.md)",
         f"- [Troubleshooting]({REPO_URL}/blob/{tag}/docs/troubleshooting.md)",
         f"- [Security policy]({REPO_URL}/blob/{tag}/SECURITY.md)",
